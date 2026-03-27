@@ -1,0 +1,13 @@
+export const K0P6 = 0.6000000238418579;
+export const K1 = 1;
+export const K1P5 = 1.5;
+export const K2 = 2;
+export const K4 = 4;
+export const K8 = 8;
+export const K20 = 20;
+export const K30 = 30;
+export const K40 = 40;
+export const K28 = 28;
+export const K56 = 56;
+export const KHALF = 0.5;
+export const K32768 = 32768;

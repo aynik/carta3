@@ -1,0 +1,71 @@
+{
+  "name": "carta3",
+  "version": "0.1.0",
+  "description": "JavaScript ATRAC3 and ATRAC3plus codecs (encoder + decoder)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./atrac3": {
+      "types": "./src/atrac3/index.d.ts",
+      "import": "./src/atrac3/index.js"
+    },
+    "./atrac3plus": {
+      "types": "./src/atrac3plus/index.d.ts",
+      "import": "./src/atrac3plus/index.js"
+    },
+    "./browser": {
+      "types": "./src/browser.d.ts",
+      "import": "./src/browser.js"
+    },
+    "./container": {
+      "types": "./src/container/index.d.ts",
+      "import": "./src/container/index.js"
+    },
+    "./container/node": {
+      "types": "./src/container/node.d.ts",
+      "import": "./src/container/node.js"
+    },
+    "./encoders": {
+      "types": "./src/encoders/index.d.ts",
+      "import": "./src/encoders/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src"
+  ],
+  "bin": {
+    "carta3": "src/cli.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
+  },
+  "keywords": [
+    "atrac3",
+    "atrac3plus",
+    "codec",
+    "audio"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "c8": "^10.1.2",
+    "esbuild": "^0.27.0",
+    "eslint": "^9.37.0",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2"
+  }
+}
