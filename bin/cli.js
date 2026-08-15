@@ -124,7 +124,7 @@ async function readPcmWaveMetadata(filePath) {
     let format = null
     let dataOffset = -1
     let dataBytes = -1
-    for (let offset = 12; offset + 8 <= size; ) {
+    for (let offset = 12; offset + 8 <= size;) {
       const chunkHeader = await readExactly(handle, 8, offset)
       const id = chunkHeader.toString('ascii', 0, 4)
       const declaredBytes = chunkHeader.readUInt32LE(4)

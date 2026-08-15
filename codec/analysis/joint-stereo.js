@@ -143,22 +143,18 @@ export function selectJointStereoRatios(state) {
       const rightEnergy = state.energies[stream].right
       let ratioOkay = false
       let ratio = 0
-      if (
-        !(
-          leftEnergy * lowerRatioBound >= rightEnergy ||
-          rightEnergy >= upperRatioBound * leftEnergy
-        )
-      ) {
+      if (!(
+        leftEnergy * lowerRatioBound >= rightEnergy ||
+        rightEnergy >= upperRatioBound * leftEnergy
+      )) {
         ratio =
           ((rightEnergy - leftEnergy) * ratioMappingScale) /
           (rightEnergy + leftEnergy)
         ratioOkay = true
-      } else if (
-        !(
-          lowerRatioBound * rightEnergy >= leftEnergy ||
-          leftEnergy >= upperRatioBound * rightEnergy
-        )
-      ) {
+      } else if (!(
+        lowerRatioBound * rightEnergy >= leftEnergy ||
+        leftEnergy >= upperRatioBound * rightEnergy
+      )) {
         ratio =
           ((leftEnergy - rightEnergy) * ratioMappingScale) /
           (leftEnergy + rightEnergy)

@@ -121,7 +121,7 @@ export function parseWave(input) {
   let fact = null
   let dataOffset = -1
   let dataBytes = 0
-  for (let offset = 12; offset + 8 <= input.length; ) {
+  for (let offset = 12; offset + 8 <= input.length;) {
     const id = readFourCc(input, offset)
     const size = view.getUint32(offset + 4, true)
     const payload = offset + 8
