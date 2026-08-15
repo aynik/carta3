@@ -1,7 +1,6 @@
 /** Carta3 Audio Codec - Gain-window reconstruction and application. */
 
 import { GainRecord } from '../coding/gain.js'
-import { GainScaleScratch } from '../state/encoder.js'
 import { float32FromBits, float32Multiply, float32ToBits } from '../utils.js'
 import {
   BAND_PART_FLOATS,
@@ -162,15 +161,10 @@ function applyRecordSteps(destination, record, endBias, add) {
  * @param {GainRecord} previous Prior-frame record for the same subband.
  * @param {GainRecord} current Current-frame record.
  * @param {Float32Array} output Destination gain envelope.
- * @param {Int32Array} [steps] Reusable 64-step intermediate storage.
+ * @param {Int32Array} steps Reusable 64-step intermediate storage.
  * @returns {number|null} First changed sample, or null for invalid syntax.
  */
-export function reconstructGainScale(
-  previous,
-  current,
-  output,
-  steps = new Int32Array(GAIN_STEP_COUNT)
-) {
+export function reconstructGainScale(previous, current, output, steps) {
   if (output.length < GAIN_SCALE_SAMPLES) {
     throw new RangeError('ATRAC3 gain scale requires 512 output samples')
   }
@@ -252,7 +246,7 @@ export function gainPairIsActive(previous, current) {
  * @param {GainRecord} [previous] Prior-frame gain record.
  * @param {GainRecord} [current] Current-frame gain record.
  * @param {Float32Array} [output] Destination 512-sample window.
- * @param {object} [scratch] Reusable gain-scale buffers.
+ * @param {GainScaleScratch} gainScaleScratch Reusable gain-scale buffers.
  * @returns {Float32Array|null} Reconstructed signal, or null for invalid syntax.
  */
 export function reconstructGainPairSignal(
@@ -261,7 +255,7 @@ export function reconstructGainPairSignal(
   previous = new GainRecord(),
   current = new GainRecord(),
   output = new Float32Array(GAIN_SCALE_SAMPLES),
-  scratch = new GainScaleScratch()
+  gainScaleScratch
 ) {
   if (input.length < 256 || overlap.length < 256 || output.length < 512) {
     throw new RangeError(
@@ -272,12 +266,16 @@ export function reconstructGainPairSignal(
   output.set(overlap.subarray(0, 256), 256)
   if (gainPairIsActive(previous, current)) {
     if (
-      reconstructGainScale(previous, current, scratch.scale, scratch.steps) ===
-      null
+      reconstructGainScale(
+        previous,
+        current,
+        gainScaleScratch.scale,
+        gainScaleScratch.steps
+      ) === null
     ) {
       return null
     }
-    applyGainScale(output, scratch.scale, 'divide')
+    applyGainScale(output, gainScaleScratch.scale, 'divide')
   }
   return output
 }
@@ -294,7 +292,7 @@ export function reconstructGainPairSignal(
  * @param {object[]} currentRecords Gain records selected for this frame.
  * @param {Float32Array} carry Previous 256-sample halves, updated in place.
  * @param {Float32Array} windows Destination containing four 512-sample windows.
- * @param {object} scratch Reusable gain-scale reconstruction buffers.
+ * @param {GainScaleScratch} gainScaleScratch Reusable gain-scale reconstruction buffers.
  * @returns {Float32Array} `windows` after all four bands are prepared.
  */
 export function prepareGainAdjustedWindows(
@@ -303,7 +301,7 @@ export function prepareGainAdjustedWindows(
   currentRecords,
   carry,
   windows,
-  scratch
+  gainScaleScratch
 ) {
   if (
     currentByBand?.length < SUBBAND_COUNT ||
@@ -336,7 +334,7 @@ export function prepareGainAdjustedWindows(
         previousRecords[band],
         currentRecords[band],
         window,
-        scratch
+        gainScaleScratch
       )
     ) {
       return null

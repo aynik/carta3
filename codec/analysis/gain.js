@@ -16,7 +16,6 @@ import {
   SUBBAND_COUNT,
 } from '../core/constants.js'
 import { reconstructGainPairSignal } from '../transforms/gain-scale.js'
-import { GainAnalysisScratch, GainScaleScratch } from '../state/encoder.js'
 import { bandGainOffset } from '../transforms/qmf.js'
 import { absoluteMaximum } from '../utils.js'
 
@@ -125,12 +124,18 @@ function selectCandidates(entries, detectedCount, ranked) {
  * @param {Float32Array} spectrum
  * @param {number} sampleCount
  * @param {GainRecord} previousRecord
- * @param {GainAnalysisScratch} scratch
+ * @param {GainAnalysisScratch} gainAnalysisScratch
  * @returns {object|null}
  */
-function detectGainCandidates(spectrum, sampleCount, previousRecord, scratch) {
-  const { maxima, groupMaxima, candidates, rankedCandidateSlots } = scratch
-  scratch.resetCandidates()
+function detectGainCandidates(
+  spectrum,
+  sampleCount,
+  previousRecord,
+  gainAnalysisScratch
+) {
+  const { maxima, groupMaxima, candidates, rankedCandidateSlots } =
+    gainAnalysisScratch
+  gainAnalysisScratch.resetCandidates()
   let detectedCount = 0
   const stride = sampleCount / 64
   const half = sampleCount / 2
@@ -341,19 +346,24 @@ function buildGainRecord(seed, peakHistory, levels) {
  * @param {Float32Array} spectrum Complete 768-float rolling band slot.
  * @param {GainRecord} [previousRecord] Prior committed gain record.
  * @param {GainRecord} [outputSeed] Detached destination seed.
- * @param {GainAnalysisScratch} [scratch]
+ * @param {GainAnalysisScratch} gainAnalysisScratch
  * @returns {GainRecord|null} Planned record, or `null` when unrepresentable.
  */
 export function planBandGainRecord(
   spectrum,
   previousRecord = new GainRecord(),
   outputSeed = new GainRecord(),
-  scratch = new GainAnalysisScratch()
+  gainAnalysisScratch
 ) {
   if (spectrum.length < 768) {
     throw new RangeError('ATRAC3 band gain analysis requires 768 samples')
   }
-  const detection = detectGainCandidates(spectrum, 512, previousRecord, scratch)
+  const detection = detectGainCandidates(
+    spectrum,
+    512,
+    previousRecord,
+    gainAnalysisScratch
+  )
   if (!detection) return null
   if (previousRecord.entries === 0 && detection.detectedCount === 0) {
     outputSeed.entries = 0
@@ -365,7 +375,7 @@ export function planBandGainRecord(
     detection.peakHistory,
     gainLevelEnvelope(
       lowerGainCandidates(detection, previousRecord),
-      scratch.levels
+      gainAnalysisScratch.levels
     )
   )
 }
@@ -452,14 +462,14 @@ export function planGainContinuityEdit(
  * @param {Float32Array} targetSpectrum First band's rolling sample slot.
  * @param {GainRecord[]} previousRecords Prior committed records.
  * @param {GainRecord[]} plannedRecords Detached current records.
- * @param {GainScaleScratch} [scratch] Reusable gain reconstruction scratch.
+ * @param {GainScaleScratch} gainScaleScratch Reusable gain reconstruction scratch.
  * @returns {GainRecord[]|null} Selected detached records, or `null` on failure.
  */
 export function adjustGainContinuity(
   targetSpectrum,
   previousRecords,
   plannedRecords,
-  scratch = new GainScaleScratch()
+  gainScaleScratch
 ) {
   const edit = planGainContinuityEdit(
     targetSpectrum,
@@ -469,7 +479,7 @@ export function adjustGainContinuity(
   if (!edit) return plannedRecords
 
   const incumbent = plannedRecords[0]
-  const candidate = incumbent.copyTo(scratch.candidateRecord)
+  const candidate = incumbent.copyTo(gainScaleScratch.candidateRecord)
   candidate.entries = 1
   candidate.locations[0] = edit.location
   candidate.levels[0] = edit.level
@@ -481,21 +491,24 @@ export function adjustGainContinuity(
       overlap,
       previousRecords[0],
       incumbent,
-      scratch.incumbent,
-      scratch
+      gainScaleScratch.incumbent,
+      gainScaleScratch
     ) ||
     !reconstructGainPairSignal(
       input,
       overlap,
       previousRecords[0],
       candidate,
-      scratch.candidate,
-      scratch
+      gainScaleScratch.candidate,
+      gainScaleScratch
     )
   ) {
     return null
   }
-  const effect = compareSignals(scratch.candidate, scratch.incumbent)
+  const effect = compareSignals(
+    gainScaleScratch.candidate,
+    gainScaleScratch.incumbent
+  )
   const reversedRelativeDifference =
     effect.candidateEnergy > 0
       ? effect.differenceEnergy / effect.candidateEnergy
@@ -513,16 +526,16 @@ export function adjustGainContinuity(
  * @param {Float32Array} channelState Persistent rolling subband state.
  * @param {GainRecord[]} previousRecords Prior committed records.
  * @param {GainRecord[]} outputSeeds Detached destination records.
- * @param {GainScaleScratch} [scratch] Reusable gain reconstruction scratch.
- * @param {GainAnalysisScratch} [analysisScratch]
+ * @param {GainScaleScratch} gainScaleScratch Reusable gain reconstruction scratch.
+ * @param {GainAnalysisScratch} gainAnalysisScratch Reusable gain-analysis scratch.
  * @returns {GainRecord[]|null} Complete plan, or `null` if any band fails.
  */
 export function planGainControl(
   channelState,
   previousRecords,
   outputSeeds,
-  scratch = new GainScaleScratch(),
-  analysisScratch = new GainAnalysisScratch()
+  gainScaleScratch,
+  gainAnalysisScratch
 ) {
   if (channelState.length < SUBBAND_COUNT * BAND_STRIDE_FLOATS) {
     throw new RangeError(
@@ -535,7 +548,7 @@ export function planGainControl(
       channelState.subarray(offset, offset + BAND_STRIDE_FLOATS),
       previousRecords[band],
       outputSeeds[band],
-      analysisScratch
+      gainAnalysisScratch
     )
     if (!planned) return null
   }
@@ -546,6 +559,6 @@ export function planGainControl(
     ),
     previousRecords,
     outputSeeds,
-    scratch
+    gainScaleScratch
   )
 }

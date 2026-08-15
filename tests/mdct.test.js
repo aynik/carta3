@@ -57,6 +57,9 @@ describe('ATRAC3 forward MDCT', () => {
     expect(() =>
       forwardMdct256(new Float32Array(511), output, false, scratch)
     ).toThrow(/512 input/)
+    expect(() => forwardMdct256(new Float32Array(512), output, false)).toThrow(
+      /scratch/
+    )
   })
 
   it('reverses only the final coefficient order', () => {

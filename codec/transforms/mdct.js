@@ -34,7 +34,6 @@ import {
   TRANSFORM_REORDER_INDICES,
   transformTables,
 } from '../core/tables.js'
-import { MdctScratch } from '../state/encoder.js'
 import {
   float32Add,
   float32FromBits,
@@ -53,32 +52,32 @@ const bitReverseIndices = Uint8Array.from(MDCT_BIT_REVERSE_PAIRS.flat())
  * @param {Float32Array} source Prepared 512-sample gain-adjusted window.
  * @param {Float32Array} destination Destination 256-line spectrum.
  * @param {boolean} reverseOutput Whether to publish coefficients in reverse order.
- * @param {MdctScratch} scratch Reusable forward-transform storage.
+ * @param {MdctScratch} mdctScratch Reusable forward-transform storage.
  * @returns {Float32Array} `destination` after the transform.
  */
 export function forwardMdct256(
   source,
   destination,
   reverseOutput,
-  scratch = new MdctScratch()
+  mdctScratch
 ) {
   if (source.length < 512 || destination.length < 256) {
     throw new RangeError('ATRAC3 MDCT requires 512 input and 256 output values')
   }
   if (
-    !scratch ||
-    scratch.preWindowed?.length < 256 ||
-    scratch.real?.length < 128 ||
-    scratch.imaginary?.length < 128
+    !mdctScratch ||
+    mdctScratch.preWindowed?.length < 256 ||
+    mdctScratch.real?.length < 128 ||
+    mdctScratch.imaginary?.length < 128
   ) {
     throw new RangeError('ATRAC3 MDCT scratch has invalid geometry')
   }
 
   const tables = transformTables()
   const window = tables.mdctWindow
-  const preWindowed = scratch.preWindowed
-  const real = scratch.real
-  const imaginary = scratch.imaginary
+  const preWindowed = mdctScratch.preWindowed
+  const real = mdctScratch.real
+  const imaginary = mdctScratch.imaginary
 
   for (let sampleIndex = 0; sampleIndex < 64; sampleIndex++) {
     const forwardIndex = 384 + sampleIndex * 2
@@ -237,10 +236,10 @@ export function forwardMdct256(
  *
  * @param {Float32Array} windows Four contiguous 512-sample time windows.
  * @param {Float32Array} spectrum Destination for four 256-line spectra.
- * @param {object} scratch Reusable MDCT work buffers.
+ * @param {MdctScratch} mdctScratch Reusable MDCT work buffers.
  * @returns {Float32Array} `spectrum`.
  */
-export function transformPreparedSubbands(windows, spectrum, scratch) {
+export function transformPreparedSubbands(windows, spectrum, mdctScratch) {
   if (
     windows?.length < SUBBAND_COUNT * GAIN_SCALE_SAMPLES ||
     spectrum?.length < SUBBAND_COUNT * BAND_PART_FLOATS
@@ -255,7 +254,7 @@ export function transformPreparedSubbands(windows, spectrum, scratch) {
       ),
       spectrum.subarray(band * BAND_PART_FLOATS, (band + 1) * BAND_PART_FLOATS),
       REVERSE_OUTPUT_BY_SUBBAND[band] !== 0,
-      scratch
+      mdctScratch
     )
   }
   return spectrum

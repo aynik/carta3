@@ -36,7 +36,6 @@ import {
   SYNTHESIS_QMF_CURVE,
   TWO_PI,
 } from '../core/tables.js'
-import { IndependentQmfScratch } from '../state/encoder.js'
 import { float32Add, float32Multiply } from '../utils.js'
 
 /**
@@ -122,13 +121,13 @@ function analyzeBranch(
  *
  * @param {Float32Array} pcm One complete 1024-sample channel frame.
  * @param {Float32Array} analysisWork Persistent 132 kbps analysis image.
- * @param {object} scratch Operation-local QMF buffers.
+ * @param {IndependentQmfScratch} independentQmfScratch Operation-local QMF buffers.
  * @returns {Float32Array} `analysisWork` with its newest split slots populated.
  */
 export function analyzeIndependentQmf(
   pcm,
   analysisWork,
-  scratch = new IndependentQmfScratch()
+  independentQmfScratch
 ) {
   if (pcm.length < FRAME_SAMPLES) {
     throw new RangeError('ATRAC3 QMF analysis requires 1024 PCM samples')
@@ -137,10 +136,10 @@ export function analyzeIndependentQmf(
     throw new RangeError('ATRAC3 QMF analysis work buffer is too short')
   }
   if (
-    !scratch ||
-    scratch.firstLow?.length < 512 ||
-    scratch.firstHigh?.length < 512 ||
-    scratch.convolutionWork?.length < QMF_DELAY + FRAME_SAMPLES
+    !independentQmfScratch ||
+    independentQmfScratch.firstLow?.length < 512 ||
+    independentQmfScratch.firstHigh?.length < 512 ||
+    independentQmfScratch.convolutionWork?.length < QMF_DELAY + FRAME_SAMPLES
   ) {
     throw new RangeError('ATRAC3 QMF scratch has invalid geometry')
   }
@@ -160,15 +159,15 @@ export function analyzeIndependentQmf(
   )
   analyzeBranch(
     pcm,
-    scratch.firstLow,
-    scratch.firstHigh,
+    independentQmfScratch.firstLow,
+    independentQmfScratch.firstHigh,
     FRAME_SAMPLES,
     rootHistory,
-    scratch.convolutionWork
+    independentQmfScratch.convolutionWork
   )
 
   analyzeBranch(
-    scratch.firstLow,
+    independentQmfScratch.firstLow,
     analysisWork.subarray(
       bandSplitOffset(0),
       bandSplitOffset(0) + BAND_PART_FLOATS
@@ -179,11 +178,11 @@ export function analyzeIndependentQmf(
     ),
     512,
     analysisWork.subarray(LOW_HISTORY_OFFSET, LOW_HISTORY_OFFSET + QMF_DELAY),
-    scratch.convolutionWork
+    independentQmfScratch.convolutionWork
   )
 
   analyzeBranch(
-    scratch.firstHigh,
+    independentQmfScratch.firstHigh,
     analysisWork.subarray(
       bandSplitOffset(3),
       bandSplitOffset(3) + BAND_PART_FLOATS
@@ -194,7 +193,7 @@ export function analyzeIndependentQmf(
     ),
     512,
     analysisWork.subarray(HIGH_HISTORY_OFFSET, HIGH_HISTORY_OFFSET + QMF_DELAY),
-    scratch.convolutionWork
+    independentQmfScratch.convolutionWork
   )
 
   return analysisWork
@@ -206,56 +205,51 @@ export function analyzeIndependentQmf(
  * @param {Float32Array} pcm One complete PCM frame.
  * @param {Float32Array} spectrum Destination for four interleaved bands.
  * @param {Float32Array} history Persistent 138-float interleaved delay state.
- * @param {Float32Array} [scratch] Operation-local history+input workspace.
+ * @param {Float32Array} layeredQmfScratch Operation-local history+input workspace.
  * @returns {Float32Array} `spectrum` after analysis.
  */
-export function analyzeLayeredQmf(
-  pcm,
-  spectrum,
-  history,
-  scratch = new Float32Array(FRAME_SAMPLES + LAYERED_QMF_HISTORY_FLOATS)
-) {
+export function analyzeLayeredQmf(pcm, spectrum, history, layeredQmfScratch) {
   if (
     pcm.length < FRAME_SAMPLES ||
     spectrum.length < FRAME_SAMPLES ||
     history.length < LAYERED_QMF_HISTORY_FLOATS ||
-    scratch.length < FRAME_SAMPLES + LAYERED_QMF_HISTORY_FLOATS
+    layeredQmfScratch.length < FRAME_SAMPLES + LAYERED_QMF_HISTORY_FLOATS
   ) {
     throw new RangeError('ATRAC3 layered QMF has invalid buffer geometry')
   }
-  scratch.set(history.subarray(0, LAYERED_QMF_HISTORY_FLOATS), 0)
+  layeredQmfScratch.set(history.subarray(0, LAYERED_QMF_HISTORY_FLOATS), 0)
 
   for (let window = 0; window < FRAME_SAMPLES; window += 4) {
     const sample0 = pcm[window]
     const sample1 = pcm[window + 1]
     const sample2 = pcm[window + 2]
     const sample3 = pcm[window + 3]
-    scratch[window + LAYERED_QMF_HISTORY_FLOATS] = sample0
-    scratch[window + LAYERED_QMF_HISTORY_FLOATS + 1] = sample1
-    scratch[window + LAYERED_QMF_HISTORY_FLOATS + 2] = sample2
-    scratch[window + LAYERED_QMF_HISTORY_FLOATS + 3] = sample3
+    layeredQmfScratch[window + LAYERED_QMF_HISTORY_FLOATS] = sample0
+    layeredQmfScratch[window + LAYERED_QMF_HISTORY_FLOATS + 1] = sample1
+    layeredQmfScratch[window + LAYERED_QMF_HISTORY_FLOATS + 2] = sample2
+    layeredQmfScratch[window + LAYERED_QMF_HISTORY_FLOATS + 3] = sample3
 
     let oddLow = float32Add(
       sample1,
       float32Multiply(
-        scratch[window + LAYERED_QMF_STAGE_OFFSET + 1],
+        layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 1],
         ANALYSIS_QMF_CURVE[0]
       )
     )
     let oddHigh = float32Add(
       sample3,
       float32Multiply(
-        scratch[window + LAYERED_QMF_STAGE_OFFSET + 3],
+        layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 3],
         ANALYSIS_QMF_CURVE[0]
       )
     )
     let evenLow = float32Add(
       float32Multiply(sample0, ANALYSIS_QMF_CURVE[0]),
-      scratch[window + LAYERED_QMF_STAGE_OFFSET]
+      layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET]
     )
     let evenHigh = float32Add(
       float32Multiply(sample2, ANALYSIS_QMF_CURVE[0]),
-      scratch[window + LAYERED_QMF_STAGE_OFFSET + 2]
+      layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 2]
     )
     for (
       let curveIndex = LAYERED_QMF_ANALYSIS_TAIL_INDEX;
@@ -267,28 +261,34 @@ export function analyzeLayeredQmf(
         oddHigh,
         float32Multiply(
           ANALYSIS_QMF_CURVE[curveIndex],
-          scratch[window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET + 3]
+          layeredQmfScratch[
+            window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET + 3
+          ]
         )
       )
       oddLow = float32Add(
         oddLow,
         float32Multiply(
           ANALYSIS_QMF_CURVE[curveIndex],
-          scratch[window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET + 1]
+          layeredQmfScratch[
+            window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET + 1
+          ]
         )
       )
       evenLow = float32Add(
         evenLow,
         float32Multiply(
           ANALYSIS_QMF_CURVE[mirrored],
-          scratch[window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET]
+          layeredQmfScratch[window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET]
         )
       )
       evenHigh = float32Add(
         evenHigh,
         float32Multiply(
           ANALYSIS_QMF_CURVE[mirrored],
-          scratch[window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET + 2]
+          layeredQmfScratch[
+            window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET + 2
+          ]
         )
       )
     }
@@ -296,26 +296,26 @@ export function analyzeLayeredQmf(
     const lowDifference = float32Add(oddLow, -evenLow)
     const highSum = float32Add(oddHigh, evenHigh)
     const highDifference = float32Add(oddHigh, -evenHigh)
-    scratch[window + LAYERED_QMF_STAGE_OFFSET] = lowSum
-    scratch[window + LAYERED_QMF_STAGE_OFFSET + 1] = lowDifference
-    scratch[window + LAYERED_QMF_STAGE_OFFSET + 2] = highSum
-    scratch[window + LAYERED_QMF_STAGE_OFFSET + 3] = highDifference
+    layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET] = lowSum
+    layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 1] = lowDifference
+    layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 2] = highSum
+    layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 3] = highDifference
 
     let lane0 = float32Add(
-      float32Multiply(scratch[window + 2], ANALYSIS_QMF_CURVE[0]),
+      float32Multiply(layeredQmfScratch[window + 2], ANALYSIS_QMF_CURVE[0]),
       highSum
     )
     let lane1 = float32Add(
-      float32Multiply(scratch[window + 3], ANALYSIS_QMF_CURVE[0]),
+      float32Multiply(layeredQmfScratch[window + 3], ANALYSIS_QMF_CURVE[0]),
       highDifference
     )
     let lane2 = float32Add(
       float32Multiply(lowDifference, ANALYSIS_QMF_CURVE[0]),
-      scratch[window + 1]
+      layeredQmfScratch[window + 1]
     )
     let lane3 = float32Add(
       float32Multiply(lowSum, ANALYSIS_QMF_CURVE[0]),
-      scratch[window]
+      layeredQmfScratch[window]
     )
     const cursor = window + LAYERED_QMF_CONVOLUTION_CURSOR_OFFSET
     for (
@@ -327,19 +327,28 @@ export function analyzeLayeredQmf(
       const offset = cursor - (LAYERED_QMF_ANALYSIS_TAIL_INDEX - curveIndex) * 4
       lane1 = float32Add(
         lane1,
-        float32Multiply(ANALYSIS_QMF_CURVE[curveIndex], scratch[offset + 3])
+        float32Multiply(
+          ANALYSIS_QMF_CURVE[curveIndex],
+          layeredQmfScratch[offset + 3]
+        )
       )
       lane0 = float32Add(
         lane0,
-        float32Multiply(ANALYSIS_QMF_CURVE[curveIndex], scratch[offset + 2])
+        float32Multiply(
+          ANALYSIS_QMF_CURVE[curveIndex],
+          layeredQmfScratch[offset + 2]
+        )
       )
       lane3 = float32Add(
         lane3,
-        float32Multiply(ANALYSIS_QMF_CURVE[mirrored], scratch[offset])
+        float32Multiply(ANALYSIS_QMF_CURVE[mirrored], layeredQmfScratch[offset])
       )
       lane2 = float32Add(
         lane2,
-        float32Multiply(ANALYSIS_QMF_CURVE[mirrored], scratch[offset + 1])
+        float32Multiply(
+          ANALYSIS_QMF_CURVE[mirrored],
+          layeredQmfScratch[offset + 1]
+        )
       )
     }
     spectrum[window] = float32Add(lane0, lane3)
@@ -349,7 +358,10 @@ export function analyzeLayeredQmf(
   }
 
   history.set(
-    scratch.subarray(FRAME_SAMPLES, FRAME_SAMPLES + LAYERED_QMF_HISTORY_FLOATS)
+    layeredQmfScratch.subarray(
+      FRAME_SAMPLES,
+      FRAME_SAMPLES + LAYERED_QMF_HISTORY_FLOATS
+    )
   )
   return spectrum
 }

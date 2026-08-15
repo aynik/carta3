@@ -23,7 +23,6 @@ import {
   TUNE_SCALE,
   WORD_LENGTH_LIMIT,
 } from '../core/constants.js'
-import { SoundUnitAllocationScratch } from '../state/encoder.js'
 import {
   QUANTIZATION_UNIT_OFFSETS,
   WORD_LENGTH_QUANTIZER_LEVELS,
@@ -293,7 +292,7 @@ function priceBandOption(
  * @param {number} wordLength Selected spectral word length.
  * @param {number} timeFactor Selected dead-zone time factor.
  * @param {object[][]} tables Canonical Huffman table families.
- * @param {Int32Array} scratch Detached symbol storage for the selected band.
+ * @param {Int32Array} symbolScratch Detached symbol storage for the selected band.
  * @returns {number} Exact change in the allocation's residual bit cost.
  */
 function commitBandOption(
@@ -303,7 +302,7 @@ function commitBandOption(
   wordLength,
   timeFactor,
   tables,
-  scratch
+  symbolScratch
 ) {
   const previousBits = state.bitsByBand[band]
   const bits = priceBandOption(
@@ -312,7 +311,7 @@ function commitBandOption(
     spectrum,
     band,
     tables,
-    scratch
+    symbolScratch
   )
   const start = QUANTIZATION_UNIT_OFFSETS[band]
   const end = QUANTIZATION_UNIT_OFFSETS[band + 1]
@@ -321,7 +320,7 @@ function commitBandOption(
   state.bitsByBand[band] = bits
   state.quantizedSpectrum
     .subarray(start, end)
-    .set(scratch.subarray(0, end - start))
+    .set(symbolScratch.subarray(0, end - start))
   state.sumBits += bits - previousBits
   return bits - previousBits
 }
@@ -398,7 +397,7 @@ function retunedState(
  * @param {Float32Array} spectrum
  * @param {number} bandCount
  * @param {object[][]} tables
- * @param {object} scratch
+ * @param {SoundUnitAllocationScratch} allocationScratch
  * @returns {object}
  */
 function tuneToBudget(
@@ -409,7 +408,7 @@ function tuneToBudget(
   spectrum,
   bandCount,
   tables,
-  scratch
+  allocationScratch
 ) {
   let current = seed
   let best = seed.sumBits <= budget ? { probe: 0, state: seed } : null
@@ -426,7 +425,7 @@ function tuneToBudget(
       }
       current = retunedState(
         seed,
-        scratch.tuningCandidate,
+        allocationScratch.tuningCandidate,
         thresholds,
         gate,
         probe / TUNE_SCALE,
@@ -434,10 +433,13 @@ function tuneToBudget(
         spectrum,
         bandCount,
         tables,
-        scratch.candidateSymbols
+        allocationScratch.candidateSymbols
       )
       if (current.sumBits <= budget) {
-        best = { probe, state: current.copyTo(scratch.bestTuningCandidate) }
+        best = {
+          probe,
+          state: current.copyTo(allocationScratch.bestTuningCandidate),
+        }
         delta *= 2
       } else {
         low = best.probe
@@ -457,7 +459,7 @@ function tuneToBudget(
       }
       current = retunedState(
         seed,
-        scratch.tuningCandidate,
+        allocationScratch.tuningCandidate,
         thresholds,
         gate,
         probe / TUNE_SCALE,
@@ -465,10 +467,13 @@ function tuneToBudget(
         spectrum,
         bandCount,
         tables,
-        scratch.candidateSymbols
+        allocationScratch.candidateSymbols
       )
       if (current.sumBits <= budget) {
-        best = { probe, state: current.copyTo(scratch.bestTuningCandidate) }
+        best = {
+          probe,
+          state: current.copyTo(allocationScratch.bestTuningCandidate),
+        }
         low = probe
         high = previousOver
         break
@@ -483,7 +488,7 @@ function tuneToBudget(
       if (mid === low || mid === high) break
       current = retunedState(
         seed,
-        scratch.tuningCandidate,
+        allocationScratch.tuningCandidate,
         thresholds,
         gate,
         mid / TUNE_SCALE,
@@ -491,13 +496,13 @@ function tuneToBudget(
         spectrum,
         bandCount,
         tables,
-        scratch.candidateSymbols
+        allocationScratch.candidateSymbols
       )
       if (current.sumBits <= budget) {
         low = mid
         best = {
           probe: mid,
-          state: current.copyTo(scratch.bestTuningCandidate),
+          state: current.copyTo(allocationScratch.bestTuningCandidate),
         }
       } else high = mid
     }
@@ -1011,7 +1016,7 @@ function commitAllocation(block, state, componentCount, bandCount) {
  * @param {object} block Detached destination sound-unit state.
  * @param {GainRecord[]} previousGainRecords Prior committed gain records.
  * @param {number} unitBits Exact sound-unit bit budget.
- * @param {SoundUnitAllocationScratch} [scratch] Reusable allocation scratch.
+ * @param {SoundUnitAllocationScratch} allocationScratch Reusable allocation scratch.
  * @param {object} [tables] Canonical Huffman table families.
  * @param {string} [tonePolicy] Tone candidate policy identifier.
  * @returns {number} Exact selected syntax bit count.
@@ -1022,7 +1027,7 @@ export function allocateNontoneSoundUnit(
   block,
   previousGainRecords,
   unitBits,
-  scratch = new SoundUnitAllocationScratch(),
+  allocationScratch,
   tables = huffmanFamilies(),
   tonePolicy = TONE_POLICY_NONE
 ) {
@@ -1034,7 +1039,8 @@ export function allocateNontoneSoundUnit(
   }
   const bandCount = INITIAL_132_SPECTRUM_GROUPS
   const componentCount = INITIAL_132_COMPONENT_GROUPS
-  const { normalizedSpectrum, candidateSymbols, fillCandidates } = scratch
+  const { normalizedSpectrum, candidateSymbols, fillCandidates } =
+    allocationScratch
   block.spectrumGroupCount = bandCount
   block.componentGroupCount = componentCount
   block.componentMode = 1
@@ -1047,12 +1053,12 @@ export function allocateNontoneSoundUnit(
   const originalProfile = scaleFactorProfile(
     sourceSpectrum,
     bandCount,
-    scratch.originalScaleProfile
+    allocationScratch.originalScaleProfile
   )
   const transformedProfile = scaleFactorProfile(
     transformedSpectrum,
     bandCount,
-    scratch.transformedScaleProfile
+    allocationScratch.transformedScaleProfile
   )
   normalizedSpectrum.set(sourceSpectrum.subarray(0, FRAME_SAMPLES))
   const average =
@@ -1076,19 +1082,19 @@ export function allocateNontoneSoundUnit(
   const originalScaleFactors = bandScaleFactors(
     originalProfile,
     bandCount,
-    scratch.originalScaleFactors
+    allocationScratch.originalScaleFactors
   )
   const transformedScaleFactors = bandScaleFactors(
     transformedProfile,
     bandCount,
-    scratch.transformedScaleFactors
+    allocationScratch.transformedScaleFactors
   )
   const thresholds = buildThresholds(
     transformedScaleFactors,
     bandCount,
     average,
     hasAttack(block.gainRecords, previousGainRecords, componentCount),
-    scratch.thresholds
+    allocationScratch.thresholds
   )
   normalizeSpectrum(originalScaleFactors, bandCount, normalizedSpectrum)
 
@@ -1096,13 +1102,13 @@ export function allocateNontoneSoundUnit(
     thresholds,
     transformedScaleFactors,
     bandCount,
-    scratch.translatedWordLengths
+    allocationScratch.translatedWordLengths
   )
   for (let band = 0; band < bandCount; band++) {
     if (originalScaleFactors[band] < translated.threshold)
       translated.output[band] = 0
   }
-  let state = scratch.seedCandidate.reset(
+  let state = allocationScratch.seedCandidate.reset(
     translated.output,
     originalScaleFactors
   )
@@ -1111,7 +1117,7 @@ export function allocateNontoneSoundUnit(
     maximumWordLengthThresholds,
     transformedScaleFactors,
     bandCount,
-    scratch.gateWordLengths
+    allocationScratch.gateWordLengths
   ).output
   const residualBudget =
     toneBudget - toneBits + (block.toneEntryIndex === 0 ? 2 : 0)
@@ -1131,7 +1137,7 @@ export function allocateNontoneSoundUnit(
     normalizedSpectrum,
     bandCount,
     tables,
-    scratch
+    allocationScratch
   )
   state = trimToBudget(
     state,
@@ -1186,11 +1192,11 @@ export function allocateNontoneSoundUnit(
  *
  * @param {object} block
  * @param {Float32Array} source
- * @param {object} scratch
+ * @param {SoundUnitAllocationScratch} allocationScratch
  * @returns {number}
  */
-function reconstructionError(block, source, scratch) {
-  const reconstructed = scratch.reconstructedSpectrum
+function reconstructionError(block, source, allocationScratch) {
+  const reconstructed = allocationScratch.reconstructedSpectrum
   reconstructed.fill(0)
   for (let band = 0; band < block.spectrumGroupCount; band++) {
     const wordLength = block.wordLengths[band]
@@ -1225,7 +1231,11 @@ function reconstructionError(block, source, scratch) {
       }
     }
   }
-  const mask = buildReconstructionMask(source, scratch.unityScaleIndices, 32)
+  const mask = buildReconstructionMask(
+    source,
+    allocationScratch.unityScaleIndices,
+    32
+  )
   let score = 0
   for (let band = 0; band < 32; band++) {
     const start = QUANTIZATION_UNIT_OFFSETS[band]
@@ -1249,7 +1259,7 @@ function reconstructionError(block, source, scratch) {
  * @param {object} candidateBlock Reusable alternative candidate state.
  * @param {GainRecord[]} previousGainRecords Prior committed gain records.
  * @param {number} unitBits Exact sound-unit bit budget.
- * @param {SoundUnitAllocationScratch} scratch Reusable allocation scratch.
+ * @param {SoundUnitAllocationScratch} allocationScratch Reusable allocation scratch.
  * @param {object} [tables] Canonical Huffman table families.
  * @returns {number} Exact bit count of the published candidate.
  */
@@ -1260,7 +1270,7 @@ export function allocateSoundUnitCandidates(
   candidateBlock,
   previousGainRecords,
   unitBits,
-  scratch,
+  allocationScratch,
   tables = huffmanFamilies()
 ) {
   selectedBlock.copyTo(candidateBlock)
@@ -1273,12 +1283,16 @@ export function allocateSoundUnitCandidates(
       selectedBlock,
       previousGainRecords,
       unitBits,
-      scratch,
+      allocationScratch,
       tables,
       TONE_POLICY_THRESHOLD
     )
     if (selectedBlock.toneCount === 0) return toneBits
-    toneError = reconstructionError(selectedBlock, sourceSpectrum, scratch)
+    toneError = reconstructionError(
+      selectedBlock,
+      sourceSpectrum,
+      allocationScratch
+    )
   } catch (error) {
     if (!(error instanceof SoundUnitCandidateError)) throw error
     // The no-tone policy below remains the mandatory fallback transaction.
@@ -1289,14 +1303,14 @@ export function allocateSoundUnitCandidates(
     candidateBlock,
     previousGainRecords,
     unitBits,
-    scratch,
+    allocationScratch,
     tables,
     TONE_POLICY_NONE
   )
   const nontoneError = reconstructionError(
     candidateBlock,
     sourceSpectrum,
-    scratch
+    allocationScratch
   )
   if (
     nontoneError < toneError ||

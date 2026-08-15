@@ -98,12 +98,14 @@ function analyzeMaximumMagnitudes(words, output) {
 /**
  * Read one float32 magnitude from the biased gain scratch region.
  *
- * @param {Uint32Array} scratchBits
+ * @param {Uint32Array} gainScratchBits
  * @param {number} index
  * @returns {number}
  */
-function gainScratchValue(scratchBits, index) {
-  return float32FromBits(scratchBits[LAYER_GAIN_SCRATCH_HISTORY_OFFSET + index])
+function gainScratchValue(gainScratchBits, index) {
+  return float32FromBits(
+    gainScratchBits[LAYER_GAIN_SCRATCH_HISTORY_OFFSET + index]
+  )
 }
 
 /**
@@ -126,7 +128,7 @@ function gainStepsForRatio(ratio) {
  *
  * @param {Uint32Array} words
  * @param {Uint32Array} maximumMagnitudes
- * @param {Uint32Array} scratchBits
+ * @param {Uint32Array} gainScratchBits
  * @param {number} unit
  * @param {number} pairBase
  * @returns {number}
@@ -134,7 +136,7 @@ function gainStepsForRatio(ratio) {
 function stagePairMagnitudeHistory(
   words,
   maximumMagnitudes,
-  scratchBits,
+  gainScratchBits,
   unit,
   pairBase
 ) {
@@ -143,10 +145,10 @@ function stagePairMagnitudeHistory(
   const magnitudeSegment = unit * PAIR_BLOCK_MAGNITUDE_HISTORY_WORDS
   for (let index = 0; index < PAIR_BLOCK_MAGNITUDE_HISTORY_WORDS; index++) {
     const oldBits = words[historyBase + index]
-    scratchBits[LAYER_GAIN_SCRATCH_HISTORY_OFFSET + index] = oldBits
+    gainScratchBits[LAYER_GAIN_SCRATCH_HISTORY_OFFSET + index] = oldBits
     if (oldMaximumBits < oldBits) oldMaximumBits = oldBits
     const newBits = maximumMagnitudes[magnitudeSegment + index]
-    scratchBits[
+    gainScratchBits[
       LAYER_GAIN_SCRATCH_HISTORY_OFFSET +
         PAIR_BLOCK_MAGNITUDE_HISTORY_WORDS +
         index
@@ -176,26 +178,26 @@ function pairModeSelector(unit, layerFlag, hints, modes) {
  * Measure current group maxima and publish the last group history.
  *
  * @param {Uint32Array} words
- * @param {Uint32Array} scratchBits
+ * @param {Uint32Array} gainScratchBits
  * @param {number} pairBase
  * @returns {number}
  */
-function measurePairGroupMaxima(words, scratchBits, pairBase) {
-  scratchBits[0] = words[pairBase + PAIR_BLOCK_LAST_GROUP_MAXIMUM_WORD]
+function measurePairGroupMaxima(words, gainScratchBits, pairBase) {
+  gainScratchBits[0] = words[pairBase + PAIR_BLOCK_LAST_GROUP_MAXIMUM_WORD]
   let lastMaximum = 0
   for (let group = 0; group < LAYER_GAIN_GROUP_COUNT; group++) {
     let current = gainScratchValue(
-      scratchBits,
+      gainScratchBits,
       group * LAYER_GAIN_GROUP_SAMPLES
     )
     for (let offset = 1; offset < LAYER_GAIN_GROUP_SAMPLES; offset++) {
       const candidate = gainScratchValue(
-        scratchBits,
+        gainScratchBits,
         group * LAYER_GAIN_GROUP_SAMPLES + offset
       )
       if (unorderedLess(current, candidate)) current = candidate
     }
-    scratchBits[group + 1] = float32ToBits(current)
+    gainScratchBits[group + 1] = float32ToBits(current)
     lastMaximum = current
   }
   words[pairBase + PAIR_BLOCK_LAST_GROUP_MAXIMUM_WORD] =
@@ -207,21 +209,21 @@ function measurePairGroupMaxima(words, scratchBits, pairBase) {
  * Select release points and return remaining budget plus the tail cursor.
  *
  * @param {Uint32Array} words
- * @param {Uint32Array} scratchBits
+ * @param {Uint32Array} gainScratchBits
  * @param {number} locationsBase
  * @param {number} levelsBase
  * @param {number} lastMaximum
  * @param {number} modeSelector
- * @param {Int32Array} selectionScratch
+ * @param {Int32Array} gainSelectionScratch
  */
 function selectPairReleasePoints(
   words,
-  scratchBits,
+  gainScratchBits,
   locationsBase,
   levelsBase,
   lastMaximum,
   modeSelector,
-  selectionScratch
+  gainSelectionScratch
 ) {
   let remainingBudget = LAYER_GAIN_RELEASE_BUDGET
   let tailCursor = PAIR_BLOCK_GAIN_SLOTS
@@ -231,7 +233,7 @@ function selectPairReleasePoints(
       ? (LAYER_GAIN_GROUP_COUNT - modeSelector) * LAYER_GAIN_GROUP_COUNT
       : GAIN_STEP_COUNT
   for (let index = PAIR_BLOCK_MAGNITUDE_HISTORY_WORDS; index < bound; index++) {
-    const magnitude = gainScratchValue(scratchBits, index)
+    const magnitude = gainScratchValue(gainScratchBits, index)
     if (unorderedLess(runningCeiling, magnitude)) runningCeiling = magnitude
   }
   const sentinel = float32FromBits(GAIN_MAGNITUDE_SENTINEL_BITS)
@@ -243,7 +245,7 @@ function selectPairReleasePoints(
     group >= 0 && remainingBudget > 0 && tailCursor !== 5;
     group--
   ) {
-    const groupPeak = float32FromBits(scratchBits[group])
+    const groupPeak = float32FromBits(gainScratchBits[group])
     if (unorderedLess(groupPeak, runningCeiling)) continue
     const fired = detectGainLogFlux(groupPeak, runningCeiling, releaseState)
     if (unorderedLessEqual(groupPeak, breakpointMagnitudeFloor) || !fired) {
@@ -254,12 +256,15 @@ function selectPairReleasePoints(
     let index = group * LAYER_GAIN_GROUP_SAMPLES
     if (
       group !== 0 &&
-      unorderedLess(gainScratchValue(scratchBits, index), snapThreshold) &&
-      unorderedLess(gainScratchValue(scratchBits, index - 1), snapThreshold)
+      unorderedLess(gainScratchValue(gainScratchBits, index), snapThreshold) &&
+      unorderedLess(gainScratchValue(gainScratchBits, index - 1), snapThreshold)
     ) {
       index--
       if (
-        unorderedLess(gainScratchValue(scratchBits, index - 1), snapThreshold)
+        unorderedLess(
+          gainScratchValue(gainScratchBits, index - 1),
+          snapThreshold
+        )
       ) {
         index--
       }
@@ -273,15 +278,15 @@ function selectPairReleasePoints(
     runningCeiling = groupPeak
     snapThreshold = runningCeiling * breakpointSnapRatio
   }
-  selectionScratch[0] = remainingBudget
-  selectionScratch[1] = tailCursor
+  gainSelectionScratch[0] = remainingBudget
+  gainSelectionScratch[1] = tailCursor
 }
 
 /**
  * Select attack points, merge release points, and lower cumulative levels.
  *
  * @param {Uint32Array} words
- * @param {Uint32Array} scratchBits
+ * @param {Uint32Array} gainScratchBits
  * @param {number} locationsBase
  * @param {number} levelsBase
  * @param {number} previousMaximumBits
@@ -291,7 +296,7 @@ function selectPairReleasePoints(
  */
 function selectPairAttackPoints(
   words,
-  scratchBits,
+  gainScratchBits,
   locationsBase,
   levelsBase,
   previousMaximumBits,
@@ -313,13 +318,13 @@ function selectPairAttackPoints(
 
   let entryCount = 0
   let previous = previousMaximum
-  if (unorderedLess(previous, gainScratchValue(scratchBits, 0))) {
-    previous = gainScratchValue(scratchBits, 0)
+  if (unorderedLess(previous, gainScratchValue(gainScratchBits, 0))) {
+    previous = gainScratchValue(gainScratchBits, 0)
   }
   const attackState = { smoothedRise: 0 }
   const limit = words[locationsBase + tailCursor] | 0
   for (let scan = 0; scan < limit; scan++) {
-    const candidatePeak = gainScratchValue(scratchBits, scan + 1)
+    const candidatePeak = gainScratchValue(gainScratchBits, scan + 1)
     if (unorderedLess(candidatePeak, previous)) continue
     const previousPeak = previous
     previous = candidatePeak
@@ -362,7 +367,7 @@ function selectPairAttackPoints(
  * Optionally seed an inactive primary pair from its active paired unit.
  *
  * @param {Uint32Array} words
- * @param {Uint32Array} scratchBits
+ * @param {Uint32Array} gainScratchBits
  * @param {number} locationsBase
  * @param {number} levelsBase
  * @param {number} selector
@@ -374,7 +379,7 @@ function selectPairAttackPoints(
  */
 function seedPairedGainPoint(
   words,
-  scratchBits,
+  gainScratchBits,
   locationsBase,
   levelsBase,
   selector,
@@ -405,7 +410,7 @@ function seedPairedGainPoint(
   if (maximum - minimum <= 1) return selector
   const checkCount = (words[pairedLocations] | 0) + 1
   for (let entry = 0; entry < checkCount; entry++) {
-    if (gainScratchValue(scratchBits, entry + 1) > seedMagnitudeLimit) {
+    if (gainScratchValue(gainScratchBits, entry + 1) > seedMagnitudeLimit) {
       return selector
     }
   }
@@ -419,8 +424,8 @@ function seedPairedGainPoint(
  *
  * @param {Uint32Array} words
  * @param {Uint32Array} maximumMagnitudes
- * @param {Uint32Array} scratchBits
- * @param {Int32Array} selectionScratch
+ * @param {Uint32Array} gainScratchBits
+ * @param {Int32Array} gainSelectionScratch
  * @param {number} layerFlag
  * @param {Int32Array} hints
  * @param {Int32Array} modes
@@ -428,8 +433,8 @@ function seedPairedGainPoint(
 function analyzePairBlocks(
   words,
   maximumMagnitudes,
-  scratchBits,
-  selectionScratch,
+  gainScratchBits,
+  gainSelectionScratch,
   layerFlag,
   hints,
   modes
@@ -446,35 +451,35 @@ function analyzePairBlocks(
     const oldMaximumBits = stagePairMagnitudeHistory(
       words,
       maximumMagnitudes,
-      scratchBits,
+      gainScratchBits,
       unit,
       pairBase
     )
     const modeSelector = pairModeSelector(unit, layerFlag, hints, modes)
-    const lastMaximum = measurePairGroupMaxima(words, scratchBits, pairBase)
+    const lastMaximum = measurePairGroupMaxima(words, gainScratchBits, pairBase)
     if (unit === 0) words[TONE_HISTORY_WORD] = previousCount
     selectPairReleasePoints(
       words,
-      scratchBits,
+      gainScratchBits,
       locationsBase,
       levelsBase,
       lastMaximum,
       modeSelector,
-      selectionScratch
+      gainSelectionScratch
     )
     const entryCount = selectPairAttackPoints(
       words,
-      scratchBits,
+      gainScratchBits,
       locationsBase,
       levelsBase,
       previousMaximumBits,
-      selectionScratch[0],
-      selectionScratch[1]
+      gainSelectionScratch[0],
+      gainSelectionScratch[1]
     )
     words[pairBase + PAIR_BLOCK_MAXIMUM_MAGNITUDE_WORD] = oldMaximumBits
     const selector = seedPairedGainPoint(
       words,
-      scratchBits,
+      gainScratchBits,
       locationsBase,
       levelsBase,
       entryCount,
