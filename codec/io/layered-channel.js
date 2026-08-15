@@ -117,13 +117,16 @@ function writeLayeredChannel(
   layer,
   work,
   sink,
-  { previousOutput = 0, gainSelectors = new Int32Array(4) } = {}
+  { previousOutput = 0, gainSelectors } = {}
 ) {
   const allocation = new AllocationWorkView(work)
   const spectrum = residualSpectrumView(work)
   if (!spectrum) throw new RangeError('Missing ATRAC3 residual spectrum')
   const unitCount = allocation.unitCount
   if (layer.stereoFlag !== 0) {
+    if (gainSelectors?.length < 4) {
+      throw new RangeError('ATRAC3 joint-stereo gain selectors are incomplete')
+    }
     const header = JointStereoHeader.create(
       previousOutput,
       gainSelectors,
@@ -186,11 +189,7 @@ export function packLayeredChannel(
   work,
   outputOffsetBytes,
   output,
-  {
-    previousOutput = 0,
-    gainSelectors = new Int32Array(4),
-    allowOverflow = false,
-  } = {}
+  { previousOutput = 0, gainSelectors, allowOverflow = false } = {}
 ) {
   if (!Number.isInteger(outputOffsetBytes) || outputOffsetBytes < 0) {
     throw new RangeError('ATRAC3 layered output offset must be non-negative')

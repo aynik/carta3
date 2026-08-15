@@ -14,7 +14,7 @@ describe('ATRAC3 sound-unit gain analysis', () => {
     seed.locations[3] = 0xdeadbeef
     const planned = planBandGainRecord(
       new Float32Array(768).fill(1),
-      undefined,
+      new GainRecord(),
       seed,
       pool.encoder.scratch.gainAnalysis
     )
@@ -31,8 +31,8 @@ describe('ATRAC3 sound-unit gain analysis', () => {
     spectrum.fill(64, 264, 768)
     const planned = planBandGainRecord(
       spectrum,
-      undefined,
-      undefined,
+      new GainRecord(),
+      new GainRecord(),
       pool.encoder.scratch.gainAnalysis
     )
     expect({

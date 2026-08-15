@@ -6,7 +6,7 @@
  * either channel's plan.
  */
 
-import { GainRecord, gainRecordBits } from '../coding/gain.js'
+import { gainRecordBits } from '../coding/gain.js'
 import {
   ATTACK_CANDIDATE_COUNT,
   BAND_PART_FLOATS,
@@ -344,15 +344,15 @@ function buildGainRecord(seed, peakHistory, levels) {
  * Plan one band's coded gain record without publishing persistent state.
  *
  * @param {Float32Array} spectrum Complete 768-float rolling band slot.
- * @param {GainRecord} [previousRecord] Prior committed gain record.
- * @param {GainRecord} [outputSeed] Detached destination seed.
+ * @param {GainRecord} previousRecord Prior committed gain record.
+ * @param {GainRecord} outputSeed Detached destination seed.
  * @param {GainAnalysisScratch} gainAnalysisScratch
  * @returns {GainRecord|null} Planned record, or `null` when unrepresentable.
  */
 export function planBandGainRecord(
   spectrum,
-  previousRecord = new GainRecord(),
-  outputSeed = new GainRecord(),
+  previousRecord,
+  outputSeed,
   gainAnalysisScratch
 ) {
   if (spectrum.length < 768) {

@@ -116,7 +116,6 @@ describe('ATRAC3 132 kbps non-tone allocation baseline', () => {
       pool.encoder.state.channelBlockRing[0][1].gainRecords,
       1536,
       pool.encoder.scratch.allocation,
-      undefined,
       TONE_POLICY_THRESHOLD
     )
     expect(block.toneEntryIndex).toBe(1)

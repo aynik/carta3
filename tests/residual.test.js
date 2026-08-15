@@ -21,7 +21,7 @@ import {
 } from '../codec/coding/residual.js'
 import { BitCounter } from '../codec/io/bitstream.js'
 import { packLayeredChannel } from '../codec/io/layered-channel.js'
-import { LayerState } from '../codec/state/layered.js'
+import { LayerState, ResidualSourceProfile } from '../codec/state/layered.js'
 
 const numberBits = new DataView(new ArrayBuffer(8))
 const floatBits = new DataView(new ArrayBuffer(4))
@@ -163,7 +163,7 @@ describe('ATRAC3 layered residual coding', () => {
   it('matches the residual source-analysis reference image', () => {
     const layer = new LayerState()
     layer.spectrum.set(referenceSpectrum())
-    const profile = measureResidualSource(layer)
+    const profile = measureResidualSource(layer, new ResidualSourceProfile())
     expect(sourceProfileHash(profile)).toBe('b720b245f658a5fe')
     expect(initialResidualBandLimit(profile, 12, 357, true)).toBe(28)
     expect(initialResidualBandLimit(profile, 12, 357, false)).toBe(12)
@@ -193,7 +193,7 @@ describe('ATRAC3 layered residual coding', () => {
       layer.stereoFlag = expected.stereoFlag
       layer.spectrum.set(referenceSpectrum())
       layer.pairBlocks[0][0x32] = 1
-      const profile = measureResidualSource(layer)
+      const profile = measureResidualSource(layer, new ResidualSourceProfile())
       const work = createAllocationWork()
       expect(
         allocateLayeredResidual(
@@ -222,7 +222,7 @@ describe('ATRAC3 layered residual coding', () => {
       const work = createAllocationWork()
       allocateLayeredResidual(
         layer,
-        measureResidualSource(layer),
+        measureResidualSource(layer, new ResidualSourceProfile()),
         limit,
         budget,
         mode,

@@ -1,6 +1,5 @@
 /** Carta3 Audio Codec - Gain-window reconstruction and application. */
 
-import { GainRecord } from '../coding/gain.js'
 import { float32FromBits, float32Multiply, float32ToBits } from '../utils.js'
 import {
   BAND_PART_FLOATS,
@@ -243,18 +242,18 @@ export function gainPairIsActive(previous, current) {
  *
  * @param {Float32Array} input Current 256-sample half-window.
  * @param {Float32Array} overlap Prior 256-sample overlap half.
- * @param {GainRecord} [previous] Prior-frame gain record.
- * @param {GainRecord} [current] Current-frame gain record.
- * @param {Float32Array} [output] Destination 512-sample window.
+ * @param {GainRecord} previous Prior-frame gain record.
+ * @param {GainRecord} current Current-frame gain record.
+ * @param {Float32Array} output Destination 512-sample window.
  * @param {GainScaleScratch} gainScaleScratch Reusable gain-scale buffers.
  * @returns {Float32Array|null} Reconstructed signal, or null for invalid syntax.
  */
 export function reconstructGainPairSignal(
   input,
   overlap,
-  previous = new GainRecord(),
-  current = new GainRecord(),
-  output = new Float32Array(GAIN_SCALE_SAMPLES),
+  previous,
+  current,
+  output,
   gainScaleScratch
 ) {
   if (input.length < 256 || overlap.length < 256 || output.length < 512) {

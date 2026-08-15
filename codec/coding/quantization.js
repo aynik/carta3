@@ -11,7 +11,7 @@ import {
   QUANTIZATION_BIAS_SCALE,
   QUANTIZATION_LIMIT_BIAS,
 } from '../core/constants.js'
-import { measureHuffmanBits } from './entropy.js'
+import { HUFFMAN_FAMILIES, measureHuffmanBits } from './entropy.js'
 
 /**
  * Resolve a coded spectral scale-factor index.
@@ -132,12 +132,11 @@ export function quantizeNontoneSymbols(
  * @param {number} tableGroup Huffman family selector.
  * @param {number} wordLength Coded word length.
  * @param {ArrayLike<number>} symbols Quantized symbols.
- * @param {object[][]} families Runtime Huffman families.
  * @returns {number} Exact syntax cost in bits.
  */
-export function measureNontoneBits(tableGroup, wordLength, symbols, families) {
+export function measureNontoneBits(tableGroup, wordLength, symbols) {
   if (wordLength === 0) return 0
-  const table = families?.[tableGroup]?.[wordLength]
+  const table = HUFFMAN_FAMILIES[tableGroup]?.[wordLength]
   if (!table) throw new RangeError('ATRAC3 non-tone codebook is unavailable')
   return 6 + measureHuffmanBits(table, symbols)
 }

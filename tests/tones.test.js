@@ -4,7 +4,6 @@ import {
   TONE_POLICY_NONE,
   TONE_POLICY_THRESHOLD,
 } from '../codec/core/constants.js'
-import { huffmanFamilies } from '../codec/coding/entropy.js'
 import { EncoderChannelBlock } from '../codec/state/encoder.js'
 
 describe('ATRAC3 multitone lowering', () => {
@@ -45,8 +44,7 @@ describe('ATRAC3 multitone lowering', () => {
         original,
         transformed,
         residual,
-        block,
-        huffmanFamilies()
+        block
       )
     ).toBe(0)
     expect(block.toneEntryIndex).toBe(0)
@@ -71,8 +69,7 @@ describe('ATRAC3 multitone lowering', () => {
       original,
       transformed,
       residual,
-      block,
-      huffmanFamilies()
+      block
     )
     expect(bits).toBeGreaterThan(0)
     expect(block.toneEntryIndex).toBe(1)
@@ -96,8 +93,7 @@ describe('ATRAC3 multitone lowering', () => {
         original,
         transformed,
         new Float32Array(1024).fill(100),
-        block,
-        huffmanFamilies()
+        block
       )
     ).toBe(0)
     expect(block.toneEntryIndex).toBe(0)

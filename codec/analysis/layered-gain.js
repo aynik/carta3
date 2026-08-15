@@ -33,7 +33,6 @@ import {
   SUBBAND_COUNT,
   TONE_HISTORY_WORD,
 } from '../core/constants.js'
-import { LayeredTransformState } from '../state/layered.js'
 import { float32FromBits, float32Multiply, float32ToBits } from '../utils.js'
 
 /**
@@ -502,14 +501,14 @@ function analyzePairBlocks(
  * @param {object} layer Transaction-local layer state.
  * @param {Int32Array} absoluteModeHints Joint-stereo gain hints.
  * @param {Int32Array} slotModes Joint-stereo slot modes.
- * @param {LayeredTransformState} [transformState] Cross-stage frame state.
+ * @param {LayeredTransformState} transformState Cross-stage frame state.
  * @returns {LayeredTransformState} State containing the selected gain plan.
  */
 export function analyzeLayeredGain(
   layer,
   absoluteModeHints,
   slotModes,
-  transformState = new LayeredTransformState()
+  transformState
 ) {
   if (
     !layer ||

@@ -1,7 +1,7 @@
 /** Carta3 Audio Codec - Independent sound-unit costing and emission. */
 
 import { packGainRecords } from '../coding/gain.js'
-import { huffmanFamilies, writeHuffman } from '../coding/entropy.js'
+import { HUFFMAN_FAMILIES, writeHuffman } from '../coding/entropy.js'
 import {
   QUANTIZATION_UNIT_OFFSETS,
   TONE_COEFFICIENT_COUNT_BY_DESCRIPTOR,
@@ -43,11 +43,10 @@ function writeHeader(syntax, sink) {
  * Write admitted tone components and return their total item count.
  *
  * @param {object} syntax
- * @param {object[][]} tables
  * @param {object} sink
  * @returns {number}
  */
-function writeToneComponents(syntax, tables, sink) {
+function writeToneComponents(syntax, sink) {
   const componentCount = syntax.toneEntryIndex
   if (
     !Number.isInteger(componentCount) ||
@@ -80,7 +79,9 @@ function writeToneComponents(syntax, tables, sink) {
     ).pack(sink)
 
     const table =
-      tables[2 + entry.huffmanTableSetIndex]?.[entry.huffmanTableBaseIndex]
+      HUFFMAN_FAMILIES[2 + entry.huffmanTableSetIndex]?.[
+        entry.huffmanTableBaseIndex
+      ]
     if (!table) throw new RangeError('ATRAC3 tone Huffman table is invalid')
     let coefficientCount =
       TONE_COEFFICIENT_COUNT_BY_DESCRIPTOR[entry.descriptorIndex]
@@ -118,10 +119,9 @@ function writeToneComponents(syntax, tables, sink) {
  * Write spectrum allocation metadata and quantized Huffman payload.
  *
  * @param {object} syntax
- * @param {object[][]} tables
  * @param {object} sink
  */
-function writeSpectrum(syntax, tables, sink) {
+function writeSpectrum(syntax, sink) {
   if (syntax.spectrumTableIndex !== 0 && syntax.spectrumTableIndex !== 1) {
     throw new RangeError('ATRAC3 spectrum table selector must be 0 or 1')
   }
@@ -132,7 +132,7 @@ function writeSpectrum(syntax, tables, sink) {
     syntax.scaleFactorIndices
   )
   allocation.pack(sink)
-  const family = tables[syntax.spectrumTableIndex]
+  const family = HUFFMAN_FAMILIES[syntax.spectrumTableIndex]
   for (let band = 0; band < allocation.groupCount; band++) {
     const wordLength = allocation.wordLengths[band]
     if (wordLength === 0) continue
@@ -150,17 +150,16 @@ function writeSpectrum(syntax, tables, sink) {
  * Traverse one complete sound unit through a writer or exact counter.
  *
  * @param {object} syntax
- * @param {object[][]} tables
  * @param {object} sink
  */
-function writeSoundUnit(syntax, tables, sink) {
+function writeSoundUnit(syntax, sink) {
   if (syntax.scratchFlag === 1) {
     throw new RangeError('Scratch ATRAC3 candidates cannot be serialized')
   }
   writeHeader(syntax, sink)
   packGainRecords(syntax.gainRecords.slice(0, syntax.componentGroupCount), sink)
-  writeToneComponents(syntax, tables, sink)
-  writeSpectrum(syntax, tables, sink)
+  writeToneComponents(syntax, sink)
+  writeSpectrum(syntax, sink)
 }
 
 /**
@@ -182,12 +181,11 @@ export function countSoundUnitFixedBits(syntax) {
  * Count one complete sound unit without writing an output image.
  *
  * @param {object} syntax Completed sound-unit syntax.
- * @param {object[][]} [tables] Runtime Huffman families.
  * @returns {number} Exact sound-unit length in bits.
  */
-export function countSoundUnitBits(syntax, tables = huffmanFamilies()) {
+export function countSoundUnitBits(syntax) {
   const sink = new BitCounter()
-  writeSoundUnit(syntax, tables, sink)
+  writeSoundUnit(syntax, sink)
   return sink.bitPosition
 }
 
@@ -199,16 +197,9 @@ export function countSoundUnitBits(syntax, tables = huffmanFamilies()) {
  * @param {number} exactBits
  * @param {Uint8Array} output
  * @param {number} [outputOffset]
- * @param {object[][]} [tables]
  * @returns {number}
  */
-export function packSoundUnit(
-  syntax,
-  exactBits,
-  output,
-  outputOffset = 0,
-  tables = huffmanFamilies()
-) {
+export function packSoundUnit(syntax, exactBits, output, outputOffset = 0) {
   if (!Number.isInteger(exactBits) || exactBits < 0) {
     throw new RangeError('ATRAC3 sound-unit bit ledger is invalid')
   }
@@ -217,7 +208,7 @@ export function packSoundUnit(
   }
   const start = outputOffset * 8
   const sink = new BitWriter(output, start)
-  writeSoundUnit(syntax, tables, sink)
+  writeSoundUnit(syntax, sink)
   const actualBits = sink.bitPosition - start
   if (actualBits !== exactBits) {
     throw new RangeError(

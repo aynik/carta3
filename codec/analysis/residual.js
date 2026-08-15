@@ -4,7 +4,6 @@ import {
   QUANTIZATION_UNIT_OFFSETS,
   RESIDUAL_BAND_ENERGY_THRESHOLDS,
 } from '../core/tables.js'
-import { ResidualSourceProfile } from '../state/layered.js'
 import { float32ToBits } from '../utils.js'
 
 /**
@@ -25,13 +24,10 @@ function scaleFactorEstimate(magnitudeKey) {
  * Measure stable activity, scale, and mono-expansion evidence for one layer.
  *
  * @param {object} layer Transformed transaction-local layer state.
- * @param {object} [profile] Reusable destination measurement profile.
+ * @param {ResidualSourceProfile} profile Reusable destination measurement profile.
  * @returns {object} The populated `profile`.
  */
-export function measureResidualSource(
-  layer,
-  profile = new ResidualSourceProfile()
-) {
+export function measureResidualSource(layer, profile) {
   if (
     !layer?.spectrum ||
     layer.spectrum.length < 1024 ||

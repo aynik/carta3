@@ -46,21 +46,18 @@ function buildFamily(pairs) {
   return family
 }
 
-let cachedFamilies
-
 /**
- * Return the cached Huffman families used by spectrum and tone syntax.
- *
- * @returns {object[][]} Four immutable family slots: spectrum A/B then tone A/B.
+ * Eagerly expanded Huffman families used by spectrum and tone syntax.
+ * The tone slots alias the corresponding spectrum families.
  */
-export function huffmanFamilies() {
-  if (!cachedFamilies) {
-    const primary = buildFamily(HUFFMAN_PAIRS_A)
-    const secondary = buildFamily(HUFFMAN_PAIRS_B)
-    cachedFamilies = [primary, secondary, primary, secondary]
-  }
-  return cachedFamilies
-}
+const primaryHuffmanFamily = buildFamily(HUFFMAN_PAIRS_A)
+const secondaryHuffmanFamily = buildFamily(HUFFMAN_PAIRS_B)
+export const HUFFMAN_FAMILIES = Object.freeze([
+  primaryHuffmanFamily,
+  secondaryHuffmanFamily,
+  primaryHuffmanFamily,
+  secondaryHuffmanFamily,
+])
 
 /**
  * Traverse symbols using the table's one- or two-value grouping rule.
@@ -99,7 +96,7 @@ function visitSymbols(table, values, count, visitor) {
 /**
  * Measure the exact Huffman cost of a symbol run.
  *
- * @param {object} table One word-length table from {@link huffmanFamilies}.
+ * @param {object} table One word-length table from {@link HUFFMAN_FAMILIES}.
  * @param {ArrayLike<number>} values Signed symbols in encoder representation.
  * @param {number} [count] Number of values to traverse.
  * @returns {number} Required codeword bits.
@@ -192,7 +189,7 @@ function reconstructionRank(symbol, wordLength) {
  */
 export function readHuffmanRun(reader, tableSelector, codeIndex, sampleCount) {
   const wordLength = codeIndex + 1
-  const table = huffmanFamilies()[tableSelector & 1]?.[wordLength]
+  const table = HUFFMAN_FAMILIES[tableSelector & 1]?.[wordLength]
   if (!table || !Number.isInteger(sampleCount) || sampleCount < 0) {
     throw new RangeError('Invalid ATRAC3 Huffman run geometry')
   }

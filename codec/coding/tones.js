@@ -1,6 +1,6 @@
 /** Carta3 Audio Codec - Sound-unit tone analysis and coding. */
 
-import { measureHuffmanBits } from './entropy.js'
+import { HUFFMAN_FAMILIES, measureHuffmanBits } from './entropy.js'
 import {
   scaleFactorIndexForAbs,
   spectralScaleForIndex,
@@ -75,10 +75,9 @@ function toneScaleFactorIndex(value) {
  *
  * @param {Float32Array} spectrum
  * @param {number} scanIndex
- * @param {object[][]} tables
  * @returns {object}
  */
-function quantizeTone(spectrum, scanIndex, tables) {
+function quantizeTone(spectrum, scanIndex) {
   const tone = createToneSpec()
   tone.start = scanIndex * 4
   const coefficientCount = TONE_DESCRIPTOR + 1
@@ -97,7 +96,7 @@ function quantizeTone(spectrum, scanIndex, tables) {
         ? 0
         : quantizeSpectralValue(spectrum[index], scale, steps)
   }
-  const table = tables[2 + TONE_TABLE_SET][TONE_WORD_LENGTH]
+  const table = HUFFMAN_FAMILIES[2 + TONE_TABLE_SET][TONE_WORD_LENGTH]
   return {
     tone,
     exactBits:
@@ -162,7 +161,6 @@ function preflight(scaleFactors, count, threshold, existingToneCount) {
  * @param {Int32Array} transformedScaleFactors Candidate residual profile.
  * @param {Float32Array} residual Residual spectrum, lowered in place.
  * @param {object} block Sound-unit syntax candidate receiving tones.
- * @param {object[][]} tables Runtime Huffman families.
  * @returns {number} Exact admitted tone-section bits.
  */
 export function extractMultitone(
@@ -174,8 +172,7 @@ export function extractMultitone(
   originalScaleFactors,
   transformedScaleFactors,
   residual,
-  block,
-  tables
+  block
 ) {
   if (policy === TONE_POLICY_NONE) return 0
   if (policy !== TONE_POLICY_THRESHOLD) {
@@ -217,7 +214,7 @@ export function extractMultitone(
       TONE_SIDE_BITS_BY_MODE[tableIndex] * 4 + TONE_COMPONENT_SIDE_BITS
     if (bits + componentReserve > budget) continue
 
-    const lowering = quantizeTone(residual, scan, tables)
+    const lowering = quantizeTone(residual, scan)
     const toneIndex = block.toneCount++
     const listIndex = entry.listCounts[listBlock]++
     entry.lists[listBlock][listIndex] = toneIndex

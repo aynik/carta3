@@ -27,7 +27,6 @@ import {
   QUANTIZATION_UNIT_OFFSETS,
   WORD_LENGTH_QUANTIZER_LEVELS,
 } from '../core/tables.js'
-import { huffmanFamilies } from './entropy.js'
 import {
   quantZeroThreshold,
   scaleFactorIndexForAbs,
@@ -228,10 +227,9 @@ function normalizeSpectrum(scaleFactors, bandCount, output) {
  * @param {object} state
  * @param {Float32Array} spectrum
  * @param {number} bandCount
- * @param {object[][]} tables
  * @returns {number}
  */
-function priceState(state, spectrum, bandCount, tables) {
+function priceState(state, spectrum, bandCount) {
   state.sumBits = 0
   for (let band = 0; band < bandCount; band++) {
     const start = QUANTIZATION_UNIT_OFFSETS[band]
@@ -244,8 +242,7 @@ function priceState(state, spectrum, bandCount, tables) {
       spectrum.subarray(start, end),
       symbols
     )
-    const bits =
-      count === 0 ? 0 : measureNontoneBits(0, wordLength, symbols, tables)
+    const bits = count === 0 ? 0 : measureNontoneBits(0, wordLength, symbols)
     state.bitsByBand[band] = bits
     state.sumBits += bits
   }
@@ -259,18 +256,10 @@ function priceState(state, spectrum, bandCount, tables) {
  * @param {number} timeFactor Candidate dead-zone time factor.
  * @param {Float32Array} spectrum Normalized source spectrum.
  * @param {number} band Quantization-band index.
- * @param {object[][]} tables Canonical Huffman table families.
  * @param {Int32Array} output Detached symbol destination for the band.
  * @returns {number} Exact Huffman syntax cost for the candidate band.
  */
-function priceBandOption(
-  wordLength,
-  timeFactor,
-  spectrum,
-  band,
-  tables,
-  output
-) {
+function priceBandOption(wordLength, timeFactor, spectrum, band, output) {
   const start = QUANTIZATION_UNIT_OFFSETS[band]
   const end = QUANTIZATION_UNIT_OFFSETS[band + 1]
   const symbols = output.subarray(0, end - start)
@@ -280,7 +269,7 @@ function priceBandOption(
     spectrum.subarray(start, end),
     symbols
   )
-  return count === 0 ? 0 : measureNontoneBits(0, wordLength, symbols, tables)
+  return count === 0 ? 0 : measureNontoneBits(0, wordLength, symbols)
 }
 
 /**
@@ -291,7 +280,6 @@ function priceBandOption(
  * @param {number} band Quantization-band index.
  * @param {number} wordLength Selected spectral word length.
  * @param {number} timeFactor Selected dead-zone time factor.
- * @param {object[][]} tables Canonical Huffman table families.
  * @param {Int32Array} symbolScratch Detached symbol storage for the selected band.
  * @returns {number} Exact change in the allocation's residual bit cost.
  */
@@ -301,7 +289,6 @@ function commitBandOption(
   band,
   wordLength,
   timeFactor,
-  tables,
   symbolScratch
 ) {
   const previousBits = state.bitsByBand[band]
@@ -310,7 +297,6 @@ function commitBandOption(
     timeFactor,
     spectrum,
     band,
-    tables,
     symbolScratch
   )
   const start = QUANTIZATION_UNIT_OFFSETS[band]
@@ -347,7 +333,6 @@ function tuneWeight(tune, band) {
  * @param {number} runningBitSum
  * @param {Float32Array} spectrum
  * @param {number} bandCount
- * @param {object[][]} tables
  * @param {Int32Array} candidateSymbols
  * @returns {object}
  */
@@ -360,7 +345,6 @@ function retunedState(
   runningBitSum,
   spectrum,
   bandCount,
-  tables,
   candidateSymbols
 ) {
   seed.copyTo(state)
@@ -379,7 +363,6 @@ function retunedState(
         band,
         wordLength,
         seed.timeFactors[band],
-        tables,
         candidateSymbols
       )
     }
@@ -396,7 +379,6 @@ function retunedState(
  * @param {number} budget
  * @param {Float32Array} spectrum
  * @param {number} bandCount
- * @param {object[][]} tables
  * @param {SoundUnitAllocationScratch} allocationScratch
  * @returns {object}
  */
@@ -407,7 +389,6 @@ function tuneToBudget(
   budget,
   spectrum,
   bandCount,
-  tables,
   allocationScratch
 ) {
   let current = seed
@@ -432,7 +413,6 @@ function tuneToBudget(
         current.sumBits,
         spectrum,
         bandCount,
-        tables,
         allocationScratch.candidateSymbols
       )
       if (current.sumBits <= budget) {
@@ -466,7 +446,6 @@ function tuneToBudget(
         current.sumBits,
         spectrum,
         bandCount,
-        tables,
         allocationScratch.candidateSymbols
       )
       if (current.sumBits <= budget) {
@@ -495,7 +474,6 @@ function tuneToBudget(
         current.sumBits,
         spectrum,
         bandCount,
-        tables,
         allocationScratch.candidateSymbols
       )
       if (current.sumBits <= budget) {
@@ -535,7 +513,7 @@ function trimTargets(transformedScaleFactors, bandCount) {
  * @returns {object|null}
  */
 function trimCandidate(state, target, operation) {
-  const { spectrum, tables, kind, candidateSymbols, mask } = operation
+  const { spectrum, kind, candidateSymbols, mask } = operation
   const band = target.band
   if (state.wordLengths[band] <= 0) return null
   let wordLength = state.wordLengths[band]
@@ -552,7 +530,6 @@ function trimCandidate(state, target, operation) {
         timeFactor,
         spectrum,
         band,
-        tables,
         candidateSymbols
       )
       if (candidateBits < state.bitsByBand[band]) break
@@ -565,7 +542,6 @@ function trimCandidate(state, target, operation) {
       timeFactor,
       spectrum,
       band,
-      tables,
       candidateSymbols
     )
   }
@@ -612,7 +588,7 @@ function rankTrimCandidates(candidates) {
  * @returns {object}
  */
 function acceptTrimChoice(state, choice, operation) {
-  const { spectrum, tables, candidateSymbols } = operation
+  const { spectrum, candidateSymbols } = operation
   const band = choice.target.band
   commitBandOption(
     state,
@@ -620,7 +596,6 @@ function acceptTrimChoice(state, choice, operation) {
     band,
     choice.wordLength,
     choice.timeFactor,
-    tables,
     candidateSymbols
   )
   return state
@@ -707,7 +682,6 @@ function trimPhase(state, budget, operation) {
  * @param {number} bandCount
  * @param {number} componentCount
  * @param {ArrayLike<number>} transformedScaleFactors
- * @param {object[][]} tables
  * @param {Int32Array} candidateSymbols
  * @returns {object}
  */
@@ -718,7 +692,6 @@ function trimToBudget(
   bandCount,
   componentCount,
   transformedScaleFactors,
-  tables,
   candidateSymbols
 ) {
   if (state.sumBits <= budget) return state
@@ -730,7 +703,6 @@ function trimToBudget(
   )
   const operation = {
     spectrum,
-    tables,
     targets,
     kind: 'time',
     targetLimit: componentCount,
@@ -770,13 +742,12 @@ function measureFillCandidate(
   incumbentNoise,
   operation
 ) {
-  const { spectrum, tables, candidateSymbols, candidates, mask } = operation
+  const { spectrum, candidateSymbols, candidates, mask } = operation
   const candidateBits = priceBandOption(
     wordLength,
     timeFactor,
     spectrum,
     band,
-    tables,
     candidateSymbols
   )
   const delta = candidateBits - state.bitsByBand[band]
@@ -851,8 +822,7 @@ function refreshFillBand(state, band, allowLowerTimeFactors, operation) {
  * @returns {object} The incrementally improved `state` allocation.
  */
 function spendSlack(state, unitBits, syntaxBits, operation) {
-  const { spectrum, bandCount, candidates, tables, candidateSymbols } =
-    operation
+  const { spectrum, bandCount, candidates, candidateSymbols } = operation
   const allowLowerTimeFactors = state.timeFactors
     .subarray(0, bandCount)
     .some((value) => value > 0)
@@ -895,7 +865,6 @@ function spendSlack(state, unitBits, syntaxBits, operation) {
       band,
       candidates.wordLengths[selected],
       candidates.timeFactors[selected],
-      tables,
       candidateSymbols
     )
     used += delta
@@ -1017,7 +986,6 @@ function commitAllocation(block, state, componentCount, bandCount) {
  * @param {GainRecord[]} previousGainRecords Prior committed gain records.
  * @param {number} unitBits Exact sound-unit bit budget.
  * @param {SoundUnitAllocationScratch} allocationScratch Reusable allocation scratch.
- * @param {object} [tables] Canonical Huffman table families.
  * @param {string} [tonePolicy] Tone candidate policy identifier.
  * @returns {number} Exact selected syntax bit count.
  */
@@ -1028,7 +996,6 @@ export function allocateNontoneSoundUnit(
   previousGainRecords,
   unitBits,
   allocationScratch,
-  tables = huffmanFamilies(),
   tonePolicy = TONE_POLICY_NONE
 ) {
   if (
@@ -1076,8 +1043,7 @@ export function allocateNontoneSoundUnit(
     originalProfile.values,
     transformedProfile.values,
     normalizedSpectrum,
-    block,
-    tables
+    block
   )
   const originalScaleFactors = bandScaleFactors(
     originalProfile,
@@ -1112,7 +1078,7 @@ export function allocateNontoneSoundUnit(
     translated.output,
     originalScaleFactors
   )
-  priceState(state, normalizedSpectrum, bandCount, tables)
+  priceState(state, normalizedSpectrum, bandCount)
   const gate = translateWordLengths(
     maximumWordLengthThresholds,
     transformedScaleFactors,
@@ -1136,7 +1102,6 @@ export function allocateNontoneSoundUnit(
     residualBudget,
     normalizedSpectrum,
     bandCount,
-    tables,
     allocationScratch
   )
   state = trimToBudget(
@@ -1146,7 +1111,6 @@ export function allocateNontoneSoundUnit(
     bandCount,
     componentCount,
     transformedScaleFactors,
-    tables,
     candidateSymbols
   )
   let activeBands = activeBandCount(state, bandCount)
@@ -1157,12 +1121,11 @@ export function allocateNontoneSoundUnit(
   // is published.  Starting from the already-shortened wire cost here gives
   // sparse drain frames extra budget and can select different final moves.
   const reservedSyntaxBits =
-    countSoundUnitBits(block, tables) + (bandCount - activeBands) * 3
+    countSoundUnitBits(block) + (bandCount - activeBands) * 3
   const fillOperation = {
     transformedScaleFactors,
     spectrum: normalizedSpectrum,
     bandCount: activeBands,
-    tables,
     candidateSymbols,
     candidates: fillCandidates,
     mask: null,
@@ -1171,7 +1134,7 @@ export function allocateNontoneSoundUnit(
   refineScaleFactors(state, normalizedSpectrum, activeBands)
   commitAllocation(block, state, componentCount, activeBands)
 
-  while (countSoundUnitBits(block, tables) > unitBits) {
+  while (countSoundUnitBits(block) > unitBits) {
     const band = block.wordLengths.findLastIndex(
       (value, index) => index < activeBands && value > 0
     )
@@ -1180,11 +1143,11 @@ export function allocateNontoneSoundUnit(
         'ATRAC3 sound unit cannot fit its fixed syntax'
       )
     state.wordLengths[band] = 0
-    priceState(state, normalizedSpectrum, bandCount, tables)
+    priceState(state, normalizedSpectrum, bandCount)
     activeBands = activeBandCount(state, bandCount)
     commitAllocation(block, state, componentCount, activeBands)
   }
-  return countSoundUnitBits(block, tables)
+  return countSoundUnitBits(block)
 }
 
 /**
@@ -1260,7 +1223,6 @@ function reconstructionError(block, source, allocationScratch) {
  * @param {GainRecord[]} previousGainRecords Prior committed gain records.
  * @param {number} unitBits Exact sound-unit bit budget.
  * @param {SoundUnitAllocationScratch} allocationScratch Reusable allocation scratch.
- * @param {object} [tables] Canonical Huffman table families.
  * @returns {number} Exact bit count of the published candidate.
  */
 export function allocateSoundUnitCandidates(
@@ -1270,8 +1232,7 @@ export function allocateSoundUnitCandidates(
   candidateBlock,
   previousGainRecords,
   unitBits,
-  allocationScratch,
-  tables = huffmanFamilies()
+  allocationScratch
 ) {
   selectedBlock.copyTo(candidateBlock)
   let toneBits = 0
@@ -1284,7 +1245,6 @@ export function allocateSoundUnitCandidates(
       previousGainRecords,
       unitBits,
       allocationScratch,
-      tables,
       TONE_POLICY_THRESHOLD
     )
     if (selectedBlock.toneCount === 0) return toneBits
@@ -1304,7 +1264,6 @@ export function allocateSoundUnitCandidates(
     previousGainRecords,
     unitBits,
     allocationScratch,
-    tables,
     TONE_POLICY_NONE
   )
   const nontoneError = reconstructionError(
