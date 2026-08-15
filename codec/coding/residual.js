@@ -14,7 +14,12 @@ import {
 } from '../core/constants.js'
 import { float32FromBits, float32ToBits } from '../utils.js'
 
-/** Expand one compact residual mode into encoder and decoder tables. */
+/**
+ * Expand one compact residual mode into encoder and decoder tables.
+ *
+ * @param {number} mode
+ * @returns {object}
+ */
 function buildCodebook(mode) {
   const pairs = RESIDUAL_CODE_PAIRS[mode - 1]
   const count = pairs.length / 2
@@ -56,7 +61,11 @@ function buildCodebook(mode) {
 
 let residualCodebooks
 
-/** Lazily build and cache all seven residual codebooks. */
+/**
+ * Lazily build and cache all seven residual codebooks.
+ *
+ * @returns {object[]}
+ */
 function codebooks() {
   residualCodebooks ??= Array.from({ length: 7 }, (_, index) =>
     buildCodebook(index + 1)
@@ -66,6 +75,7 @@ function codebooks() {
 
 /**
  * Resolve one cached low-rate residual codebook.
+ *
  * @param {number} mode Coded residual mode from 1 through 7.
  * @returns {object|null} Codebook, or null for an invalid mode.
  */
@@ -77,6 +87,7 @@ export function residualCodebook(mode) {
 
 /**
  * Compute the exact f32 scale used before residual symbol-index rounding.
+ *
  * @param {number} mode Residual quantization mode.
  * @param {number} scaleFactor Six-bit residual scale-factor index.
  * @returns {number} Float32 quantizer scale.
@@ -99,6 +110,7 @@ export function residualQuantGroupScale(mode, scaleFactor) {
 
 /**
  * Quantize through the codec's f64 multiply plus f32 rounding-bit boundary.
+ *
  * @param {number} coefficient Source spectral coefficient.
  * @param {number} quantizerScale Float32 quantizer scale.
  * @param {number} symbolMask Codebook-specific unsigned symbol mask.
@@ -115,7 +127,13 @@ export function quantizeResidualCoefficient(
   return float32ToBits(rounded) & symbolMask
 }
 
-/** Validate and return one residual band's coefficient range. */
+/**
+ * Validate and return one residual band's coefficient range.
+ *
+ * @param {Float32Array} source
+ * @param {number} band
+ * @returns {object}
+ */
 function residualBandRange(source, band) {
   if (!Number.isInteger(band) || band < 0 || band >= 32) {
     throw new RangeError('Invalid ATRAC3 residual band geometry')
@@ -128,7 +146,12 @@ function residualBandRange(source, band) {
   return { start, end }
 }
 
-/** Validate one residual mode/scale-factor pair before coding. */
+/**
+ * Validate one residual mode/scale-factor pair before coding.
+ *
+ * @param {number} mode
+ * @param {number} scaleFactor
+ */
 function validateResidualSyntax(mode, scaleFactor) {
   if (!Number.isInteger(mode) || mode < 1 || mode > 7) {
     throw new RangeError('Invalid ATRAC3 residual quantization mode')
@@ -138,7 +161,15 @@ function validateResidualSyntax(mode, scaleFactor) {
   }
 }
 
-/** Quantize and measure reconstruction cost over a coefficient range. */
+/**
+ * Quantize and measure reconstruction cost over a coefficient range.
+ *
+ * @param {Float32Array} source
+ * @param {object} range
+ * @param {number} mode
+ * @param {number} scaleFactor
+ * @returns {object}
+ */
 function residualBandCostInRange(source, range, mode, scaleFactor) {
   validateResidualSyntax(mode, scaleFactor)
   const codebook = residualCodebook(mode)
@@ -192,6 +223,7 @@ function residualBandCostInRange(source, range, mode, scaleFactor) {
 
 /**
  * Measure exact syntax bits, reconstruction error, and energy for one band.
+ *
  * @param {ArrayLike<number>} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Residual mode, or zero for an omitted band.
@@ -212,6 +244,7 @@ export function measureResidualBand(source, band, mode, scaleFactor) {
 
 /**
  * Measure the immediately adjacent residual modes for allocation search.
+ *
  * @param {ArrayLike<number>} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Current residual mode.
@@ -234,6 +267,7 @@ export function measureResidualModeNeighbors(source, band, mode, scaleFactor) {
 
 /**
  * Measure the immediately adjacent scale factors for allocation search.
+ *
  * @param {ArrayLike<number>} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Current residual mode.
@@ -256,7 +290,16 @@ export function measureResidualScaleNeighbors(source, band, mode, scaleFactor) {
   })
 }
 
-/** Quantize and write residual symbols over a validated coefficient range. */
+/**
+ * Quantize and write residual symbols over a validated coefficient range.
+ *
+ * @param {Float32Array} source
+ * @param {object} range
+ * @param {number} mode
+ * @param {number} scaleFactor
+ * @param {object} sink
+ * @returns {number}
+ */
 function writeResidualSymbolsInRange(source, range, mode, scaleFactor, sink) {
   const codebook = residualCodebook(mode)
   const quantizerScale = residualQuantGroupScale(mode, scaleFactor)
@@ -288,6 +331,7 @@ function writeResidualSymbolsInRange(source, range, mode, scaleFactor, sink) {
 
 /**
  * Emit only residual symbols; the allocation header owns the selector.
+ *
  * @param {ArrayLike<number>} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Residual quantization mode.
@@ -303,6 +347,7 @@ export function writeResidualSymbols(source, band, mode, scaleFactor, sink) {
 
 /**
  * Emit a residual band's six-bit scale selector and exact codewords.
+ *
  * @param {ArrayLike<number>} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Residual quantization mode.

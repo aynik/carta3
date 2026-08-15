@@ -20,7 +20,14 @@ import { GainAnalysisScratch, GainScaleScratch } from '../state/encoder.js'
 import { bandGainOffset } from '../transforms/qmf.js'
 import { absoluteMaximum } from '../utils.js'
 
-/** Measure consecutive fixed-width absolute maxima into caller storage. */
+/**
+ * Measure consecutive fixed-width absolute maxima into caller storage.
+ *
+ * @param {Float32Array} values
+ * @param {number} start
+ * @param {number} chunkLength
+ * @param {Float32Array} output
+ */
 function fillAbsMaxChunks(values, start, chunkLength, output) {
   for (let chunk = 0; chunk < output.length; chunk++) {
     output[chunk] = absoluteMaximum(
@@ -33,6 +40,7 @@ function fillAbsMaxChunks(values, start, chunkLength, output) {
 
 /**
  * Detect an adaptive logarithmic rise and advance detector smoothing.
+ *
  * @param {number} value Candidate peak magnitude.
  * @param {number} ceiling Previous running peak.
  * @param {{smoothedRise: number}} state Mutable detector history.
@@ -48,19 +56,36 @@ export function detectGainLogFlux(value, ceiling, state) {
   return detected
 }
 
-/** Convert a positive gain ratio to the codec's rounded log2 step. */
+/**
+ * Convert a positive gain ratio to the codec's rounded log2 step.
+ *
+ * @param {number} value
+ * @returns {number}
+ */
 function gainLog2Round(value) {
   const safe = value <= 1e-20 ? 1e-20 : value
   return Math.trunc(Math.log10(safe) / Math.log10(2) + 0.5)
 }
 
-/** Mark one detector slot with its requested positive gain step. */
+/**
+ * Mark one detector slot with its requested positive gain step.
+ *
+ * @param {object[]} entries
+ * @param {number} slot
+ * @param {number} requestedStep
+ */
 function detectCandidate(entries, slot, requestedStep) {
   entries[slot].requestedStep = Math.max(0, requestedStep)
   entries[slot].detected = true
 }
 
-/** Retain the strongest detector events within the coded point limit. */
+/**
+ * Retain the strongest detector events within the coded point limit.
+ *
+ * @param {object[]} entries
+ * @param {number} detectedCount
+ * @param {Int32Array} ranked
+ */
 function selectCandidates(entries, detectedCount, ranked) {
   const limit = Math.min(detectedCount, MAX_SELECTED_GAIN_CANDIDATES)
   let rankedCount = 0
@@ -94,7 +119,15 @@ function selectCandidates(entries, detectedCount, ranked) {
   if (rankedCount < limit) entries[0].selected = true
 }
 
-/** Detect attack/release breakpoints while advancing peak history. */
+/**
+ * Detect attack/release breakpoints while advancing peak history.
+ *
+ * @param {Float32Array} spectrum
+ * @param {number} sampleCount
+ * @param {GainRecord} previousRecord
+ * @param {GainAnalysisScratch} scratch
+ * @returns {object|null}
+ */
 function detectGainCandidates(spectrum, sampleCount, previousRecord, scratch) {
   const { maxima, groupMaxima, candidates, rankedCandidateSlots } = scratch
   scratch.resetCandidates()
@@ -173,13 +206,26 @@ function detectGainCandidates(spectrum, sampleCount, previousRecord, scratch) {
   }
 }
 
-/** Clamp one gain step to the remaining representable budget. */
+/**
+ * Clamp one gain step to the remaining representable budget.
+ *
+ * @param {number} step
+ * @param {number} used
+ * @param {number} limit
+ * @returns {number}
+ */
 function boundedGainStep(step, used, limit) {
   const requested = Math.max(0, step)
   return Math.min(requested, limit - used)
 }
 
-/** Lower detector events into the seven-point coded representation. */
+/**
+ * Lower detector events into the seven-point coded representation.
+ *
+ * @param {object} detection
+ * @param {GainRecord} previousRecord
+ * @returns {object}
+ */
 function lowerGainCandidates(detection, previousRecord) {
   const up = []
   const down = []
@@ -219,7 +265,13 @@ function lowerGainCandidates(detection, previousRecord) {
   return { up, down }
 }
 
-/** Convert signed gain deltas to the cumulative coded level envelope. */
+/**
+ * Convert signed gain deltas to the cumulative coded level envelope.
+ *
+ * @param {object} lowered
+ * @param {Int32Array} levels
+ * @returns {Int32Array}
+ */
 function gainLevelEnvelope(lowered, levels) {
   let accumulated = 0
   for (let index = lowered.down.length - 1; index >= 0; index--) {
@@ -246,7 +298,14 @@ function gainLevelEnvelope(lowered, levels) {
   return levels
 }
 
-/** Materialize a record in caller-owned storage while preserving unused slots. */
+/**
+ * Materialize a record in caller-owned storage while preserving unused slots.
+ *
+ * @param {GainRecord} seed
+ * @param {number} peakHistory
+ * @param {Int32Array} levels
+ * @returns {GainRecord|null}
+ */
 function buildGainRecord(seed, peakHistory, levels) {
   const events = []
   for (let location = 31; location >= 0; location--) {
@@ -278,9 +337,11 @@ function buildGainRecord(seed, peakHistory, levels) {
 
 /**
  * Plan one band's coded gain record without publishing persistent state.
+ *
  * @param {Float32Array} spectrum Complete 768-float rolling band slot.
  * @param {GainRecord} [previousRecord] Prior committed gain record.
  * @param {GainRecord} [outputSeed] Detached destination seed.
+ * @param {GainAnalysisScratch} [scratch]
  * @returns {GainRecord|null} Planned record, or `null` when unrepresentable.
  */
 export function planBandGainRecord(
@@ -309,7 +370,14 @@ export function planBandGainRecord(
   )
 }
 
-/** Measure the strongest prefix excursion around the minimum coded level. */
+/**
+ * Measure the strongest prefix excursion around the minimum coded level.
+ *
+ * @param {GainRecord} record
+ * @param {number} minimumSeed
+ * @param {number} maximumSeed
+ * @returns {number}
+ */
 function prefixPeakToMinimumLevelDelta(record, minimumSeed, maximumSeed) {
   if (record.entries === 0) return 0
   let minimum = minimumSeed
@@ -327,7 +395,13 @@ function prefixPeakToMinimumLevelDelta(record, minimumSeed, maximumSeed) {
   return maximum - minimum
 }
 
-/** Compare continuity candidates in reconstructed time-domain sample space. */
+/**
+ * Compare continuity candidates in reconstructed time-domain sample space.
+ *
+ * @param {Float32Array} candidate
+ * @param {Float32Array} reference
+ * @returns {object}
+ */
 function compareSignals(candidate, reference) {
   let candidateEnergy = 0
   let differenceEnergy = 0
@@ -343,6 +417,7 @@ function compareSignals(candidate, reference) {
 
 /**
  * Select the optional band-1-to-band-0 continuity insertion.
+ *
  * @param {Float32Array} targetSpectrum First band's rolling sample slot.
  * @param {GainRecord[]} previousRecords Prior committed channel records.
  * @param {GainRecord[]} plannedRecords Candidate current records.
@@ -373,10 +448,11 @@ export function planGainContinuityEdit(
 
 /**
  * Evaluate and apply the optional continuity edit in reconstructed sample space.
+ *
  * @param {Float32Array} targetSpectrum First band's rolling sample slot.
  * @param {GainRecord[]} previousRecords Prior committed records.
  * @param {GainRecord[]} plannedRecords Detached current records.
- * @param {object} [scratch] Reusable gain reconstruction scratch.
+ * @param {GainScaleScratch} [scratch] Reusable gain reconstruction scratch.
  * @returns {GainRecord[]|null} Selected detached records, or `null` on failure.
  */
 export function adjustGainContinuity(
@@ -433,10 +509,12 @@ export function adjustGainContinuity(
 
 /**
  * Plan all four channel gain records atomically.
+ *
  * @param {Float32Array} channelState Persistent rolling subband state.
  * @param {GainRecord[]} previousRecords Prior committed records.
  * @param {GainRecord[]} outputSeeds Detached destination records.
- * @param {object} [scratch] Reusable gain reconstruction scratch.
+ * @param {GainScaleScratch} [scratch] Reusable gain reconstruction scratch.
+ * @param {GainAnalysisScratch} [analysisScratch]
  * @returns {GainRecord[]|null} Complete plan, or `null` if any band fails.
  */
 export function planGainControl(

@@ -30,12 +30,26 @@ const SCALE_FACTOR_SENTINEL = SCALE_FACTOR_INDEX_MAX + 1
 const HIGH_BAND_CORRECTION_START = 0x12
 const CORRECTION_FIXED_POINT_SCALE = 0x400
 
-/** Clamp an integer-like value to an inclusive range. */
+/**
+ * Clamp an integer-like value to an inclusive range.
+ *
+ * @param {number} value
+ * @param {number} minimum
+ * @param {number} maximum
+ * @returns {number}
+ */
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value))
 }
 
-/** Trim inactive tail bands while preserving a required minimum prefix. */
+/**
+ * Trim inactive tail bands while preserving a required minimum prefix.
+ *
+ * @param {number} limit
+ * @param {number} minimum
+ * @param {function(number): boolean} isActive
+ * @returns {number}
+ */
 function activeBandPrefixLength(limit, minimum, isActive) {
   const floor = Math.min(minimum, limit)
   let count = limit
@@ -43,28 +57,58 @@ function activeBandPrefixLength(limit, minimum, isActive) {
   return count
 }
 
-/** Return the coefficient width of one residual band. */
+/**
+ * Return the coefficient width of one residual band.
+ *
+ * @param {number} band
+ * @returns {number}
+ */
 function bandWidth(band) {
   return QUANTIZATION_UNIT_OFFSETS[band + 1] - QUANTIZATION_UNIT_OFFSETS[band]
 }
 
-/** Return the scale-factor step associated with a residual mode. */
+/**
+ * Return the scale-factor step associated with a residual mode.
+ *
+ * @param {number} mode
+ * @returns {number}
+ */
 function stepByMode(mode) {
   if (mode <= 0) return 0
   return RESIDUAL_MODE_STEPS[Math.min(mode, RESIDUAL_MODE_MAX) - 1]
 }
 
-/** Return the fixed lower bound for one coded residual band. */
+/**
+ * Return the fixed lower bound for one coded residual band.
+ *
+ * @param {number} mode
+ * @param {number} width
+ * @returns {number}
+ */
 function minimumResidualBandBits(mode, width) {
   return 6 + (width >> 1) * RESIDUAL_CLASS_BIT_SCALES[mode - 1]
 }
 
-/** Exactly price one residual-band candidate. */
+/**
+ * Exactly price one residual-band candidate.
+ *
+ * @param {object} layer
+ * @param {number} band
+ * @param {number} mode
+ * @param {number} scaleFactor
+ * @returns {number}
+ */
 function countResidualBandBits(layer, band, mode, scaleFactor) {
   return measureResidualBand(layer.spectrum, band, mode, scaleFactor).bits
 }
 
-/** Count pair-block gain syntax reserved ahead of residual allocation. */
+/**
+ * Count pair-block gain syntax reserved ahead of residual allocation.
+ *
+ * @param {object} layer
+ * @param {number} blockCount
+ * @returns {number}
+ */
 function countLayerGainBits(layer, blockCount) {
   let bits = 0
   for (let block = 0; block < blockCount; block++) {
@@ -75,7 +119,15 @@ function countLayerGainBits(layer, blockCount) {
   return bits
 }
 
-/** Estimate one residual band's cost before exact symbol pricing. */
+/**
+ * Estimate one residual band's cost before exact symbol pricing.
+ *
+ * @param {number} mode
+ * @param {number} scaleSelector
+ * @param {ArrayLike<number>} groupScaleFactors
+ * @param {number} band
+ * @returns {number}
+ */
 function residualEstimatedBandBits(
   mode,
   scaleSelector,
@@ -93,7 +145,14 @@ function residualEstimatedBandBits(
   return bits
 }
 
-/** Create the semantic allocation state refined before word-image commit. */
+/**
+ * Create the semantic allocation state refined before word-image commit.
+ *
+ * @param {ArrayLike<number>} scaleFactors
+ * @param {number} bandLimit
+ * @param {number} blockCount
+ * @returns {object}
+ */
 function createAllocation(scaleFactors, bandLimit, blockCount) {
   return {
     modes: new Int32Array(ALLOCATION_BAND_COUNT),
@@ -103,7 +162,15 @@ function createAllocation(scaleFactors, bandLimit, blockCount) {
   }
 }
 
-/** Create the first mode/scale proposal after fixed syntax reservations. */
+/**
+ * Create the first mode/scale proposal after fixed syntax reservations.
+ *
+ * @param {object} layer
+ * @param {object} profile
+ * @param {number} bitBudget
+ * @param {number} bandLimit
+ * @returns {object}
+ */
 function initializeResidualModes(layer, profile, bitBudget, bandLimit) {
   let modeShift = 10
   if (bitBudget * 2 < profile.bandMetrics[bandLimit] * 0x0c) modeShift = 0x0b
@@ -135,7 +202,15 @@ function initializeResidualModes(layer, profile, bitBudget, bandLimit) {
   return { modeShift, availableBits, allocation, metrics }
 }
 
-/** Prune incoherent seed bands and estimate the remaining payload. */
+/**
+ * Prune incoherent seed bands and estimate the remaining payload.
+ *
+ * @param {object} allocation
+ * @param {ArrayLike<number>} metrics
+ * @param {ArrayLike<number>} groups
+ * @param {number} bandLimit
+ * @returns {object}
+ */
 function planSeedPruning(allocation, metrics, groups, bandLimit) {
   const lastBand = bandLimit - 1
   let estimatedBits = 0
@@ -173,7 +248,14 @@ function planSeedPruning(allocation, metrics, groups, bandLimit) {
   }
 }
 
-/** Raise scale factors for bands affected by a negative budget correction. */
+/**
+ * Raise scale factors for bands affected by a negative budget correction.
+ *
+ * @param {object} allocation
+ * @param {ArrayLike<number>} metrics
+ * @param {number} correction
+ * @param {number} activeBands
+ */
 function applyNegativeCorrectionScaleFactors(
   allocation,
   metrics,
@@ -202,7 +284,16 @@ function applyNegativeCorrectionScaleFactors(
   }
 }
 
-/** Derive the global mode correction from target and estimated costs. */
+/**
+ * Derive the global mode correction from target and estimated costs.
+ *
+ * @param {object} allocation
+ * @param {ArrayLike<number>} metrics
+ * @param {number} modeShift
+ * @param {number} totalAvailable
+ * @param {object} estimate
+ * @returns {number}
+ */
 function deriveBudgetCorrection(
   allocation,
   metrics,
@@ -242,7 +333,15 @@ function deriveBudgetCorrection(
   return correction
 }
 
-/** Refund gain headers for inactive trailing transform blocks. */
+/**
+ * Refund gain headers for inactive trailing transform blocks.
+ *
+ * @param {object} layer
+ * @param {object} allocation
+ * @param {number} stereoMode
+ * @param {boolean} isMono
+ * @returns {number}
+ */
 function trimBlockTail(layer, allocation, stereoMode, isMono) {
   if (!isMono && (stereoMode & 7) !== 7) return 0
   const initial = allocation.blockCount
@@ -258,7 +357,17 @@ function trimBlockTail(layer, allocation, stereoMode, isMono) {
   return (initial - allocation.blockCount) * SPECTRUM_ALLOCATION_BITS_PER_BAND
 }
 
-/** Correct estimated mode costs into a budget-converged allocation seed. */
+/**
+ * Correct estimated mode costs into a budget-converged allocation seed.
+ *
+ * @param {object} layer
+ * @param {object} profile
+ * @param {object} prepared
+ * @param {number} bandLimit
+ * @param {number} stereoMode
+ * @param {boolean} isMono
+ * @returns {object}
+ */
 function convergeResidualBudget(
   layer,
   profile,
@@ -308,7 +417,13 @@ function convergeResidualBudget(
   return { allocation, metrics, totalAvailable }
 }
 
-/** Reprice the converged seed exactly and initialize bounded refinement state. */
+/**
+ * Reprice the converged seed exactly and initialize bounded refinement state.
+ *
+ * @param {object} layer
+ * @param {object} converged
+ * @returns {object}
+ */
 function seedResidualRefinement(layer, converged) {
   const { allocation, metrics } = converged
   let totalAvailable = converged.totalAvailable
@@ -371,7 +486,13 @@ function seedResidualRefinement(layer, converged) {
   }
 }
 
-/** Determine tail bands that can be removed to fit an overflowing proposal. */
+/**
+ * Determine tail bands that can be removed to fit an overflowing proposal.
+ *
+ * @param {object} execution
+ * @param {number} band
+ * @returns {object|null}
+ */
 function selectOverflowTailTrim(execution, band) {
   const previousActiveBands = execution.allocation.activeBands
   const activeBands = activeBandPrefixLength(
@@ -384,7 +505,13 @@ function selectOverflowTailTrim(execution, band) {
   return { previousActiveBands, activeBands }
 }
 
-/** Fit one exactly priced band into the evolving refinement budget. */
+/**
+ * Fit one exactly priced band into the evolving refinement budget.
+ *
+ * @param {object} layer
+ * @param {number} band
+ * @param {object} execution
+ */
 function fitRefinementBand(layer, band, execution) {
   const allocation = execution.allocation
   const fromMode = allocation.modes[band]
@@ -482,7 +609,15 @@ function fitRefinementBand(layer, band, execution) {
   }
 }
 
-/** Fit every active band while preserving the layer's exact bit limit. */
+/**
+ * Fit every active band while preserving the layer's exact bit limit.
+ *
+ * @param {object} layer
+ * @param {number} bitBudget
+ * @param {boolean} isMono
+ * @param {object} converged
+ * @returns {object}
+ */
 function refineResidualAllocation(layer, bitBudget, isMono, converged) {
   const execution = seedResidualRefinement(layer, converged)
   const activeBands = execution.allocation.activeBands
@@ -517,7 +652,13 @@ function refineResidualAllocation(layer, bitBudget, isMono, converged) {
   }
 }
 
-/** Publish a completed candidate into the detached allocation word image. */
+/**
+ * Publish a completed candidate into the detached allocation word image.
+ *
+ * @param {object} layer
+ * @param {object} allocation
+ * @param {Int32Array} work
+ */
 function commitResidualAllocation(layer, allocation, work) {
   const target = new AllocationWorkMut(work)
   target.setActiveBandCount(allocation.activeBands)
@@ -532,6 +673,7 @@ function commitResidualAllocation(layer, allocation, work) {
 
 /**
  * Lower one transformed layer into the exact allocation work image.
+ *
  * @param {object} layer Transaction-local transformed layer state.
  * @param {object} sourceProfile Measured residual source evidence.
  * @param {number} scaleFactorBandLimit Profile-derived active-band ceiling.

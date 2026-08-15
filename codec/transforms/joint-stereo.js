@@ -22,7 +22,14 @@ const interpolationStep = float32FromBits(INTERPOLATION_STEP_BITS)
 const unity = float32FromBits(UNITY_BITS)
 const half = float32FromBits(HALF_BITS)
 
-/** Convert one left/right coefficient pair to scaled mid/side form. */
+/**
+ * Convert one left/right coefficient pair to scaled mid/side form.
+ *
+ * @param {object[]} layers
+ * @param {number} index
+ * @param {number} ratio
+ * @param {boolean} inverseScale
+ */
 function applyCoefficient(layers, index, ratio, inverseScale) {
   const left = layers[0].spectrum[index]
   const right = layers[1].spectrum[index]
@@ -34,6 +41,7 @@ function applyCoefficient(layers, index, ratio, inverseScale) {
 
 /**
  * Apply a fully selected decorrelation plan to two layer spectra.
+ *
  * @param {object} state Analysis-complete joint-stereo transform plan.
  * @param {object[]} layers Two staged layer spectra, mutated in place.
  * @returns {object[]} The converted layers.
@@ -109,7 +117,12 @@ export function applyJointStereoConversion(state, layers) {
   return layers
 }
 
-/** Resolve one decoder gain selector to its two mixing scales. */
+/**
+ * Resolve one decoder gain selector to its two mixing scales.
+ *
+ * @param {number} selector
+ * @returns {number[]}
+ */
 function gainScalePair(selector) {
   return [
     JOINT_STEREO_GAIN_SCALES[selector] ?? 0,
@@ -119,6 +132,7 @@ function gainScalePair(selector) {
 
 /**
  * Apply one preflighted inverse mix across both staged decoder channels.
+ *
  * @param {object} state Staged decoder state, mutated and advanced in place.
  * @param {object} plan Validated current-frame joint-stereo header plan.
  * @returns {object} `state` after mixing and header-history publication.

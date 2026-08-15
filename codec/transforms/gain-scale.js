@@ -30,7 +30,14 @@ import {
 
 const LAYER_GAIN_ROW_OFFSETS = Object.freeze([0, 4, 8, 12, 16, 20, 24, 28])
 
-/** Apply one selected layered gain envelope to interleaved transform rows. */
+/**
+ * Apply one selected layered gain envelope to interleaved transform rows.
+ *
+ * @param {Uint32Array} words
+ * @param {number} unit
+ * @param {number} pairBase
+ * @param {number} selector
+ */
 function applyLayeredGainRegions(words, unit, pairBase, selector) {
   if (selector === 0) return
   const locationsBase = pairBase
@@ -107,6 +114,7 @@ function applyLayeredGainRegions(words, unit, pairBase, selector) {
 
 /**
  * Apply an analyzed low-rate gain plan to its detached transform matrix.
+ *
  * @param {object} transformState State produced by layered gain analysis.
  * @returns {object} The gain-prepared `transformState`.
  */
@@ -123,7 +131,15 @@ export function prepareLayeredGain(transformState) {
   return transformState
 }
 
-/** Expand one coded gain record into the 64-step intermediate envelope. */
+/**
+ * Expand one coded gain record into the 64-step intermediate envelope.
+ *
+ * @param {Int32Array} destination
+ * @param {GainRecord} record
+ * @param {number} endBias
+ * @param {boolean} add
+ * @returns {boolean}
+ */
 function applyRecordSteps(destination, record, endBias, add) {
   let cursor = 0
   const count = Math.min(record.entries, 7)
@@ -142,6 +158,7 @@ function applyRecordSteps(destination, record, endBias, add) {
 
 /**
  * Expand adjacent coded gain records into a 512-sample envelope.
+ *
  * @param {GainRecord} previous Prior-frame record for the same subband.
  * @param {GainRecord} current Current-frame record.
  * @param {Float32Array} output Destination gain envelope.
@@ -199,6 +216,7 @@ export function reconstructGainScale(
 
 /**
  * Multiply or divide samples by a reconstructed gain envelope in place.
+ *
  * @param {Float32Array} samples Samples to update.
  * @param {Float32Array} scale Reconstructed envelope.
  * @param {'divide'|'multiply'} [operation] Direction of gain application.
@@ -217,6 +235,7 @@ export function applyGainScale(samples, scale, operation = 'divide') {
 
 /**
  * Test whether either half of an adjacent gain-record pair is active.
+ *
  * @param {GainRecord} previous Prior-frame record.
  * @param {GainRecord} current Current-frame record.
  * @returns {boolean} Whether reconstruction requires gain scaling.
@@ -227,6 +246,7 @@ export function gainPairIsActive(previous, current) {
 
 /**
  * Materialize current+overlap samples and divide by their coded gain window.
+ *
  * @param {Float32Array} input Current 256-sample half-window.
  * @param {Float32Array} overlap Prior 256-sample overlap half.
  * @param {GainRecord} [previous] Prior-frame gain record.
@@ -328,6 +348,7 @@ export function prepareGainAdjustedWindows(
 
 /**
  * Apply a decoded gain envelope to one already transformed subband.
+ *
  * @param {object} synthesis Transaction-staged decoder channel state.
  * @param {number} blockIndex Interleaved subband index.
  * @param {object} pairTable Decoded gain locations and selectors.

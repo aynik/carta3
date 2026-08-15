@@ -6,6 +6,11 @@ import { createWave } from '../codec/io/wave.js'
 import { encode } from '../codec/pipeline/encoder.js'
 import { createWaveStreamingEncoder } from '../codec/io/wave-encoder.js'
 
+/**
+ * Test helper for stereoSignal.
+ *
+ * @returns {Float32Array[]}
+ */
 function stereoSignal() {
   return [
     Float32Array.from({ length: 1024 }, (_, index) =>

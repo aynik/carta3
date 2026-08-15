@@ -36,12 +36,24 @@ import {
 import { LayeredTransformState } from '../state/layered.js'
 import { float32FromBits, float32Multiply, float32ToBits } from '../utils.js'
 
-/** Reproduce the port's unordered-or-less floating comparison. */
+/**
+ * Reproduce the port's unordered-or-less floating comparison.
+ *
+ * @param {number} left
+ * @param {number} right
+ * @returns {boolean}
+ */
 function unorderedLess(left, right) {
   return Number.isNaN(left) || Number.isNaN(right) || left < right
 }
 
-/** Reproduce the port's unordered-or-less-equal floating comparison. */
+/**
+ * Reproduce the port's unordered-or-less-equal floating comparison.
+ *
+ * @param {number} left
+ * @param {number} right
+ * @returns {boolean}
+ */
 function unorderedLessEqual(left, right) {
   return Number.isNaN(left) || Number.isNaN(right) || left <= right
 }
@@ -53,7 +65,12 @@ const squareRootTwo = float32FromBits(SQUARE_ROOT_TWO_BITS)
 const gainBudgetScale = float32FromBits(GAIN_BUDGET_SCALE_BITS)
 const breakpointSnapRatio = float32FromBits(BREAKPOINT_SNAP_RATIO_BITS)
 const seedMagnitudeLimit = Math.fround(SEED_MAGNITUDE_LIMIT)
-/** Measure 32 four-line maxima for each of the four interleaved units. */
+/**
+ * Measure 32 four-line maxima for each of the four interleaved units.
+ *
+ * @param {Uint32Array} words
+ * @param {Uint32Array} output
+ */
 function analyzeMaximumMagnitudes(words, output) {
   let source = 0
   for (let block = 0; block < PAIR_BLOCK_MAGNITUDE_HISTORY_WORDS; block++) {
@@ -78,12 +95,23 @@ function analyzeMaximumMagnitudes(words, output) {
   }
 }
 
-/** Read one float32 magnitude from the biased gain scratch region. */
+/**
+ * Read one float32 magnitude from the biased gain scratch region.
+ *
+ * @param {Uint32Array} scratchBits
+ * @param {number} index
+ * @returns {number}
+ */
 function gainScratchValue(scratchBits, index) {
   return float32FromBits(scratchBits[LAYER_GAIN_SCRATCH_HISTORY_OFFSET + index])
 }
 
-/** Convert one positive magnitude ratio to a whole gain-step delta. */
+/**
+ * Convert one positive magnitude ratio to a whole gain-step delta.
+ *
+ * @param {number} ratio
+ * @returns {number}
+ */
 function gainStepsForRatio(ratio) {
   return (
     ((float32ToBits(float32Multiply(ratio, squareRootTwo)) >>>
@@ -93,7 +121,16 @@ function gainStepsForRatio(ratio) {
   )
 }
 
-/** Stage old and new magnitude histories and return the prior maximum bits. */
+/**
+ * Stage old and new magnitude histories and return the prior maximum bits.
+ *
+ * @param {Uint32Array} words
+ * @param {Uint32Array} maximumMagnitudes
+ * @param {Uint32Array} scratchBits
+ * @param {number} unit
+ * @param {number} pairBase
+ * @returns {number}
+ */
 function stagePairMagnitudeHistory(
   words,
   maximumMagnitudes,
@@ -119,7 +156,15 @@ function stagePairMagnitudeHistory(
   return oldMaximumBits
 }
 
-/** Select the history scan bound implied by layer and joint-stereo modes. */
+/**
+ * Select the history scan bound implied by layer and joint-stereo modes.
+ *
+ * @param {number} unit
+ * @param {number} layerFlag
+ * @param {Int32Array} hints
+ * @param {Int32Array} modes
+ * @returns {number}
+ */
 function pairModeSelector(unit, layerFlag, hints, modes) {
   if (layerFlag === 0) return unit
   const hint = hints[unit] >>> 0
@@ -127,7 +172,14 @@ function pairModeSelector(unit, layerFlag, hints, modes) {
   return hint === mode ? (hint === 3 ? -1 : 0) : 5
 }
 
-/** Measure current group maxima and publish the last group history. */
+/**
+ * Measure current group maxima and publish the last group history.
+ *
+ * @param {Uint32Array} words
+ * @param {Uint32Array} scratchBits
+ * @param {number} pairBase
+ * @returns {number}
+ */
 function measurePairGroupMaxima(words, scratchBits, pairBase) {
   scratchBits[0] = words[pairBase + PAIR_BLOCK_LAST_GROUP_MAXIMUM_WORD]
   let lastMaximum = 0
@@ -151,7 +203,17 @@ function measurePairGroupMaxima(words, scratchBits, pairBase) {
   return lastMaximum
 }
 
-/** Select release points and return remaining budget plus the tail cursor. */
+/**
+ * Select release points and return remaining budget plus the tail cursor.
+ *
+ * @param {Uint32Array} words
+ * @param {Uint32Array} scratchBits
+ * @param {number} locationsBase
+ * @param {number} levelsBase
+ * @param {number} lastMaximum
+ * @param {number} modeSelector
+ * @param {Int32Array} selectionScratch
+ */
 function selectPairReleasePoints(
   words,
   scratchBits,
@@ -215,7 +277,18 @@ function selectPairReleasePoints(
   selectionScratch[1] = tailCursor
 }
 
-/** Select attack points, merge release points, and lower cumulative levels. */
+/**
+ * Select attack points, merge release points, and lower cumulative levels.
+ *
+ * @param {Uint32Array} words
+ * @param {Uint32Array} scratchBits
+ * @param {number} locationsBase
+ * @param {number} levelsBase
+ * @param {number} previousMaximumBits
+ * @param {number} remainingBudget
+ * @param {number} tailCursor
+ * @returns {number}
+ */
 function selectPairAttackPoints(
   words,
   scratchBits,
@@ -285,7 +358,20 @@ function selectPairAttackPoints(
   return entryCount
 }
 
-/** Optionally seed an inactive primary pair from its active paired unit. */
+/**
+ * Optionally seed an inactive primary pair from its active paired unit.
+ *
+ * @param {Uint32Array} words
+ * @param {Uint32Array} scratchBits
+ * @param {number} locationsBase
+ * @param {number} levelsBase
+ * @param {number} selector
+ * @param {number} unit
+ * @param {number} layerFlag
+ * @param {number} previousCount
+ * @param {number} pairBase
+ * @returns {number}
+ */
 function seedPairedGainPoint(
   words,
   scratchBits,
@@ -328,7 +414,17 @@ function seedPairedGainPoint(
   return 1
 }
 
-/** Select pair-block gain points and advance magnitude history without scaling. */
+/**
+ * Select pair-block gain points and advance magnitude history without scaling.
+ *
+ * @param {Uint32Array} words
+ * @param {Uint32Array} maximumMagnitudes
+ * @param {Uint32Array} scratchBits
+ * @param {Int32Array} selectionScratch
+ * @param {number} layerFlag
+ * @param {Int32Array} hints
+ * @param {Int32Array} modes
+ */
 function analyzePairBlocks(
   words,
   maximumMagnitudes,
@@ -399,8 +495,8 @@ function analyzePairBlocks(
  * transform matrix untouched. Call {@link prepareLayeredGain} before MDCT.
  *
  * @param {object} layer Transaction-local layer state.
- * @param {Uint8Array} absoluteModeHints Joint-stereo gain hints.
- * @param {Uint8Array} slotModes Joint-stereo slot modes.
+ * @param {Int32Array} absoluteModeHints Joint-stereo gain hints.
+ * @param {Int32Array} slotModes Joint-stereo slot modes.
  * @param {LayeredTransformState} [transformState] Cross-stage frame state.
  * @returns {LayeredTransformState} State containing the selected gain plan.
  */

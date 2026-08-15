@@ -51,7 +51,12 @@ import { pipe } from '../utils.js'
 
 /** Identify a failed pre-transform sound-unit phase and channel. */
 class SoundUnitAnalysisError extends Error {
-  /** Create an error annotated with its failed phase and channel index. */
+  /**
+   * Create an error annotated with its failed phase and channel index.
+   *
+   * @param {string} stage
+   * @param {number} channel
+   */
   constructor(stage, channel) {
     super(`ATRAC3 ${stage} failed for channel ${channel}`)
     this.name = 'SoundUnitAnalysisError'
@@ -60,17 +65,32 @@ class SoundUnitAnalysisError extends Error {
   }
 }
 
-/** Return whether any record changes the unity gain window. */
+/**
+ * Return whether any record changes the unity gain window.
+ *
+ * @param {GainRecord[]} records
+ * @returns {boolean}
+ */
 function gainRecordsAreActive(records) {
   return records.some((record) => record.entries !== 0)
 }
 
-/** Select a detached ring node without overwriting committed state. */
+/**
+ * Select a detached ring node without overwriting committed state.
+ *
+ * @param {number} activeIndex
+ * @returns {number}
+ */
 function nextRingIndex(activeIndex) {
   return (activeIndex + 2) % 3
 }
 
-/** Expose the four newest QMF halves without copying them. */
+/**
+ * Expose the four newest QMF halves without copying them.
+ *
+ * @param {object} analysisWork
+ * @returns {Float32Array[]}
+ */
 function currentBandHalves(analysisWork) {
   return Array.from({ length: SUBBAND_COUNT }, (_, band) => {
     const offset = bandMdctOffset(band)
@@ -78,7 +98,12 @@ function currentBandHalves(analysisWork) {
   })
 }
 
-/** Expose the coded-gain MDCT overlap carry. */
+/**
+ * Expose the coded-gain MDCT overlap carry.
+ *
+ * @param {object} analysisWork
+ * @returns {Float32Array[]}
+ */
 function transformCarry(analysisWork) {
   return analysisWork.subarray(
     TRANSFORM_CARRY_OFFSET_FLOATS,
@@ -86,7 +111,12 @@ function transformCarry(analysisWork) {
   )
 }
 
-/** Expose the independent zero-gain reference overlap carry. */
+/**
+ * Expose the independent zero-gain reference overlap carry.
+ *
+ * @param {object} analysisWork
+ * @returns {Float32Array[]}
+ */
 function referenceTransformCarry(analysisWork) {
   return analysisWork.subarray(
     FORWARD_TRANSFORM_CARRY_OFFSET,
@@ -96,6 +126,7 @@ function referenceTransformCarry(analysisWork) {
 
 /**
  * Validate a complete stereo frame before transactional scratch advances.
+ *
  * @returns {function(Float32Array[]): EncoderFrame} Reusable validation stage.
  */
 export function validateFrameStage() {
@@ -119,6 +150,7 @@ export function validateFrameStage() {
 
 /**
  * Capture reusable destination nodes for one all-channel transaction.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Transaction capture stage.
  */
@@ -147,6 +179,7 @@ export function transactionStage(context) {
 
 /**
  * Advance the four-band QMF histories for both frame-transaction channels.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Stateful QMF stage.
  */
@@ -167,6 +200,7 @@ export function qmfStage(context) {
 
 /**
  * Plan both channels' gain records before either plan can be published.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Atomic gain-analysis stage.
  */
@@ -191,6 +225,7 @@ export function gainStage(context) {
 
 /**
  * Apply selected gain windows and advance carry without transforming.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Gain preparation stage.
  */
@@ -217,6 +252,7 @@ export function gainPreparationStage(context) {
 
 /**
  * Transform prepared four-band windows without applying or selecting gain.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Forward MDCT stage.
  */
@@ -237,6 +273,7 @@ export function mdctStage(context) {
 
 /**
  * Prepare the independent zero-gain comparison used by allocation.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Reference preparation stage.
  */
@@ -279,6 +316,7 @@ export function referencePreparationStage(context) {
 
 /**
  * Transform only zero-gain windows that require a second MDCT.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Reference transform stage.
  */
@@ -299,6 +337,7 @@ export function referenceSpectrumStage(context) {
 
 /**
  * Choose exact sound-unit syntax without publishing persistent state.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Allocation stage.
  */
@@ -326,6 +365,7 @@ export function allocationStage(context) {
 
 /**
  * Pack the complete stereo frame after all coding decisions are final.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Wire-publication stage.
  */
@@ -351,6 +391,7 @@ export function packingStage(context) {
 
 /**
  * Publish all histories only after the complete frame has packed.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): Uint8Array} Atomic commit stage.
  */
@@ -373,6 +414,7 @@ export function commitStage(context) {
 
 /**
  * Capture layered states and shared stereo history into the frame transaction.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Layer transaction stage.
  */
@@ -393,6 +435,7 @@ export function layeredTransactionStage(context) {
 
 /**
  * Run the stateful low-rate QMF over the complete stereo transaction.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Layered QMF stage.
  */
@@ -414,6 +457,7 @@ export function layeredQmfStage(context) {
 
 /**
  * Select 66 kbps modes and ratios without modifying either spectrum.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Joint-stereo analysis stage.
  */
@@ -428,6 +472,7 @@ export function layeredJointStereoAnalysisStage(context) {
 
 /**
  * Apply the fully selected 66 kbps conversion to both spectra.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Joint-stereo transform stage.
  */
@@ -441,6 +486,7 @@ export function layeredJointStereoTransformStage(context) {
 
 /**
  * Select layered gain regions without modifying transform samples.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Layered gain-analysis stage.
  */
@@ -464,6 +510,7 @@ export function layeredGainAnalysisStage(context) {
 
 /**
  * Apply each layered gain plan to its detached transform input.
+ *
  * @returns {function(EncoderFrame): EncoderFrame} Gain-preparation stage.
  */
 export function layeredGainPreparationStage() {
@@ -477,6 +524,7 @@ export function layeredGainPreparationStage() {
 
 /**
  * Run each prepared low-rate layer through only its forward MDCT.
+ *
  * @returns {function(EncoderFrame): EncoderFrame} Layered MDCT stage.
  */
 export function layeredMdctStage() {
@@ -540,7 +588,12 @@ export function layeredAllocationStage(context) {
   }
 }
 
-/** Return whether gain syntax makes equal-rate stereo exchange unsafe. */
+/**
+ * Return whether gain syntax makes equal-rate stereo exchange unsafe.
+ *
+ * @param {object[]} states
+ * @returns {boolean}
+ */
 function layeredHasGainPoints(states) {
   return states.some((state) =>
     state.pairBlocks.some((block) => block[PAIR_BLOCK_GAIN_COUNT_WORD] !== 0)
@@ -595,6 +648,7 @@ export function layeredFinalizationStage() {
 
 /**
  * Pack completed layers into their final independent or shared spans.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Layer packing stage.
  */
@@ -638,6 +692,7 @@ export function layeredPackingStage(context) {
 
 /**
  * Publish both layered histories only after successful packing.
+ *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): Uint8Array} Layer commit stage.
  */
@@ -654,6 +709,7 @@ export function layeredCommitStage(context) {
 
 /**
  * Compose one persistent ATRAC3 encoder from the profile's stage chain.
+ *
  * @param {object} [options] Profile options for 66, 105, or 132 kbps.
  * @param {BufferPool} [bufferPool] Reusable persistent and scratch storage.
  * @returns {function(Float32Array[]): Uint8Array} One-frame stereo encoder.

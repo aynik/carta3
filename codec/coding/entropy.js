@@ -9,7 +9,12 @@ import {
   WORD_LENGTH_VALUE_BITS,
 } from '../core/tables.js'
 
-/** Build one immutable Huffman family from compact code/length pairs. */
+/**
+ * Build one immutable Huffman family from compact code/length pairs.
+ *
+ * @param {ArrayLike<number>} pairs
+ * @returns {object[]}
+ */
 function buildFamily(pairs) {
   const family = new Array(8).fill(null)
   let pairIndex = 0
@@ -45,6 +50,7 @@ let cachedFamilies
 
 /**
  * Return the cached Huffman families used by spectrum and tone syntax.
+ *
  * @returns {object[][]} Four immutable family slots: spectrum A/B then tone A/B.
  */
 export function huffmanFamilies() {
@@ -56,7 +62,14 @@ export function huffmanFamilies() {
   return cachedFamilies
 }
 
-/** Traverse symbols using the table's one- or two-value grouping rule. */
+/**
+ * Traverse symbols using the table's one- or two-value grouping rule.
+ *
+ * @param {object} table
+ * @param {ArrayLike<number>} values
+ * @param {number} count
+ * @param {function(number): void} visitor
+ */
 function visitSymbols(table, values, count, visitor) {
   if (!table || count > values.length) {
     throw new RangeError('ATRAC3 Huffman symbol count is invalid')
@@ -85,6 +98,7 @@ function visitSymbols(table, values, count, visitor) {
 
 /**
  * Measure the exact Huffman cost of a symbol run.
+ *
  * @param {object} table One word-length table from {@link huffmanFamilies}.
  * @param {ArrayLike<number>} values Signed symbols in encoder representation.
  * @param {number} [count] Number of values to traverse.
@@ -103,6 +117,7 @@ export function measureHuffmanBits(table, values, count = values.length) {
 
 /**
  * Write a Huffman symbol run using the table's grouping rule.
+ *
  * @param {object} table One word-length Huffman table.
  * @param {ArrayLike<number>} values Signed symbols in encoder representation.
  * @param {{bitPosition: number, write: Function}} sink Bit writer or counter.
@@ -120,7 +135,13 @@ export function writeHuffman(table, values, sink, count = values.length) {
   return sink.bitPosition - start
 }
 
-/** Decode one symbol by walking the canonical prefix table. */
+/**
+ * Decode one symbol by walking the canonical prefix table.
+ *
+ * @param {object} table
+ * @param {object} reader
+ * @returns {number}
+ */
 function readHuffmanSymbol(table, reader) {
   let code = 0
   for (let width = 1; width <= table.maxCodeLength; width++) {
@@ -134,7 +155,13 @@ function readHuffmanSymbol(table, reader) {
   throw new RangeError('Invalid ATRAC3 Huffman codeword')
 }
 
-/** Map a codebook symbol to its signed spectral reconstruction rank. */
+/**
+ * Map a codebook symbol to its signed spectral reconstruction rank.
+ *
+ * @param {number} symbol
+ * @param {number} wordLength
+ * @returns {number}
+ */
 function reconstructionRank(symbol, wordLength) {
   // Three ATRAC3 decoder codebooks place their zero reconstruction entry at
   // a non-zero encoder symbol.  The prefix tables exchange those two ranks;
@@ -156,6 +183,7 @@ function reconstructionRank(symbol, wordLength) {
 
 /**
  * Decode one complete sound-unit Huffman run to reconstruction values.
+ *
  * @param {{read: Function}} reader Bit reader positioned at the first codeword.
  * @param {number} tableSelector A/B table selector; only its low bit is used.
  * @param {number} codeIndex Zero-based coded word-length index.

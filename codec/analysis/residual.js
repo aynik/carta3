@@ -7,7 +7,12 @@ import {
 import { ResidualSourceProfile } from '../state/layered.js'
 import { float32ToBits } from '../utils.js'
 
-/** Approximate a layered scale-factor index from an ordered magnitude key. */
+/**
+ * Approximate a layered scale-factor index from an ordered magnitude key.
+ *
+ * @param {number} magnitudeKey
+ * @returns {number}
+ */
 function scaleFactorEstimate(magnitudeKey) {
   const mantissa = magnitudeKey & 0x00ffffff
   let estimate = Math.imul(magnitudeKey >>> 24, 3) >>> 0
@@ -18,6 +23,7 @@ function scaleFactorEstimate(magnitudeKey) {
 
 /**
  * Measure stable activity, scale, and mono-expansion evidence for one layer.
+ *
  * @param {object} layer Transformed transaction-local layer state.
  * @param {object} [profile] Reusable destination measurement profile.
  * @returns {object} The populated `profile`.
@@ -84,6 +90,7 @@ export function measureResidualSource(
 
 /**
  * Select the initial active-band prefix that can fit the residual budget.
+ *
  * @param {object} profile Measured residual source profile.
  * @param {number} scaleFactorBandLimit Profile-derived upper band limit.
  * @param {number} bitBudget Available layer bits.

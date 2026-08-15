@@ -5,6 +5,11 @@ import {
   LAYERED_QMF_HISTORY_FLOATS,
 } from '../codec/core/constants.js'
 
+/**
+ * Test helper for qmfScratch.
+ *
+ * @returns {object}
+ */
 function qmfScratch() {
   return new Float32Array(FRAME_SAMPLES + LAYERED_QMF_HISTORY_FLOATS)
 }

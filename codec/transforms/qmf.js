@@ -41,6 +41,7 @@ import { float32Add, float32Multiply } from '../utils.js'
 
 /**
  * Locate a subband's oldest gain-analysis half in the 132 kbps work image.
+ *
  * @param {number} subband Subband index from zero through three.
  * @returns {number} Float offset in the analysis work image.
  */
@@ -50,6 +51,7 @@ export function bandGainOffset(subband) {
 
 /**
  * Locate a subband's middle MDCT half in the 132 kbps work image.
+ *
  * @param {number} subband Subband index from zero through three.
  * @returns {number} Float offset in the analysis work image.
  */
@@ -59,6 +61,7 @@ export function bandMdctOffset(subband) {
 
 /**
  * Locate a subband's newest QMF half in the 132 kbps work image.
+ *
  * @param {number} subband Subband index from zero through three.
  * @returns {number} Float offset in the analysis work image.
  */
@@ -66,7 +69,16 @@ export function bandSplitOffset(subband) {
   return bandGainOffset(subband) + 2 * BAND_PART_FLOATS
 }
 
-/** Convolve one QMF branch and publish its updated delay line. */
+/**
+ * Convolve one QMF branch and publish its updated delay line.
+ *
+ * @param {Float32Array} input
+ * @param {Float32Array} low
+ * @param {Float32Array} high
+ * @param {number} sampleCount
+ * @param {Float32Array} history
+ * @param {Float64Array} convolutionWork
+ */
 function analyzeBranch(
   input,
   low,
@@ -107,6 +119,7 @@ function analyzeBranch(
 
 /**
  * Advance one channel's three-deep history and analyze one PCM frame.
+ *
  * @param {Float32Array} pcm One complete 1024-sample channel frame.
  * @param {Float32Array} analysisWork Persistent 132 kbps analysis image.
  * @param {object} scratch Operation-local QMF buffers.
@@ -343,6 +356,7 @@ export function analyzeLayeredQmf(
 
 /**
  * Fold four interleaved decoded bands through the low-rate synthesis QMF.
+ *
  * @param {object} channel Decoder channel state containing synthesis history.
  * @returns {Float32Array} One reconstructed PCM frame view.
  */

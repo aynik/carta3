@@ -23,18 +23,28 @@ const lowerRatioBound = float64FromBits(LOWER_RATIO_BOUND_BITS)
 const upperRatioBound = float32FromBits(UPPER_RATIO_BOUND_BITS)
 const ratioMappingScale = float32FromBits(RATIO_MAPPING_SCALE_BITS)
 
-/** Create four detached zeroed left/right energy records. */
+/**
+ * Create four detached zeroed left/right energy records.
+ *
+ * @returns {{left: number, right: number}[]}
+ */
 function zeroEnergies() {
   return Array.from({ length: 4 }, () => ({ left: 0, right: 0 }))
 }
 
-/** Deep-copy four left/right energy records. */
+/**
+ * Deep-copy four left/right energy records.
+ *
+ * @param {{left: number, right: number}[]} source
+ * @returns {{left: number, right: number}[]}
+ */
 function copyEnergies(source) {
   return source.map(({ left, right }) => ({ left, right }))
 }
 
 /**
  * Select four interleaved conversion modes and advance energy carry.
+ *
  * @param {object} state Transaction-staged joint-stereo state.
  * Detached joint-stereo transaction.
  * @param {object[]} layers Two analyzed layer spectra.
@@ -129,6 +139,7 @@ export function selectJointStereoModes(state, layers) {
 
 /**
  * Select and rate-limit ratios for modes chosen by the current frame.
+ *
  * @param {object} state Transaction-staged joint-stereo state.
  * Mode-selected detached transaction.
  * @returns {object} The fully selected transform plan.

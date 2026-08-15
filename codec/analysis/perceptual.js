@@ -9,7 +9,12 @@ import {
 import { spectralScaleForIndex } from '../coding/quantization.js'
 import { F64_MIN_POSITIVE } from '../core/constants.js'
 
-/** Estimate tonality from spectral energy concentration within one band. */
+/**
+ * Estimate tonality from spectral energy concentration within one band.
+ *
+ * @param {{energy: number, peak: number, width: number}} band
+ * @returns {number}
+ */
 function tonality(band) {
   if (band.energy <= 0 || band.width <= 1) return 0
   const concentration = Math.max(1, (band.peak * band.width) / band.energy)
@@ -21,6 +26,7 @@ function tonality(band) {
 
 /**
  * Build the source-derived mask from codec-owned band measures.
+ *
  * @param {object[]} bands Per-band energy, peak, and width records.
  * @returns {Float64Array} Positive masking threshold for each band.
  */
@@ -55,6 +61,7 @@ export function buildMaskFromBandMeasures(bands) {
 
 /**
  * Build the threshold vector from a normalized spectrum.
+ *
  * @param {Float32Array} normalizedSpectrum Normalized source coefficients.
  * @param {Int32Array} scaleFactorIndices Per-band scale selectors.
  * @param {number} bandCount Active quantization-band count.
@@ -89,6 +96,7 @@ export function buildReconstructionMask(
 
 /**
  * Measure one band's normalized reconstruction error.
+ *
  * @param {object} state Quantization state containing reconstructed symbols.
  * @param {Float32Array} normalizedSpectrum Normalized source coefficients.
  * @param {number} band Quantization-band index.
@@ -112,6 +120,7 @@ export function measureBandReconstructionNoise(
 
 /**
  * Measure one detached band option without constructing a complete allocation.
+ *
  * @param {number} wordLength Candidate coded word length.
  * @param {number} scaleFactorIndex Candidate spectral scale selector.
  * @param {Int32Array} symbols Candidate symbols starting at index zero.

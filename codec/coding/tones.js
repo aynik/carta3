@@ -27,6 +27,7 @@ import { absoluteMaximum } from '../utils.js'
 
 /**
  * Create one fixed-capacity tone-region syntax entry.
+ *
  * @returns {object} Empty region with group and list storage.
  */
 export function createToneRegionEntry() {
@@ -42,6 +43,7 @@ export function createToneRegionEntry() {
 
 /**
  * Create one fixed-capacity quantized tone component.
+ *
  * @returns {object} Empty tone syntax and coefficient storage.
  */
 export function createToneSpec() {
@@ -55,7 +57,12 @@ export function createToneSpec() {
   }
 }
 
-/** Select the first tone scale factor strictly above a magnitude. */
+/**
+ * Select the first tone scale factor strictly above a magnitude.
+ *
+ * @param {number} value
+ * @returns {number}
+ */
 function toneScaleFactorIndex(value) {
   const magnitude = value < 0 ? -value : value
   let index = 0
@@ -63,7 +70,14 @@ function toneScaleFactorIndex(value) {
   return index
 }
 
-/** Quantize and exactly Huffman-price one tone candidate. */
+/**
+ * Quantize and exactly Huffman-price one tone candidate.
+ *
+ * @param {Float32Array} spectrum
+ * @param {number} scanIndex
+ * @param {object[][]} tables
+ * @returns {object}
+ */
 function quantizeTone(spectrum, scanIndex, tables) {
   const tone = createToneSpec()
   tone.start = scanIndex * 4
@@ -92,7 +106,12 @@ function quantizeTone(spectrum, scanIndex, tables) {
   }
 }
 
-/** Subtract one admitted quantized tone from the residual spectrum. */
+/**
+ * Subtract one admitted quantized tone from the residual spectrum.
+ *
+ * @param {object} lowering
+ * @param {Float32Array} residual
+ */
 function subtractTone(lowering, residual) {
   const tone = lowering.tone
   const steps = WORD_LENGTH_QUANTIZER_LEVELS[tone.wordLength]
@@ -107,7 +126,15 @@ function subtractTone(lowering, residual) {
   }
 }
 
-/** Count structurally admissible tone candidates without mutation. */
+/**
+ * Count structurally admissible tone candidates without mutation.
+ *
+ * @param {ArrayLike<number>} scaleFactors
+ * @param {number} count
+ * @param {number} threshold
+ * @param {number} existingToneCount
+ * @returns {number}
+ */
 function preflight(scaleFactors, count, threshold, existingToneCount) {
   const blockCounts = new Int32Array(16)
   let candidates = 0
@@ -125,6 +152,7 @@ function preflight(scaleFactors, count, threshold, existingToneCount) {
 /**
  * Mutate one candidate residual and its group scale-factor profiles. Returns
  * the exact tone-section bits reserved beyond the common empty header.
+ *
  * @param {number} budget Remaining tone-section bit budget.
  * @param {number} scaleFactorCount Number of candidate four-line groups.
  * @param {number} entrySideBits Region-level syntax reservation.

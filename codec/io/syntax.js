@@ -6,6 +6,7 @@ import { CHANNEL_SYNC, SPECTRUM_GROUPS } from '../core/constants.js'
 export class IndependentChannelHeader {
   /**
    * Create an independent header from its two-bit unit mode.
+   *
    * @param {number} unitMode Zero-based highest active transform unit.
    */
   constructor(unitMode) {
@@ -14,6 +15,7 @@ export class IndependentChannelHeader {
 
   /**
    * Create a header from a one-based transform-unit count.
+   *
    * @param {number} unitCount Active transform-unit count.
    * @returns {IndependentChannelHeader} Normalized header.
    */
@@ -23,6 +25,7 @@ export class IndependentChannelHeader {
 
   /**
    * Decode the semantic unit mode from one raw header byte.
+   *
    * @param {number} raw Raw independent-channel header byte.
    * @returns {IndependentChannelHeader} Decoded header.
    */
@@ -32,6 +35,7 @@ export class IndependentChannelHeader {
 
   /**
    * Validate the six-bit ATRAC3 channel sync prefix.
+   *
    * @param {number} raw Raw independent-channel header byte.
    * @returns {boolean} Whether the sync prefix is valid.
    */
@@ -46,6 +50,7 @@ export class IndependentChannelHeader {
 
   /**
    * Write the header to a bit sink.
+   *
    * @param {{write: Function}} sink Bit writer or exact counter.
    * @returns {void}
    */
@@ -59,6 +64,7 @@ export class IndependentChannelHeader {
 export class JointStereoHeader {
   /**
    * Preserve the two raw shared-layout header bytes.
+   *
    * @param {number} first First header byte.
    * @param {number} second Second header byte.
    */
@@ -69,6 +75,7 @@ export class JointStereoHeader {
 
   /**
    * Build shared-layout bytes from prior output and gain selectors.
+   *
    * @param {number} previousOutput Prior joint-stereo output selector.
    * @param {ArrayLike<number>} gainSelectors Four interleaved gain selectors.
    * @param {number} unitMode Zero-based highest active transform unit.
@@ -84,6 +91,7 @@ export class JointStereoHeader {
 
   /**
    * Wrap two raw shared-layout bytes.
+   *
    * @param {number} first First header byte.
    * @param {number} second Second header byte.
    * @returns {JointStereoHeader} Decoded header wrapper.
@@ -122,6 +130,7 @@ export class JointStereoHeader {
 export class SpectrumAllocation {
   /**
    * Normalize one spectrum allocation into fixed-capacity syntax arrays.
+   *
    * @param {number} groupCount Active quantization-band prefix length.
    * @param {number} tableSelector Huffman family selector.
    * @param {ArrayLike<number>} wordLengths Per-band coded word lengths.
@@ -149,6 +158,7 @@ export class SpectrumAllocation {
 
   /**
    * Read a complete spectrum allocation from a bit reader.
+   *
    * @param {{read: Function}} reader Reader positioned at allocation metadata.
    * @returns {SpectrumAllocation} Decoded allocation.
    */
@@ -173,6 +183,7 @@ export class SpectrumAllocation {
 
   /**
    * Write allocation metadata to a bit sink.
+   *
    * @param {{write: Function}} sink Bit writer or exact counter.
    * @returns {void}
    */
@@ -203,6 +214,7 @@ export class SpectrumAllocation {
 export class ToneSectionHeader {
   /**
    * Create a tone-section header, forcing mode zero when empty.
+   *
    * @param {number} regionCount Number of tone regions.
    * @param {number} mode Tone table-selection mode.
    */
@@ -213,6 +225,7 @@ export class ToneSectionHeader {
 
   /**
    * Read a tone-section header.
+   *
    * @param {{read: Function}} reader Reader positioned at tone metadata.
    * @returns {ToneSectionHeader} Decoded header.
    */
@@ -226,6 +239,7 @@ export class ToneSectionHeader {
 
   /**
    * Write a tone-section header.
+   *
    * @param {{write: Function}} sink Bit writer or exact counter.
    * @returns {void}
    */
@@ -239,6 +253,7 @@ export class ToneSectionHeader {
 export class ToneRegionHeader {
   /**
    * Create one tone-region descriptor for the active channel count.
+   *
    * @param {number} channelMask Active-channel mask.
    * @param {number} descriptor Tone coefficient-length descriptor.
    * @param {number} codeIndex Tone Huffman code index.
@@ -253,6 +268,7 @@ export class ToneRegionHeader {
 
   /**
    * Read one tone-region descriptor.
+   *
    * @param {number} channelCount Active transform-unit count.
    * @param {{read: Function}} reader Reader positioned at the descriptor.
    * @returns {ToneRegionHeader} Decoded region header.
@@ -268,6 +284,7 @@ export class ToneRegionHeader {
 
   /**
    * Write one tone-region descriptor.
+   *
    * @param {{write: Function}} sink Bit writer or exact counter.
    * @returns {void}
    */
@@ -292,6 +309,7 @@ export class ToneRegionHeader {
 export class ToneListCount {
   /**
    * Create a three-bit tone list count.
+   *
    * @param {number} count Number of tone items in the list.
    */
   constructor(count) {
@@ -300,6 +318,7 @@ export class ToneListCount {
 
   /**
    * Read a tone list count.
+   *
    * @param {{read: Function}} reader Reader positioned at the list count.
    * @returns {ToneListCount} Decoded list count.
    */
@@ -309,6 +328,7 @@ export class ToneListCount {
 
   /**
    * Write a tone list count.
+   *
    * @param {{write: Function}} sink Bit writer or exact counter.
    * @returns {void}
    */
@@ -321,6 +341,7 @@ export class ToneListCount {
 export class ToneItemHeader {
   /**
    * Create one tone item's scale-factor and start-position header.
+   *
    * @param {number} scaleFactor Six-bit spectral scale-factor index.
    * @param {number} start Six-bit start position within the tone region.
    */
@@ -331,6 +352,7 @@ export class ToneItemHeader {
 
   /**
    * Read one tone item header.
+   *
    * @param {{read: Function}} reader Reader positioned at the item header.
    * @returns {ToneItemHeader} Decoded item header.
    */
@@ -340,6 +362,7 @@ export class ToneItemHeader {
 
   /**
    * Write one tone item header.
+   *
    * @param {{write: Function}} sink Bit writer or exact counter.
    * @returns {void}
    */

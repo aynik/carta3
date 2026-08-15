@@ -4,11 +4,23 @@ import { MdctScratch } from '../codec/state/encoder.js'
 
 const bitsView = new DataView(new ArrayBuffer(4))
 
+/**
+ * Test helper for floatBits.
+ *
+ * @param {number} value
+ * @returns {number}
+ */
 function floatBits(value) {
   bitsView.setFloat32(0, value, true)
   return bitsView.getUint32(0, true)
 }
 
+/**
+ * Test helper for checksum.
+ *
+ * @param {ArrayLike<number>} values
+ * @returns {number}
+ */
 function checksum(values) {
   let sum = 0n
   let xor = 0n
@@ -20,6 +32,11 @@ function checksum(values) {
   return [sum, xor]
 }
 
+/**
+ * Test helper for referenceSignal.
+ *
+ * @returns {Float32Array}
+ */
 function referenceSignal() {
   const source = new Float32Array(512)
   for (let index = 0; index < source.length; index++) {

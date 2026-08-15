@@ -22,7 +22,14 @@ import { applyInverseBlockTransform } from '../transforms/mdct.js'
 import { synthesizeLayeredQmf } from '../transforms/qmf.js'
 import { pipe } from '../utils.js'
 
-/** Reverse the second shared-layout region into its decoder-facing order. */
+/**
+ * Reverse the second shared-layout region into its decoder-facing order.
+ *
+ * @param {Uint8Array} source
+ * @param {number} stepBytes
+ * @param {number} previousBitPosition
+ * @returns {number}
+ */
 function prepareJointStereoRegion(source, stepBytes, previousBitPosition) {
   let left = 0
   let right = stepBytes
@@ -47,7 +54,14 @@ function prepareJointStereoRegion(source, stepBytes, previousBitPosition) {
   return availableBytes
 }
 
-/** Convert a validated wire header into a semantic transform plan. */
+/**
+ * Convert a validated wire header into a semantic transform plan.
+ *
+ * @param {object} state
+ * @param {object} header
+ * @param {number} unitMode
+ * @returns {object}
+ */
 function createJointStereoMixPlan(state, header, unitMode) {
   const selectors = header.gainSelectors
   const gainScaleSelectors = Uint8Array.from(state.header.gainScaleSelectors)
@@ -66,6 +80,7 @@ function createJointStereoMixPlan(state, header, unitMode) {
 
 /**
  * Reject malformed frame storage before capturing persistent state.
+ *
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(Uint8Array): DecoderFrame} Reusable validation stage.
  */
@@ -81,6 +96,7 @@ export function validateDecodeFrameStage(context) {
 
 /**
  * Capture both channel histories and the shared header transactionally.
+ *
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): DecoderFrame} State-capture stage.
  */
@@ -94,6 +110,7 @@ export function decodeTransactionStage(context) {
 
 /**
  * Parse both syntax regions and preflight shared selectors without mutation.
+ *
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): DecoderFrame} Syntax stage.
  */
@@ -164,6 +181,7 @@ export function channelSyntaxStage(context) {
 
 /**
  * Reconstruct spectra after both channels pass complete syntax checks.
+ *
  * @returns {function(DecoderFrame): DecoderFrame} Inverse-quantization stage.
  */
 export function spectrumReconstructionStage() {
@@ -177,6 +195,7 @@ export function spectrumReconstructionStage() {
 
 /**
  * Transform reconstructed spectra into detached frame band histories.
+ *
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): DecoderFrame} Inverse-transform stage.
  */
@@ -232,6 +251,7 @@ export function inverseTransformStage(context) {
 
 /**
  * Apply prior-frame gain envelopes after all inverse transforms are complete.
+ *
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): DecoderFrame} Inverse-gain stage.
  */
@@ -254,6 +274,7 @@ export function inverseGainStage(context) {
 
 /**
  * Apply shared-layout stereo reconstruction after both inverse transforms.
+ *
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): DecoderFrame} Joint-stereo transform stage.
  */
@@ -269,6 +290,7 @@ export function jointStereoDecodeStage(context) {
 
 /**
  * Run fixed four-band synthesis independently for each frame channel.
+ *
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): DecoderFrame} QMF synthesis stage.
  */
@@ -284,6 +306,7 @@ export function synthesisStage(context) {
 
 /**
  * Publish both histories atomically and detach the planar PCM result.
+ *
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): Float32Array[]} Commit stage.
  */
@@ -299,6 +322,7 @@ export function decodeCommitStage(context) {
 
 /**
  * Compose one persistent streaming ATRAC3 decoder from explicit stages.
+ *
  * @param {object} [options] Profile and decoder-state options.
  * @param {BufferPool} [bufferPool] Reusable persistent and scratch storage.
  * @returns {function(Uint8Array): Float32Array[]} One-frame stereo decoder.

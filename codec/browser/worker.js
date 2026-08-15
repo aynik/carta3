@@ -6,7 +6,12 @@ import { encodeWavePcm } from '../io/wave-encoder.js'
 import { parseWave } from '../io/wave.js'
 import { createPcmWave } from '../io/serialization.js'
 
-/** Normalize browser binary inputs to a byte view. */
+/**
+ * Normalize browser binary inputs to a byte view.
+ *
+ * @param {Blob|Uint8Array|ArrayBuffer} value
+ * @returns {Promise<Uint8Array>}
+ */
 async function asBytes(value) {
   if (value instanceof Blob) return new Uint8Array(await value.arrayBuffer())
   if (value instanceof Uint8Array) return value
@@ -14,7 +19,12 @@ async function asBytes(value) {
   throw new TypeError('ATRAC3 worker requires a Blob or byte array')
 }
 
-/** Project a parsed WAVE image onto worker-safe metadata. */
+/**
+ * Project a parsed WAVE image onto worker-safe metadata.
+ *
+ * @param {object} parsed
+ * @returns {object}
+ */
 function metadata(parsed) {
   return {
     bitrateKbps: parsed.profile.bitrateKbps,
@@ -25,6 +35,11 @@ function metadata(parsed) {
   }
 }
 
+/**
+ * Handle onmessage.
+ *
+ * @param {object} event
+ */
 self.onmessage = async ({ data }) => {
   const { jobId, type } = data
   try {

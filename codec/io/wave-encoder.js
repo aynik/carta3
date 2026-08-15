@@ -4,7 +4,11 @@ import { FRAME_SAMPLES, WAVE_DELAY_SAMPLES } from '../core/constants.js'
 import { encode } from '../pipeline/encoder.js'
 import { createWave } from './wave.js'
 
-/** Validate one equally sized planar stereo PCM chunk. */
+/**
+ * Validate one equally sized planar stereo PCM chunk.
+ *
+ * @param {Float32Array[]} channels
+ */
 function validateChunk(channels) {
   if (
     !Array.isArray(channels) ||
@@ -19,7 +23,11 @@ function validateChunk(channels) {
   }
 }
 
-/** Allocate one zeroed 1024-sample planar stereo frame. */
+/**
+ * Allocate one zeroed 1024-sample planar stereo frame.
+ *
+ * @returns {Float32Array[]}
+ */
 function createStereoFrame() {
   return [new Float32Array(FRAME_SAMPLES), new Float32Array(FRAME_SAMPLES)]
 }
@@ -32,6 +40,7 @@ function createStereoFrame() {
 export class WaveStreamingEncoder {
   /**
    * Create a timeline adapter around one persistent frame encoder.
+   *
    * @param {object} [options] Maintained profile options.
    */
   constructor(options = {}) {
@@ -48,6 +57,7 @@ export class WaveStreamingEncoder {
 
   /**
    * Consume one equally sized planar PCM chunk.
+   *
    * @param {Float32Array[]} channels Two equal encoder-domain PCM channels.
    * @returns {Uint8Array[]} Newly completed encoded frames.
    */
@@ -107,6 +117,7 @@ export class WaveStreamingEncoder {
 
   /**
    * Flush a partial frame and three codec-delay drain frames exactly once.
+   *
    * @returns {Uint8Array[]} Remaining encoded frames.
    */
   finish() {
@@ -137,6 +148,7 @@ export class WaveStreamingEncoder {
 
 /**
  * Create a streaming encoder for arbitrary planar PCM chunk boundaries.
+ *
  * @param {object} [options] Maintained profile options.
  * @returns {WaveStreamingEncoder} Persistent WAVE timeline adapter.
  */
@@ -146,6 +158,7 @@ export function createWaveStreamingEncoder(options) {
 
 /**
  * Encode complete planar encoder-domain PCM to ATRAC3 WAVE.
+ *
  * @param {Float32Array[]} channels Two equal signed-sample-domain channels.
  * @param {object} [options] Maintained profile options.
  * @returns {Uint8Array} Complete ATRAC3 WAVE byte image.

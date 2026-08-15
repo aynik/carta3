@@ -8,6 +8,12 @@ import {
 } from '../codec/coding/gain.js'
 import { BitCounter, BitReader, BitWriter } from '../codec/io/bitstream.js'
 
+/**
+ * Test helper for record.
+ *
+ * @param {Array<[number, number]>} entries
+ * @returns {GainRecord}
+ */
 function record(entries) {
   const result = new GainRecord()
   result.entries = entries.length

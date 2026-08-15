@@ -24,7 +24,12 @@ import {
 import { JointStereoState } from './joint-stereo.js'
 import { LayerState, LayeredTransformState } from './layered.js'
 
-/** Deep-copy a dynamic list without replacing destination-owned storage. */
+/**
+ * Deep-copy a dynamic list without replacing destination-owned storage.
+ *
+ * @param {object[]} source
+ * @param {object[]} destination
+ */
 function copyCloneList(source, destination) {
   destination.length = source.length
   for (let index = 0; index < source.length; index++) {
@@ -56,6 +61,7 @@ export class EncoderChannelBlock {
 
   /**
    * Copy this block without replacing destination-owned storage.
+   *
    * @param {EncoderChannelBlock} destination Existing destination block.
    * @returns {EncoderChannelBlock} `destination` after the copy.
    */
@@ -85,6 +91,7 @@ export class EncoderChannelBlock {
 
   /**
    * Seed a destination transaction with reusable choices and clear new syntax.
+   *
    * @param {EncoderChannelBlock} destination Transaction-local destination.
    * @returns {EncoderChannelBlock} `destination` ready for analysis.
    */
@@ -113,7 +120,12 @@ export class EncoderChannelBlock {
 
 /** Mutable rate-distortion candidate used only within one allocation call. */
 export class SoundUnitAllocationCandidate {
-  /** Allocate fixed-capacity vectors and optionally seed their syntax fields. */
+  /**
+   * Allocate fixed-capacity vectors and optionally seed their syntax fields.
+   *
+   * @param {ArrayLike<number>} [wordLengths]
+   * @param {ArrayLike<number>} [scaleFactors]
+   */
   constructor(wordLengths = null, scaleFactors = null) {
     this.wordLengths = new Int32Array(ALLOCATION_BAND_COUNT)
     this.initialWordLengths = new Int32Array(ALLOCATION_BAND_COUNT)
@@ -126,7 +138,13 @@ export class SoundUnitAllocationCandidate {
     if (wordLengths && scaleFactors) this.reset(wordLengths, scaleFactors)
   }
 
-  /** Reset all derived fields from one pair of seed vectors. */
+  /**
+   * Reset all derived fields from one pair of seed vectors.
+   *
+   * @param {ArrayLike<number>} wordLengths
+   * @param {ArrayLike<number>} scaleFactors
+   * @returns {SoundUnitAllocationCandidate}
+   */
   reset(wordLengths, scaleFactors) {
     this.wordLengths.set(wordLengths)
     this.initialWordLengths.set(wordLengths)
@@ -139,7 +157,12 @@ export class SoundUnitAllocationCandidate {
     return this
   }
 
-  /** Copy this candidate into existing destination storage. */
+  /**
+   * Copy this candidate into existing destination storage.
+   *
+   * @param {SoundUnitAllocationCandidate} destination
+   * @returns {SoundUnitAllocationCandidate}
+   */
   copyTo(destination) {
     destination.wordLengths.set(this.wordLengths)
     destination.initialWordLengths.set(this.initialWordLengths)
@@ -200,7 +223,11 @@ export class GainAnalysisScratch {
     this.levels = new Int32Array(ATTACK_CANDIDATE_COUNT + 1)
   }
 
-  /** Clear semantic detector flags without replacing candidate identities. */
+  /**
+   * Clear semantic detector flags without replacing candidate identities.
+   *
+   * @returns {object[]}
+   */
   resetCandidates() {
     for (const candidate of this.candidates) {
       candidate.requestedStep = null

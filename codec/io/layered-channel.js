@@ -15,13 +15,23 @@ import {
 
 /** Bit sink implementing the layered channel's two-byte merge behavior. */
 class LayerBitEmitter {
-  /** Wrap a frame destination at an absolute starting bit position. */
+  /**
+   * Wrap a frame destination at an absolute starting bit position.
+   *
+   * @param {Uint8Array} output
+   * @param {number} bitPosition
+   */
   constructor(output, bitPosition) {
     this.output = output
     this.bitPosition = bitPosition
   }
 
-  /** Write one value using the layered channel's two-byte merge behavior. */
+  /**
+   * Write one value using the layered channel's two-byte merge behavior.
+   *
+   * @param {number} value
+   * @param {number} width
+   */
   write(value, width) {
     const byteIndex = this.bitPosition >> 3
     const bitOffset = this.bitPosition & 7
@@ -37,13 +47,19 @@ class LayerBitEmitter {
   }
 }
 
-/** Return the exact syntax cost of one pair-block gain record. */
+/**
+ * Return the exact syntax cost of one pair-block gain record.
+ *
+ * @param {Uint32Array} block
+ * @returns {number}
+ */
 function pairBlockGainBits(block) {
   return 3 + block[PAIR_BLOCK_GAIN_COUNT_WORD] * 9
 }
 
 /**
  * Count gain-control syntax for all active transform units.
+ *
  * @param {Uint32Array[]} pairBlocks Layer pair-block records.
  * @param {number} unitCount Number of active transform units.
  * @returns {number} Exact gain syntax cost in bits.
@@ -56,7 +72,13 @@ export function countLayerGainBits(pairBlocks, unitCount) {
   return bits
 }
 
-/** Write gain syntax for every active transform unit. */
+/**
+ * Write gain syntax for every active transform unit.
+ *
+ * @param {Uint32Array[]} pairBlocks
+ * @param {number} unitCount
+ * @param {object} sink
+ */
 function writePairBlockGains(pairBlocks, unitCount, sink) {
   for (let unit = 0; unit < unitCount; unit++) {
     const block = pairBlocks[unit]
@@ -69,7 +91,12 @@ function writePairBlockGains(pairBlocks, unitCount, sink) {
   }
 }
 
-/** Reinterpret residual spectrum words as a zero-copy Float32 view. */
+/**
+ * Reinterpret residual spectrum words as a zero-copy Float32 view.
+ *
+ * @param {Int32Array} words
+ * @returns {Float32Array|null}
+ */
 function residualSpectrumView(words) {
   const allocation = new AllocationWorkView(words)
   const residual = allocation.residualSpectrum()
@@ -77,7 +104,15 @@ function residualSpectrumView(words) {
   return new Float32Array(residual.buffer, residual.byteOffset, residual.length)
 }
 
-/** Traverse one complete layered channel through an arbitrary bit sink. */
+/**
+ * Traverse one complete layered channel through an arbitrary bit sink.
+ *
+ * @param {object} layer
+ * @param {Int32Array} work
+ * @param {object} sink
+ * @param {object} [options]
+ * @returns {number}
+ */
 function writeLayeredChannel(
   layer,
   work,
@@ -125,6 +160,7 @@ function writeLayeredChannel(
 
 /**
  * Count one layered channel exactly without constructing a frame image.
+ *
  * @param {object} layer Completed transformed layer state.
  * @param {Int32Array} work Completed allocation image.
  * @param {object} [options] Shared-layout header selectors.

@@ -6,11 +6,23 @@ import { runLayeredMdct } from '../codec/transforms/mdct.js'
 
 const floatBits = new DataView(new ArrayBuffer(4))
 
+/**
+ * Test helper for f32Bits.
+ *
+ * @param {number} value
+ * @returns {number}
+ */
 function f32Bits(value) {
   floatBits.setFloat32(0, value, true)
   return floatBits.getUint32(0, true)
 }
 
+/**
+ * Test helper for stateImageHash.
+ *
+ * @param {Uint32Array} words
+ * @returns {number}
+ */
 function stateImageHash(words) {
   let hash = 1469598103934665603n
   for (const word of words) {
@@ -20,6 +32,11 @@ function stateImageHash(words) {
   return hash.toString(16).padStart(16, '0')
 }
 
+/**
+ * Test helper for createReferenceLayer.
+ *
+ * @returns {object}
+ */
 function createReferenceLayer() {
   const layer = new LayerState()
   layer.stereoFlag = 1133

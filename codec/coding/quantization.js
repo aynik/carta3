@@ -15,6 +15,7 @@ import { measureHuffmanBits } from './entropy.js'
 
 /**
  * Resolve a coded spectral scale-factor index.
+ *
  * @param {number} index Six-bit scale-factor index.
  * @returns {number} Scale factor, or positive infinity outside the syntax range.
  */
@@ -25,6 +26,7 @@ export function spectralScaleForIndex(index) {
 
 /**
  * Select the first scale-factor index strictly above an absolute magnitude.
+ *
  * @param {number} value Non-negative spectral magnitude.
  * @returns {number} Six-bit scale-factor index.
  */
@@ -36,6 +38,7 @@ export function scaleFactorIndexForAbs(value) {
 
 /**
  * Compute the profile-defined dead-zone threshold for one allocation mode.
+ *
  * @param {number} timeFactor Perceptual time-domain factor.
  * @param {number} wordLength Coded spectral word length.
  * @returns {number} Float32-rounded zero threshold.
@@ -48,7 +51,12 @@ export function quantZeroThreshold(timeFactor, wordLength) {
   )
 }
 
-/** Truncate a finite f64 to the codec's saturated signed integer domain. */
+/**
+ * Truncate a finite f64 to the codec's saturated signed integer domain.
+ *
+ * @param {number} value
+ * @returns {number}
+ */
 function truncateF64ToI32(value) {
   if (Number.isNaN(value)) return -0x80000000
   if (value >= 0x7fffffff) return 0x7fffffff
@@ -56,7 +64,13 @@ function truncateF64ToI32(value) {
   return Math.trunc(value)
 }
 
-/** Clamp one quantized symbol to the selected mode's signed range. */
+/**
+ * Clamp one quantized symbol to the selected mode's signed range.
+ *
+ * @param {number} symbol
+ * @param {number} stepCount
+ * @returns {number}
+ */
 function clampSymbol(symbol, stepCount) {
   if (symbol > stepCount) return stepCount
   if (symbol < -stepCount) return -stepCount
@@ -65,6 +79,7 @@ function clampSymbol(symbol, stepCount) {
 
 /**
  * Quantize one spectrum coefficient with codec-compatible saturation.
+ *
  * @param {number} spectrum Source coefficient.
  * @param {number} scale Selected spectral scale factor.
  * @param {number} stepCount Maximum signed quantizer rank.
@@ -78,6 +93,7 @@ export function quantizeSpectralValue(spectrum, scale, stepCount) {
 
 /**
  * Quantize a normalized non-tone coefficient run.
+ *
  * @param {number} wordLength Coded word length, or zero for an omitted band.
  * @param {number} zeroThreshold Absolute dead-zone threshold.
  * @param {ArrayLike<number>} spectrum Normalized source coefficients.
@@ -112,6 +128,7 @@ export function quantizeNontoneSymbols(
 
 /**
  * Measure selector and Huffman bits for a quantized non-tone run.
+ *
  * @param {number} tableGroup Huffman family selector.
  * @param {number} wordLength Coded word length.
  * @param {ArrayLike<number>} symbols Quantized symbols.

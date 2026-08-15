@@ -15,7 +15,13 @@ import { measureResidualSource } from '../analysis/residual.js'
 import { MIN_SHIFT, SPLIT_EXPLORE_SPAN } from '../core/constants.js'
 import { BUDGET_SHIFT_DELTAS } from '../core/tables.js'
 
-/** Return the largest absolute coefficient in one residual band. */
+/**
+ * Return the largest absolute coefficient in one residual band.
+ *
+ * @param {Float32Array} spectrum
+ * @param {number} band
+ * @returns {number}
+ */
 function bandMaximum(spectrum, band) {
   const start = QUANTIZATION_UNIT_OFFSETS[band]
   const end = QUANTIZATION_UNIT_OFFSETS[band + 1]
@@ -29,6 +35,7 @@ function bandMaximum(spectrum, band) {
 
 /**
  * Compute the energy-dependent primary joint-layer seed budget.
+ *
  * @param {object[]} layers Two transformed layered-channel states.
  * @param {number} bytesPerLayer Nominal half-frame byte span.
  * @param {object} jointStereo Selected joint-stereo hints and history.
@@ -85,7 +92,12 @@ export function jointPrimaryBitBudget(
   return targetBudget
 }
 
-/** Build one masking curve from the energy evidence of both source layers. */
+/**
+ * Build one masking curve from the energy evidence of both source layers.
+ *
+ * @param {object[]} layers
+ * @returns {Float64Array}
+ */
 function mergedSourceMask(layers) {
   const sourceBands = layers.map((layer) =>
     measureResidualBandMeasures(layer.spectrum)
@@ -98,7 +110,13 @@ function mergedSourceMask(layers) {
   return buildMaskFromBandMeasures(merged)
 }
 
-/** Measure per-band error for one detached allocation image. */
+/**
+ * Measure per-band error for one detached allocation image.
+ *
+ * @param {object} layer
+ * @param {Int32Array} words
+ * @returns {Float64Array}
+ */
 function reconstructionNoise(layer, words) {
   const allocation = new AllocationWorkView(words)
   const activeBands = allocation.activeBandCount
@@ -109,7 +127,14 @@ function reconstructionNoise(layer, words) {
   })
 }
 
-/** Sum both layer errors after normalization by the shared masking curve. */
+/**
+ * Sum both layer errors after normalization by the shared masking curve.
+ *
+ * @param {Float64Array} mask
+ * @param {Float64Array} primaryNoise
+ * @param {Float64Array} secondaryNoise
+ * @returns {number}
+ */
 function maskedDistortion(mask, primaryNoise, secondaryNoise) {
   let distortion = 0
   for (let band = 0; band < 32; band++) {
@@ -118,7 +143,12 @@ function maskedDistortion(mask, primaryNoise, secondaryNoise) {
   return distortion
 }
 
-/** Expand configured split deltas into a de-duplicated bounded frontier. */
+/**
+ * Expand configured split deltas into a de-duplicated bounded frontier.
+ *
+ * @param {number} seed
+ * @returns {number[]}
+ */
 function uniqueShiftFrontier(seed) {
   const frontier = []
   for (const delta of BUDGET_SHIFT_DELTAS) {

@@ -9,7 +9,13 @@ import {
 import { QUANTIZATION_UNIT_OFFSETS } from '../core/tables.js'
 import { buildMaskFromBandMeasures } from '../analysis/perceptual.js'
 
-/** Select a no-more-bits candidate that strictly lowers error. */
+/**
+ * Select a no-more-bits candidate that strictly lowers error.
+ *
+ * @param {object|null} selected
+ * @param {object[]} candidates
+ * @returns {object|null}
+ */
 function chooseParetoImprovement(selected, candidates) {
   let best = null
   for (const candidate of candidates) {
@@ -33,6 +39,7 @@ function chooseParetoImprovement(selected, candidates) {
 
 /**
  * Measure source energy, peak, and width for every residual band.
+ *
  * @param {Float32Array} spectrum Transformed source spectrum.
  * @returns {object[]} Thirty-two source measurement records.
  */
@@ -54,6 +61,7 @@ export function measureResidualBandMeasures(spectrum) {
 
 /**
  * Capture source evidence used to judge equal-rate mode exchange.
+ *
  * @param {object} layer Transaction-local transformed layer state.
  * @returns {object} Source energies and masking thresholds.
  */
@@ -65,7 +73,16 @@ export function createResidualQualityProfile(layer) {
   }
 }
 
-/** Enumerate feasible adjacent residual-mode moves. */
+/**
+ * Enumerate feasible adjacent residual-mode moves.
+ *
+ * @param {object} allocation
+ * @param {object[][]} modeCosts
+ * @param {number} activeBands
+ * @param {number} step
+ * @param {number} slot
+ * @returns {object[]}
+ */
 function modeMoves(allocation, modeCosts, activeBands, step, slot) {
   const moves = []
   for (let band = 0; band < activeBands; band++) {
@@ -83,12 +100,27 @@ function modeMoves(allocation, modeCosts, activeBands, step, slot) {
   return moves
 }
 
-/** Normalize reconstruction error by nonzero source energy. */
+/**
+ * Normalize reconstruction error by nonzero source energy.
+ *
+ * @param {number} error
+ * @param {number} energy
+ * @returns {number}
+ */
 function normalizedError(error, energy) {
   return energy > 0 ? error / energy : 0
 }
 
-/** Combine donor and receiver moves into one exact stereo transaction. */
+/**
+ * Combine donor and receiver moves into one exact stereo transaction.
+ *
+ * @param {object|null} donor
+ * @param {object} receiver
+ * @param {object[]} incumbentCosts
+ * @param {object} qualityProfile
+ * @param {number} residualBits
+ * @returns {object|null}
+ */
 function buildModeTransaction(
   donor,
   receiver,
@@ -137,7 +169,18 @@ function buildModeTransaction(
   }
 }
 
-/** Select the best masked-noise transaction within the fixed bit limit. */
+/**
+ * Select the best masked-noise transaction within the fixed bit limit.
+ *
+ * @param {object} allocation
+ * @param {number} activeBands
+ * @param {object[]} incumbentCosts
+ * @param {object[][]} modeCosts
+ * @param {number} residualBits
+ * @param {number} bitLimit
+ * @param {object} qualityProfile
+ * @returns {object|null}
+ */
 function selectModeTransaction(
   allocation,
   activeBands,
@@ -177,6 +220,7 @@ function selectModeTransaction(
 
 /**
  * Apply one layer's selected syntax exchange as a single transaction.
+ *
  * @param {object} transaction Selected donor/receiver mode exchange.
  * @param {Int32Array} words Structured allocation word image.
  * @returns {number} Raw reconstruction-error delta.

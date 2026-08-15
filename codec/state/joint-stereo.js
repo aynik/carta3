@@ -2,12 +2,21 @@
 
 import { SUBBAND_COUNT } from '../core/constants.js'
 
-/** Create neutral left/right energy measurements for all interleaved slots. */
+/**
+ * Create neutral left/right energy measurements for all interleaved slots.
+ *
+ * @returns {{left: number, right: number}[]}
+ */
 function createEnergies() {
   return Array.from({ length: SUBBAND_COUNT }, () => ({ left: 0, right: 0 }))
 }
 
-/** Copy left/right energy measurements without replacing destination records. */
+/**
+ * Copy left/right energy measurements without replacing destination records.
+ *
+ * @param {{left: number, right: number}[]} source
+ * @param {{left: number, right: number}[]} destination
+ */
 function copyEnergies(source, destination) {
   for (let slot = 0; slot < SUBBAND_COUNT; slot++) {
     destination[slot].left = source[slot].left
@@ -34,6 +43,7 @@ export class JointStereoState {
 
   /**
    * Copy this history without replacing destination-owned storage.
+   *
    * @param {JointStereoState} destination Existing destination state.
    * @returns {JointStereoState} `destination` after the copy.
    */

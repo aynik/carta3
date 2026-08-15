@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { encodeWavePcm } from '../codec/io/wave-encoder.js'
 import { WaveReader } from '../codec/io/readers.js'
 
+/**
+ * Test helper for fixture.
+ *
+ * @returns {Uint8Array}
+ */
 function fixture() {
   const channels = [new Float32Array(1500), new Float32Array(1500)]
   channels[0][100] = 12000

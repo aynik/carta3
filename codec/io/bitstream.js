@@ -3,6 +3,8 @@
  *
  * This module provides low-level bitstream packing and unpacking operations
  * for reading and writing ATRAC bitstreams with bit-level precision.
+ *
+ * @param {number} bitCount
  */
 
 function assertBitCount(bitCount) {
@@ -19,6 +21,7 @@ export { reverseLowBits } from '../utils.js'
 export class BitWriter {
   /**
    * Wrap a destination buffer at an optional initial bit position.
+   *
    * @param {Uint8Array} buffer Caller-owned destination bytes.
    * @param {number} [bitPosition] Initial absolute bit position.
    */
@@ -29,6 +32,7 @@ export class BitWriter {
 
   /**
    * Write one unsigned value in MSB-first order.
+   *
    * @param {number} value Unsigned low-bit field to write.
    * @param {number} bitCount Field width from zero through 32.
    * @returns {void}
@@ -50,6 +54,7 @@ export class BitWriter {
 export class BitCounter {
   /**
    * Start exact accounting at an optional existing bit position.
+   *
    * @param {number} [bitPosition] Initial absolute bit position.
    */
   constructor(bitPosition = 0) {
@@ -58,6 +63,7 @@ export class BitCounter {
 
   /**
    * Account for one write without materializing destination bytes.
+   *
    * @param {number} _value Ignored value accepted for writer compatibility.
    * @param {number} bitCount Field width from zero through 32.
    * @returns {void}
@@ -72,6 +78,7 @@ export class BitCounter {
 export class BitReader {
   /**
    * Wrap a zero-padded source at an optional initial bit position.
+   *
    * @param {Uint8Array} buffer Source bytes with required over-read padding.
    * @param {number} [bitPosition] Initial absolute bit position.
    */
@@ -82,6 +89,7 @@ export class BitReader {
 
   /**
    * Read one unsigned MSB-first value.
+   *
    * @param {number} bitCount Field width from zero through 32.
    * @returns {number} Unsigned decoded field.
    */
@@ -93,6 +101,7 @@ export class BitReader {
 
   /**
    * Read and sign-extend one two's-complement value.
+   *
    * @param {number} bitCount Field width from zero through 32.
    * @returns {number} Signed decoded field.
    */
@@ -105,6 +114,7 @@ export class BitReader {
 
 /**
  * Pack bits into a buffer at a specific bit position
+ *
  * @param {Uint8Array} buffer - Destination buffer
  * @param {number} bitPosition - Bit position to start writing at
  * @param {number} value - Value to pack
@@ -140,6 +150,7 @@ export function packBits(buffer, bitPosition, value, bitCount) {
 
 /**
  * Unpack bits from a buffer at a specific bit position
+ *
  * @param {Uint8Array} buffer - Source buffer
  * @param {number} bitPosition - Bit position to start reading from
  * @param {number} bitCount - Number of bits to unpack
@@ -171,6 +182,7 @@ export function unpackBits(buffer, bitPosition, bitCount) {
 
 /**
  * Unpack signed bits from a buffer at a specific bit position
+ *
  * @param {Uint8Array} buffer - Source buffer
  * @param {number} bitPosition - Bit position to start reading from
  * @param {number} bitCount - Number of bits to unpack

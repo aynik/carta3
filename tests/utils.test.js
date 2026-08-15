@@ -24,8 +24,23 @@ describe('Utilities', () => {
   describe('pipe', () => {
     it('should compose functions correctly', () => {
       const context = {}
+      /**
+       * Test helper for add.
+       *
+       * @returns {function(number): number}
+       */
       const add = () => (x) => x + 1
+      /**
+       * Test helper for multiply.
+       *
+       * @returns {function(number): number}
+       */
       const multiply = () => (x) => x * 2
+      /**
+       * Test helper for subtract.
+       *
+       * @returns {function(number): number}
+       */
       const subtract = () => (x) => x - 3
 
       const pipeline = pipe(context, add, multiply, subtract)
@@ -35,7 +50,19 @@ describe('Utilities', () => {
 
     it('should pass context to all stages', () => {
       const context = { value: 10 }
+      /**
+       * Test helper for stage1.
+       *
+       * @param {object} ctx
+       * @returns {function(number): number}
+       */
       const stage1 = (ctx) => (x) => x + ctx.value
+      /**
+       * Test helper for stage2.
+       *
+       * @param {object} ctx
+       * @returns {function(number): number}
+       */
       const stage2 = (ctx) => (x) => x * ctx.value
 
       const pipeline = pipe(context, stage1, stage2)

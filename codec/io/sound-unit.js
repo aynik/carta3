@@ -17,20 +17,36 @@ import {
   ToneSectionHeader,
 } from './syntax.js'
 
-/** Validate the one-to-four transform-unit syntax geometry. */
+/**
+ * Validate the one-to-four transform-unit syntax geometry.
+ *
+ * @param {number} unitCount
+ */
 function validateUnitCount(unitCount) {
   if (!Number.isInteger(unitCount) || unitCount < 1 || unitCount > 4) {
     throw new RangeError('ATRAC3 sound unit requires 1..4 transform units')
   }
 }
 
-/** Write an independent sound-unit channel header. */
+/**
+ * Write an independent sound-unit channel header.
+ *
+ * @param {object} syntax
+ * @param {object} sink
+ */
 function writeHeader(syntax, sink) {
   validateUnitCount(syntax.componentGroupCount)
   IndependentChannelHeader.fromUnitCount(syntax.componentGroupCount).pack(sink)
 }
 
-/** Write admitted tone components and return their total item count. */
+/**
+ * Write admitted tone components and return their total item count.
+ *
+ * @param {object} syntax
+ * @param {object[][]} tables
+ * @param {object} sink
+ * @returns {number}
+ */
 function writeToneComponents(syntax, tables, sink) {
   const componentCount = syntax.toneEntryIndex
   if (
@@ -98,7 +114,13 @@ function writeToneComponents(syntax, tables, sink) {
   return toneCount
 }
 
-/** Write spectrum allocation metadata and quantized Huffman payload. */
+/**
+ * Write spectrum allocation metadata and quantized Huffman payload.
+ *
+ * @param {object} syntax
+ * @param {object[][]} tables
+ * @param {object} sink
+ */
 function writeSpectrum(syntax, tables, sink) {
   if (syntax.spectrumTableIndex !== 0 && syntax.spectrumTableIndex !== 1) {
     throw new RangeError('ATRAC3 spectrum table selector must be 0 or 1')
@@ -124,7 +146,13 @@ function writeSpectrum(syntax, tables, sink) {
   }
 }
 
-/** Traverse one complete sound unit through a writer or exact counter. */
+/**
+ * Traverse one complete sound unit through a writer or exact counter.
+ *
+ * @param {object} syntax
+ * @param {object[][]} tables
+ * @param {object} sink
+ */
 function writeSoundUnit(syntax, tables, sink) {
   if (syntax.scratchFlag === 1) {
     throw new RangeError('Scratch ATRAC3 candidates cannot be serialized')
@@ -137,6 +165,7 @@ function writeSoundUnit(syntax, tables, sink) {
 
 /**
  * Count header and raw gain bits, including scratch-candidate reservation.
+ *
  * @param {object} syntax Sound-unit syntax candidate.
  * @returns {number} Fixed syntax cost in bits.
  */
@@ -151,6 +180,7 @@ export function countSoundUnitFixedBits(syntax) {
 
 /**
  * Count one complete sound unit without writing an output image.
+ *
  * @param {object} syntax Completed sound-unit syntax.
  * @param {object[][]} [tables] Runtime Huffman families.
  * @returns {number} Exact sound-unit length in bits.
@@ -164,6 +194,13 @@ export function countSoundUnitBits(syntax, tables = huffmanFamilies()) {
 /**
  * Write one allocation-ledger-sized unit in a single transactional pass.
  * The caller keeps the destination detached until this verification succeeds.
+ *
+ * @param {object} syntax
+ * @param {number} exactBits
+ * @param {Uint8Array} output
+ * @param {number} [outputOffset]
+ * @param {object[][]} [tables]
+ * @returns {number}
  */
 export function packSoundUnit(
   syntax,

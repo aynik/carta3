@@ -23,6 +23,7 @@ export class GainRecord {
 
   /**
    * Copy wire-visible fields while preserving destination-local detector state.
+   *
    * @param {GainRecord} source Record whose coded fields should be copied.
    * @returns {GainRecord} This destination record.
    */
@@ -36,6 +37,7 @@ export class GainRecord {
 
   /**
    * Copy coded fields and detector history into existing destination storage.
+   *
    * @param {GainRecord} destination Existing destination record.
    * @returns {GainRecord} `destination` after the copy.
    */
@@ -49,6 +51,7 @@ export class GainRecord {
 
   /**
    * Create a detached copy including local detector history.
+   *
    * @returns {GainRecord} Independent record copy.
    */
   clone() {
@@ -57,6 +60,7 @@ export class GainRecord {
 
   /**
    * Compare only fields that affect encoded gain syntax.
+   *
    * @param {GainRecord} other Record to compare.
    * @returns {boolean} Whether both records encode identical syntax.
    */
@@ -77,6 +81,7 @@ export class GainRecord {
 
 /**
  * Validate the wire-visible geometry and ordering of one gain record.
+ *
  * @param {GainRecord} record Record to validate.
  * @returns {GainRecord} The validated input record.
  */
@@ -111,6 +116,7 @@ export function validateGainRecord(record) {
 
 /**
  * Return the exact number of bits needed to code one gain record.
+ *
  * @param {GainRecord} record Gain record to measure.
  * @returns {number} Exact encoded length in bits.
  */
@@ -123,6 +129,7 @@ export function gainRecordBits(record) {
 
 /**
  * Pack gain records to a bit-writer-compatible sink.
+ *
  * @param {GainRecord[]} records Ordered transform-unit gain records.
  * @param {{write: Function}} sink Bit writer or exact counter.
  * @returns {void}
@@ -142,6 +149,7 @@ export function packGainRecords(records, sink) {
 
 /**
  * Read one gain record from a bit-reader-compatible source.
+ *
  * @param {{read: Function}} reader Reader positioned at the record count.
  * @returns {GainRecord} Decoded gain record.
  */

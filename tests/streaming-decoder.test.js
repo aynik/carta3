@@ -8,6 +8,12 @@ import { decode } from '../codec/pipeline/decoder.js'
 const SAMPLE_COUNT = 10 * 1024
 const waveCache = new Map()
 
+/**
+ * Test helper for referenceWave.
+ *
+ * @param {number} bitrateKbps
+ * @returns {Uint8Array}
+ */
 function referenceWave(bitrateKbps) {
   let wave = waveCache.get(bitrateKbps)
   if (wave) return wave
@@ -28,6 +34,12 @@ function referenceWave(bitrateKbps) {
   return wave
 }
 
+/**
+ * Test helper for decodeTimelineFloatBits.
+ *
+ * @param {number} bitrateKbps
+ * @returns {number[]}
+ */
 function decodeTimelineFloatBits(bitrateKbps) {
   const parsed = parseWave(referenceWave(bitrateKbps))
   const decodeFrame = decode({ bitrateKbps })
@@ -51,6 +63,12 @@ function decodeTimelineFloatBits(bitrateKbps) {
   return bytes
 }
 
+/**
+ * Test helper for decoderStateHash.
+ *
+ * @param {BufferPool} pool
+ * @returns {number}
+ */
 function decoderStateHash(pool) {
   const hash = createHash('sha256')
   for (const channel of pool.decoder.state.channels) {

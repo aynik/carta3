@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { AudioProcessor } from '../codec/io/processor.js'
 
+/**
+ * Test helper for signal.
+ *
+ * @param {number} [sampleCount]
+ * @returns {Float32Array[]}
+ */
 function signal(sampleCount = 1500) {
   const channels = [
     new Float32Array(sampleCount),
@@ -17,6 +23,12 @@ function signal(sampleCount = 1500) {
   return channels
 }
 
+/**
+ * Test helper for chunks.
+ *
+ * @param {Float32Array[]} channels
+ * @returns {AsyncGenerator<Float32Array[]>}
+ */
 async function* chunks(channels) {
   for (let offset = 0; offset < channels[0].length; offset += 317) {
     yield channels.map((channel) => channel.subarray(offset, offset + 317))

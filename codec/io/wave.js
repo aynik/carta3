@@ -5,19 +5,32 @@ import { resolveProfile, resolveWaveProfile } from '../core/profiles.js'
 
 const textDecoder = new TextDecoder('ascii')
 
-/** Write one four-character RIFF identifier. */
+/**
+ * Write one four-character RIFF identifier.
+ *
+ * @param {Uint8Array} output
+ * @param {number} offset
+ * @param {string} value
+ */
 function writeFourCc(output, offset, value) {
   for (let index = 0; index < 4; index++)
     output[offset + index] = value.charCodeAt(index)
 }
 
-/** Read one four-character RIFF identifier. */
+/**
+ * Read one four-character RIFF identifier.
+ *
+ * @param {Uint8Array} input
+ * @param {number} offset
+ * @returns {string}
+ */
 function readFourCc(input, offset) {
   return textDecoder.decode(input.subarray(offset, offset + 4))
 }
 
 /**
  * Build the canonical ATRAC3 WAVE header.
+ *
  * @param {object} profile Resolved ATRAC3 profile.
  * @param {number} dataBytes Encoded data-chunk byte length.
  * @param {number} [alignmentSampleCount=1024] Fact alignment sample count.
@@ -72,6 +85,7 @@ export function createWaveHeader(
 
 /**
  * Materialize a complete ATRAC3 WAVE file from packed frames.
+ *
  * @param {Uint8Array[]} frames Profile-sized encoded frames.
  * @param {object} [options] Profile and timeline options.
  * @returns {Uint8Array} Complete WAVE byte image.
@@ -106,6 +120,7 @@ export function createWave(frames, options = {}) {
 
 /**
  * Parse and validate Carta3's maintained ATRAC3 RIFF/WAVE subset.
+ *
  * @param {Uint8Array} input Complete ATRAC3 WAVE byte image.
  * @returns {object} Profile, fact metadata, data geometry, and frame iterator.
  */
@@ -175,7 +190,11 @@ export function parseWave(input) {
     dataOffset,
     dataBytes,
     frameCount: dataBytes / profile.bytesPerFrame,
-    /** Return byte-aligned complete frames from the parsed data chunk. */
+    /**
+     * Return byte-aligned complete frames from the parsed data chunk.
+     *
+     * @returns {Generator<Uint8Array>}
+     */
     frames() {
       return Array.from({ length: this.frameCount }, (_, index) =>
         input.subarray(

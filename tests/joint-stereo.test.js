@@ -6,6 +6,11 @@ import {
 import { JointStereoState } from '../codec/state/joint-stereo.js'
 import { applyJointStereoConversion } from '../codec/transforms/joint-stereo.js'
 
+/**
+ * Test helper for layers.
+ *
+ * @returns {object[]}
+ */
 function layers() {
   return [
     { spectrum: new Float32Array(1024) },

@@ -8,6 +8,13 @@ import { TONE_POLICY_THRESHOLD } from '../codec/core/constants.js'
 import { BufferPool } from '../codec/core/buffers.js'
 import { packSoundUnit } from '../codec/io/sound-unit.js'
 
+/**
+ * Test helper for blockFromPool.
+ *
+ * @param {BufferPool} pool
+ * @param {number} [channel]
+ * @returns {object}
+ */
 function blockFromPool(pool, channel = 0) {
   return pool.encoder.state.channelBlockRing[channel][0]
 }
@@ -28,6 +35,14 @@ describe('ATRAC3 132 kbps non-tone allocation baseline', () => {
 
     const unexpected = new Error('unexpected tone candidate failure')
     const selected = new Proxy(blockFromPool(pool), {
+      /**
+       * Test helper for set.
+       *
+       * @param {object} target
+       * @param {string|symbol} property
+       * @param {number} value
+       * @returns {boolean}
+       */
       set(target, property, value) {
         if (property === 'toneEntries') throw unexpected
         return Reflect.set(target, property, value)

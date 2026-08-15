@@ -31,7 +31,12 @@ import {
   interleavePcm16,
 } from '../codec/io/serialization.js'
 
-/** Format a duration in seconds as MM:SS. */
+/**
+ * Format a duration in seconds as MM:SS.
+ *
+ * @param {number} seconds
+ * @returns {string}
+ */
 function formatTime(seconds) {
   const minutes = Math.floor(seconds / 60)
   const remainder = Math.floor(seconds % 60)
@@ -42,7 +47,13 @@ function formatTime(seconds) {
  * Display frame progress and real-time processing speed.
  */
 class ProgressTracker {
-  /** Create a tracker for one encode or decode operation. */
+  /**
+   * Create a tracker for one encode or decode operation.
+   *
+   * @param {number} frameCount
+   * @param {string} operation
+   * @param {boolean} [quiet]
+   */
   constructor(frameCount, operation, quiet = false) {
     this.totalFrames = frameCount
     this.quiet = quiet || frameCount === 0
@@ -64,7 +75,11 @@ class ProgressTracker {
     }
   }
 
-  /** Set the number of source or container frames processed so far. */
+  /**
+   * Set the number of source or container frames processed so far.
+   *
+   * @param {number} frameCount
+   */
   update(frameCount) {
     this.frameCount = Math.min(frameCount, this.totalFrames)
     if (this.quiet) return
@@ -80,7 +95,11 @@ class ProgressTracker {
     })
   }
 
-  /** Complete and stop the progress display. */
+  /**
+   * Complete and stop the progress display.
+   *
+   * @param {boolean} [completed]
+   */
   stop(completed = false) {
     if (this.quiet || !this.bar) return
     if (completed) this.update(this.totalFrames)
@@ -91,7 +110,14 @@ class ProgressTracker {
 /** Error caused by an invalid combination of command-line arguments. */
 class CliUsageError extends Error {}
 
-/** Read exactly one fixed-size region from an open file. */
+/**
+ * Read exactly one fixed-size region from an open file.
+ *
+ * @param {object} handle
+ * @param {number} length
+ * @param {number} position
+ * @returns {Promise<Uint8Array>}
+ */
 async function readExactly(handle, length, position) {
   const output = Buffer.alloc(length)
   let offset = 0
@@ -108,7 +134,12 @@ async function readExactly(handle, length, position) {
   return output
 }
 
-/** Parse the PCM format and data geometry needed for streaming input. */
+/**
+ * Parse the PCM format and data geometry needed for streaming input.
+ *
+ * @param {string} filePath
+ * @returns {Promise<object>}
+ */
 async function readPcmWaveMetadata(filePath) {
   const handle = await open(filePath, 'r')
   try {
@@ -194,7 +225,13 @@ async function readPcmWaveMetadata(filePath) {
   }
 }
 
-/** Yield the PCM data portion of a WAVE file without its container chunks. */
+/**
+ * Yield the PCM data portion of a WAVE file without its container chunks.
+ *
+ * @param {string} filePath
+ * @param {object} metadata
+ * @returns {AsyncGenerator<Uint8Array>}
+ */
 async function* readPcmChunks(filePath, metadata) {
   if (metadata.dataBytes === 0) return
   const stream = fs.createReadStream(filePath, {
@@ -204,7 +241,13 @@ async function* readPcmChunks(filePath, metadata) {
   for await (const chunk of stream) yield chunk
 }
 
-/** Convert interleaved signed PCM chunks to encoder-domain planar stereo. */
+/**
+ * Convert interleaved signed PCM chunks to encoder-domain planar stereo.
+ *
+ * @param {AsyncIterable<Uint8Array>} chunks
+ * @param {number} channelCount
+ * @returns {AsyncGenerator<Float32Array[]>}
+ */
 async function* readPlanarPcm(chunks, channelCount) {
   let carry = Buffer.alloc(0)
   const blockBytes = channelCount * 2
@@ -228,12 +271,23 @@ async function* readPlanarPcm(chunks, channelCount) {
   if (carry.length !== 0) throw new RangeError('Truncated PCM sample')
 }
 
-/** Write bytes while respecting stream backpressure. */
+/**
+ * Write bytes while respecting stream backpressure.
+ *
+ * @param {NodeJS.WritableStream} stream
+ * @param {Uint8Array} bytes
+ */
 async function writeBytes(stream, bytes) {
   if (!stream.write(bytes)) await once(stream, 'drain')
 }
 
-/** Encode signed 16-bit PCM WAVE to WAVE_FORMAT_ATRAC3. */
+/**
+ * Encode signed 16-bit PCM WAVE to WAVE_FORMAT_ATRAC3.
+ *
+ * @param {string} inputFile
+ * @param {string} outputFile
+ * @param {object} options
+ */
 async function encodeFile(inputFile, outputFile, options) {
   const bitrateKbps = Number(options.bitrate)
   const profile = resolveProfile({ bitrateKbps })
@@ -293,7 +347,13 @@ async function encodeFile(inputFile, outputFile, options) {
   }
 }
 
-/** Decode WAVE_FORMAT_ATRAC3 to signed 16-bit stereo PCM WAVE. */
+/**
+ * Decode WAVE_FORMAT_ATRAC3 to signed 16-bit stereo PCM WAVE.
+ *
+ * @param {string} inputFile
+ * @param {string} outputFile
+ * @param {object} options
+ */
 async function decodeFile(inputFile, outputFile, options) {
   const input = new Uint8Array(await fs.promises.readFile(inputFile))
   const parsed = parseWave(input)
@@ -341,7 +401,11 @@ async function decodeFile(inputFile, outputFile, options) {
   }
 }
 
-/** Build the root-flag CLI shared by direct execution and CLI tests. */
+/**
+ * Build the root-flag CLI shared by direct execution and CLI tests.
+ *
+ * @returns {Command}
+ */
 function createProgram() {
   const { version } = JSON.parse(
     fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')
@@ -363,7 +427,11 @@ function createProgram() {
     .argument('<output>', 'Output file path')
 }
 
-/** Parse arguments, validate shared CLI policy, and run one operation. */
+/**
+ * Parse arguments, validate shared CLI policy, and run one operation.
+ *
+ * @param {string[]} [argv]
+ */
 async function main(argv = process.argv) {
   const cli = createProgram()
   cli.parse(argv)

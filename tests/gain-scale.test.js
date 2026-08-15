@@ -6,6 +6,12 @@ import {
 } from '../codec/transforms/gain-scale.js'
 import { GainScaleScratch } from '../codec/state/encoder.js'
 
+/**
+ * Test helper for record.
+ *
+ * @param {Array<[number, number]>} entries
+ * @returns {GainRecord}
+ */
 function record(entries) {
   const result = new GainRecord()
   result.entries = entries.length

@@ -7,6 +7,11 @@ import {
 } from '../codec/io/sound-unit.js'
 import { BitReader } from '../codec/io/bitstream.js'
 
+/**
+ * Test helper for minimalSyntax.
+ *
+ * @returns {object}
+ */
 function minimalSyntax() {
   return {
     spectrumGroupCount: 1,

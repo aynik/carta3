@@ -19,6 +19,7 @@ export { ALLOCATION_WORK_WORDS }
 
 /**
  * Create a zeroed low-rate allocation word image.
+ *
  * @returns {Int32Array} Fixed-capacity allocation and packing storage.
  */
 export function createAllocationWork() {
@@ -29,6 +30,7 @@ export function createAllocationWork() {
 export class AllocationWorkView {
   /**
    * Wrap an existing allocation image without copying it.
+   *
    * @param {Int32Array} words Shared allocation word image.
    */
   constructor(words) {
@@ -40,6 +42,7 @@ export class AllocationWorkView {
 
   /**
    * Read one word, returning zero outside the available image.
+   *
    * @param {number} index Word index.
    * @returns {number} Signed stored word, or zero when out of range.
    */
@@ -79,6 +82,7 @@ export class AllocationWorkView {
 
   /**
    * Read the residual mode for one quantization band.
+   *
    * @param {number} band Quantization-band index.
    * @returns {number} Stored residual mode.
    */
@@ -88,6 +92,7 @@ export class AllocationWorkView {
 
   /**
    * Read the residual scale factor for one quantization band.
+   *
    * @param {number} band Quantization-band index.
    * @returns {number} Stored scale-factor index.
    */
@@ -97,6 +102,7 @@ export class AllocationWorkView {
 
   /**
    * Read one word from a fixed-width tone-region record.
+   *
    * @param {number} region Tone-region index.
    * @param {number} word Word offset within that region.
    * @returns {number} Stored tone-region word.
@@ -111,6 +117,7 @@ export class AllocationWorkView {
 
   /**
    * Decode the bounded header of a variable tone subrecord.
+   *
    * @param {number} offset Subrecord word offset.
    * @returns {{symbolCount: number, tableIndex: number}|null} Header or null.
    */
@@ -124,6 +131,7 @@ export class AllocationWorkView {
 
   /**
    * Read one symbol from a variable tone subrecord.
+   *
    * @param {number} offset First symbol word offset.
    * @param {number} symbol Symbol index within the subrecord.
    * @returns {number} Stored symbol word.
@@ -135,6 +143,7 @@ export class AllocationWorkView {
 
   /**
    * Return the residual spectrum bit image.
+   *
    * @returns {Int32Array|null} Zero-copy spectrum words, or null when truncated.
    */
   residualSpectrum() {
@@ -150,6 +159,7 @@ export class AllocationWorkView {
 export class AllocationWorkMut extends AllocationWorkView {
   /**
    * Publish the active residual band count.
+   *
    * @param {number} count Active band prefix length.
    * @returns {void}
    */
@@ -159,6 +169,7 @@ export class AllocationWorkMut extends AllocationWorkView {
 
   /**
    * Publish the number of transform blocks.
+   *
    * @param {number} count Active transform-block count.
    * @returns {void}
    */
@@ -168,6 +179,7 @@ export class AllocationWorkMut extends AllocationWorkView {
 
   /**
    * Publish the tone coding mode.
+   *
    * @param {number} mode Tone syntax mode.
    * @returns {void}
    */
@@ -177,6 +189,7 @@ export class AllocationWorkMut extends AllocationWorkView {
 
   /**
    * Publish the number of tone regions.
+   *
    * @param {number} count Tone-region count.
    * @returns {void}
    */
@@ -186,6 +199,7 @@ export class AllocationWorkMut extends AllocationWorkView {
 
   /**
    * Reset all currently implemented tone syntax fields.
+   *
    * @returns {void}
    */
   clearToneSyntax() {
@@ -195,6 +209,7 @@ export class AllocationWorkMut extends AllocationWorkView {
 
   /**
    * Set the residual mode for one band.
+   *
    * @param {number} band Quantization-band index.
    * @param {number} mode Residual coding mode.
    * @returns {void}
@@ -205,6 +220,7 @@ export class AllocationWorkMut extends AllocationWorkView {
 
   /**
    * Set the residual scale factor for one band.
+   *
    * @param {number} band Quantization-band index.
    * @param {number} scaleFactor Six-bit scale-factor index.
    * @returns {void}
@@ -215,6 +231,7 @@ export class AllocationWorkMut extends AllocationWorkView {
 
   /**
    * Copy Float32 spectrum bits into the shared integer work image.
+   *
    * @param {Float32Array} spectrum Complete residual spectrum.
    * @returns {void}
    */

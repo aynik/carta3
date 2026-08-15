@@ -11,6 +11,7 @@ import { createPcmWave } from './serialization.js'
 export class AudioProcessor {
   /**
    * Adapt arbitrary stereo PCM chunks to complete ATRAC3 frames.
+   *
    * @param {AsyncIterable<Float32Array[]>|Iterable<Float32Array[]>} pcmChunks
    * Planar stereo PCM chunks.
    * @param {object} [options] Encoder profile and progress options.
@@ -33,6 +34,7 @@ export class AudioProcessor {
 
   /**
    * Decode complete ATRAC3 frames without applying container timeline trim.
+   *
    * @param {AsyncIterable<Uint8Array>|Iterable<Uint8Array>} encodedFrames
    * Complete encoded frames.
    * @param {object} [options] Decoder profile and progress options.
@@ -49,6 +51,7 @@ export class AudioProcessor {
 
   /**
    * Decode frames while applying the WAVE fact/alignment timeline.
+   *
    * @param {AsyncIterable<Uint8Array>|Iterable<Uint8Array>} encodedFrames
    * Complete encoded frames.
    * @param {object} [options] Timeline, profile, and progress options.
@@ -67,6 +70,7 @@ export class AudioProcessor {
 
   /**
    * Fold complete planar buffers into zero-padded stereo coding frames.
+   *
    * @param {Float32Array[]} buffers Complete planar stereo PCM.
    * @param {number} [frameSize] Samples per emitted channel frame.
    * @returns {Generator<Float32Array[]>} Zero-padded planar frames.
@@ -94,6 +98,7 @@ export class AudioProcessor {
 
   /**
    * Encode complete planar PCM buffers into an ATRAC3 WAVE image.
+   *
    * @param {Float32Array[]} channels Complete planar stereo PCM.
    * @param {object} [options] Encoder profile and WAVE options.
    * @returns {Uint8Array} Complete ATRAC3 WAVE image.
@@ -104,6 +109,7 @@ export class AudioProcessor {
 
   /**
    * Decode an ATRAC3 WAVE image into complete planar PCM buffers.
+   *
    * @param {Uint8Array} input Complete ATRAC3 WAVE image.
    * @returns {Float32Array[]} Decoded planar stereo PCM.
    */
@@ -113,6 +119,7 @@ export class AudioProcessor {
 
   /**
    * Collect encoded frames into a browser WAVE blob.
+   *
    * @param {AsyncIterable<Uint8Array>|Iterable<Uint8Array>} encodedFrames
    * Complete encoded frames.
    * @param {object} [options] Profile and WAVE timeline options.
@@ -126,6 +133,7 @@ export class AudioProcessor {
 
   /**
    * Parse a browser WAVE blob into metadata and a lazy frame iterable.
+   *
    * @param {Blob} blob Complete ATRAC3 WAVE blob.
    * @returns {Promise<object>} Profile, fact metadata, frames, and source bytes.
    */
@@ -142,6 +150,7 @@ export class AudioProcessor {
 
   /**
    * Serialize planar PCM into a browser-compatible PCM WAVE blob.
+   *
    * @param {Float32Array[]} channels Complete planar PCM channels.
    * @param {object} [options] PCM WAVE serialization options.
    * @returns {Blob} PCM WAVE blob.

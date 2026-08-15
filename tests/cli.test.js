@@ -6,7 +6,12 @@ import { createProgram, main } from '../bin/cli.js'
 import { createPcmWave } from '../codec/io/serialization.js'
 import { parseWave } from '../codec/io/wave.js'
 
-/** Build a short stereo PCM fixture in the encoder's signed-sample domain. */
+/**
+ * Build a short stereo PCM fixture in the encoder's signed-sample domain.
+ *
+ * @param {number} [sampleCount]
+ * @returns {Uint8Array}
+ */
 function createInputWave(sampleCount = 2048) {
   const channels = [
     new Float32Array(sampleCount),

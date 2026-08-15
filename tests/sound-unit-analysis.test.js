@@ -16,6 +16,11 @@ import {
   validateFrameStage,
 } from '../codec/pipeline/encoder.js'
 
+/**
+ * Test helper for context.
+ *
+ * @returns {object}
+ */
 function context() {
   return {
     profile: resolveProfile({ bitrateKbps: 132 }),
@@ -23,6 +28,13 @@ function context() {
   }
 }
 
+/**
+ * Test helper for beginFrame.
+ *
+ * @param {Function} codec
+ * @param {Float32Array[]} channels
+ * @returns {object}
+ */
 function beginFrame(codec, channels) {
   let frame = validateFrameStage()(channels)
   frame = transactionStage(codec)(frame)

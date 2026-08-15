@@ -8,6 +8,12 @@ import { IndependentQmfScratch } from '../codec/state/encoder.js'
 
 const bitsView = new DataView(new ArrayBuffer(4))
 
+/**
+ * Test helper for checksum.
+ *
+ * @param {ArrayLike<number>} values
+ * @returns {number}
+ */
 function checksum(values) {
   let sum = 0n
   let xor = 0n
@@ -20,6 +26,12 @@ function checksum(values) {
   return [sum, xor]
 }
 
+/**
+ * Test helper for frame.
+ *
+ * @param {number} generation
+ * @returns {Float32Array}
+ */
 function frame(generation) {
   const values = new Float32Array(FRAME_SAMPLES)
   for (let index = 0; index < values.length; index++) {

@@ -8,7 +8,12 @@
 import { CHANNELS, FRAME_SAMPLES, SAMPLE_RATE } from './constants.js'
 import { PROFILE_ROWS } from './tables.js'
 
-/** Convert one immutable table row into the public profile shape. */
+/**
+ * Convert one immutable table row into the public profile shape.
+ *
+ * @param {object} row
+ * @returns {object}
+ */
 function materializeProfile(row) {
   const modeFlag = row.syntaxMode === 2 ? 1 : 0
   const sampleRateIndex = 1
@@ -25,6 +30,7 @@ function materializeProfile(row) {
 
 /**
  * Resolve one of Carta3's maintained ATRAC3 profiles.
+ *
  * @param {object} [options] Requested stream geometry.
  * @param {number} [options.bitrateKbps=132] Maintained bitrate.
  * @param {number} [options.channels=2] Required stereo channel count.
@@ -48,6 +54,7 @@ export function resolveProfile({
 
 /**
  * Resolve a maintained profile from ATRAC3 WAVE format fields.
+ *
  * @param {object} format Parsed WAVE format geometry.
  * @param {number} format.channels Channel count.
  * @param {number} format.sampleRate Sample rate in hertz.

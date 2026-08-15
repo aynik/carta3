@@ -49,6 +49,7 @@ const bitReverseIndices = Uint8Array.from(MDCT_BIT_REVERSE_PAIRS.flat())
 /**
  * Transform a 512-sample current/previous window into 256 ATRAC3 coefficients.
  * Every f32 operation is explicitly rounded to preserve reference evaluation order.
+ *
  * @param {Float32Array} source Prepared 512-sample gain-adjusted window.
  * @param {Float32Array} destination Destination 256-line spectrum.
  * @param {boolean} reverseOutput Whether to publish coefficients in reverse order.
@@ -274,7 +275,13 @@ const LAYER_MDCT_THREE_QUARTER_WORDS = LAYER_MDCT_QUARTER_WORDS * 3
 const LAYER_MDCT_LAST_WORD = FRAME_SAMPLES - 1
 const LAYER_MDCT_MIRROR_BASE = FRAME_SAMPLES - SUBBAND_COUNT
 
-/** Run the interleaved forward kernel over gain-prepared matrix rows. */
+/**
+ * Run the interleaved forward kernel over gain-prepared matrix rows.
+ *
+ * @param {Uint32Array} words
+ * @param {object} transform
+ * @param {Float32Array} initialGainScales
+ */
 function transformLayeredRows(words, transform, initialGainScales) {
   for (let unit = 0; unit < SUBBAND_COUNT; unit++) {
     const gainIndex =
@@ -467,6 +474,7 @@ function transformLayeredRows(words, transform, initialGainScales) {
 
 /**
  * Transform a gain-prepared low-rate layer and commit its persistent history.
+ *
  * @param {object} layer Transaction-local layer state.
  * @param {object} transformState State prepared by layered gain analysis.
  * @returns {object} The transformed `layer`.
@@ -493,13 +501,20 @@ export function runLayeredMdct(layer, transformState) {
  *
  * Gain-envelope application is deliberately owned by `gain-scale.js`.
  */
-/** Read one field from the interleaved inverse-transform coefficient table. */
+/**
+ * Read one field from the interleaved inverse-transform coefficient table.
+ *
+ * @param {number} index
+ * @param {string} field
+ * @returns {number}
+ */
 function coefficient(index, field) {
   return INVERSE_TRANSFORM_COEFFICIENTS[index * SUBBAND_COUNT + field]
 }
 
 /**
  * Inverse-transform one spectral unit and update its overlap history.
+ *
  * @param {Float32Array} spectrum Mutable reconstructed spectrum.
  * @param {number} blockIndex Interleaved subband index.
  * @param {number} gainIndex Initial transform scale selector.

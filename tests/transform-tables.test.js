@@ -4,11 +4,23 @@ import { transformTables } from '../codec/core/tables.js'
 const UINT64_MASK = 0xffffffffffffffffn
 const floatView = new DataView(new ArrayBuffer(4))
 
+/**
+ * Test helper for float32Bits.
+ *
+ * @param {number} value
+ * @returns {number}
+ */
 function float32Bits(value) {
   floatView.setFloat32(0, value, true)
   return floatView.getUint32(0, true)
 }
 
+/**
+ * Test helper for checksum.
+ *
+ * @param {ArrayLike<number>} values
+ * @returns {number}
+ */
 function checksum(values) {
   let sum = 0n
   let xor = 0n
@@ -20,10 +32,34 @@ function checksum(values) {
   return [sum, xor]
 }
 
+/**
+ * Test helper for f32Checksum.
+ *
+ * @param {ArrayLike<number>} values
+ * @returns {number}
+ */
 const f32Checksum = (values) => checksum([...values].map(float32Bits))
+/**
+ * Test helper for u32Checksum.
+ *
+ * @param {ArrayLike<number>} values
+ * @returns {number}
+ */
 const u32Checksum = (values) => checksum(values)
+/**
+ * Test helper for i16Checksum.
+ *
+ * @param {ArrayLike<number>} values
+ * @returns {number}
+ */
 const i16Checksum = (values) =>
   checksum([...values].map((value) => value & 0xffff))
+/**
+ * Test helper for u8Checksum.
+ *
+ * @param {ArrayLike<number>} values
+ * @returns {number}
+ */
 const u8Checksum = (values) => checksum(values)
 
 describe('ATRAC3 runtime transform tables', () => {

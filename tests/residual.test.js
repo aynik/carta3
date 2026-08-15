@@ -26,11 +26,23 @@ import { LayerState } from '../codec/state/layered.js'
 const numberBits = new DataView(new ArrayBuffer(8))
 const floatBits = new DataView(new ArrayBuffer(4))
 
+/**
+ * Test helper for f64Bits.
+ *
+ * @param {number} value
+ * @returns {number[]}
+ */
 function f64Bits(value) {
   numberBits.setFloat64(0, value, true)
   return numberBits.getBigUint64(0, true)
 }
 
+/**
+ * Test helper for f32Bits.
+ *
+ * @param {number} value
+ * @returns {number}
+ */
 function f32Bits(value) {
   floatBits.setFloat32(0, value, true)
   return floatBits.getUint32(0, true)
@@ -91,6 +103,11 @@ const REFERENCE_COSTS = new Map([
   ],
 ])
 
+/**
+ * Test helper for referenceSpectrum.
+ *
+ * @returns {Float32Array}
+ */
 function referenceSpectrum() {
   return Float32Array.from(
     { length: 1024 },
@@ -98,8 +115,19 @@ function referenceSpectrum() {
   )
 }
 
+/**
+ * Test helper for sourceProfileHash.
+ *
+ * @param {object} profile
+ * @returns {number}
+ */
 function sourceProfileHash(profile) {
   let hash = 1469598103934665603n
+  /**
+   * Test helper for add.
+   *
+   * @param {number} word
+   */
   const add = (word) => {
     hash ^= BigInt(word >>> 0)
     hash = BigInt.asUintN(64, hash * 1099511628211n)
@@ -116,6 +144,12 @@ function sourceProfileHash(profile) {
   return hash.toString(16).padStart(16, '0')
 }
 
+/**
+ * Test helper for wordImageHash.
+ *
+ * @param {Uint32Array} words
+ * @returns {number}
+ */
 function wordImageHash(words) {
   let hash = 1469598103934665603n
   for (const word of words) {

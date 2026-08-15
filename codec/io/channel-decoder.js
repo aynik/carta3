@@ -18,7 +18,14 @@ import { float32Add, float32Multiply } from '../utils.js'
 
 export { GainPairTable } from '../state/decoder.js'
 
-/** Decode pair-block gain tables for all active transform units. */
+/**
+ * Decode pair-block gain tables for all active transform units.
+ *
+ * @param {object} reader
+ * @param {number} unitMode
+ * @param {object} decoded
+ * @returns {number}
+ */
 function decodePairTables(reader, unitMode, decoded) {
   let coefficientExtent = 0
   for (let unit = 0; unit <= unitMode; unit++) {
@@ -45,7 +52,17 @@ function decodePairTables(reader, unitMode, decoded) {
   return coefficientExtent
 }
 
-/** Decode one bounded Huffman run and retain its reconstruction scale. */
+/**
+ * Decode one bounded Huffman run and retain its reconstruction scale.
+ *
+ * @param {object} reader
+ * @param {number} tableSelector
+ * @param {number} codeIndex
+ * @param {number} scale
+ * @param {number} start
+ * @param {number} count
+ * @returns {object}
+ */
 function decodeRun(reader, tableSelector, codeIndex, scale, start, count) {
   return {
     outputStart: start,
@@ -54,7 +71,15 @@ function decodeRun(reader, tableSelector, codeIndex, scale, start, count) {
   }
 }
 
-/** Decode tone regions and append their residual reconstruction runs. */
+/**
+ * Decode tone regions and append their residual reconstruction runs.
+ *
+ * @param {object} reader
+ * @param {number} unitMode
+ * @param {object} decoded
+ * @param {number} coefficientExtent
+ * @returns {number}
+ */
 function decodeToneResiduals(reader, unitMode, decoded, coefficientExtent) {
   const header = ToneSectionHeader.read(reader)
   let remaining = header.regionCount
@@ -122,7 +147,13 @@ function decodeToneResiduals(reader, unitMode, decoded, coefficientExtent) {
   return coefficientExtent
 }
 
-/** Decode primary spectrum allocation and append its Huffman runs. */
+/**
+ * Decode primary spectrum allocation and append its Huffman runs.
+ *
+ * @param {object} reader
+ * @param {object} decoded
+ * @returns {number}
+ */
 function decodeMainSpectrum(reader, decoded) {
   const allocation = SpectrumAllocation.read(reader)
   for (let group = 0; group < allocation.groupCount; group++) {
@@ -146,6 +177,7 @@ function decodeMainSpectrum(reader, decoded) {
 
 /**
  * Parse one channel without publishing reconstructed spectrum or history.
+ *
  * @param {Uint8Array} stream Padded encoded frame bytes.
  * @param {number} bitPosition Absolute channel start bit.
  * @param {number} unitMode Highest active transform-unit index.
@@ -172,6 +204,7 @@ export function unpackChannelSyntax(stream, bitPosition, unitMode, decoded) {
 
 /**
  * Apply staged inverse quantization after every channel passes preflight.
+ *
  * @param {object} decoded Workspace returned by {@link unpackChannelSyntax}.
  * @returns {Float32Array} Reconstructed channel spectrum.
  */

@@ -24,6 +24,7 @@ export class GainPairTable {
 
   /**
    * Copy this table without replacing destination-owned arrays.
+   *
    * @param {GainPairTable} destination Existing destination table.
    * @returns {GainPairTable} `destination` after the copy.
    */
@@ -33,7 +34,11 @@ export class GainPairTable {
     return destination
   }
 
-  /** Restore an inactive sentinel-terminated table. */
+  /**
+   * Restore an inactive sentinel-terminated table.
+   *
+   * @returns {GainPairTable}
+   */
   reset() {
     this.starts.fill(0)
     this.gains.fill(0)
@@ -61,6 +66,7 @@ export class DecoderChannelState {
 
   /**
    * Copy this channel history into an existing decoder transaction.
+   *
    * @param {DecoderChannelState} destination Existing destination channel.
    * @returns {DecoderChannelState} `destination` after the copy.
    */
@@ -79,6 +85,7 @@ export class DecoderChannelState {
 class DecoderHeaderState {
   /**
    * Derive initial header history from one resolved profile.
+   *
    * @param {object} profile Immutable decoder profile.
    */
   constructor(profile) {
@@ -94,7 +101,12 @@ class DecoderHeaderState {
       : profile.bytesPerFrame / MAX_CHANNELS
   }
 
-  /** Copy this header history into existing destination storage. */
+  /**
+   * Copy this header history into existing destination storage.
+   *
+   * @param {DecoderHeaderState} destination
+   * @returns {DecoderHeaderState}
+   */
   copyTo(destination) {
     destination.jointStereoLayout = this.jointStereoLayout
     destination.gainScaleSelectors.set(this.gainScaleSelectors)
@@ -112,6 +124,7 @@ class DecoderHeaderState {
 export class DecoderState {
   /**
    * Create complete state for one resolved profile.
+   *
    * @param {object} [options] Profile selection.
    */
   constructor(options = {}) {
@@ -127,6 +140,7 @@ export class DecoderState {
 
   /**
    * Copy this complete decoder state into an existing transaction.
+   *
    * @param {DecoderState} destination Existing destination state.
    * @returns {DecoderState} `destination` after the copy.
    */
@@ -153,7 +167,11 @@ export class DecodedChannelFrame {
     this.runs = []
   }
 
-  /** Clear variable syntax before parsing another channel frame. */
+  /**
+   * Clear variable syntax before parsing another channel frame.
+   *
+   * @returns {DecodedChannelFrame}
+   */
   reset() {
     this.samples.fill(0)
     this.coefficientBlocks = 0

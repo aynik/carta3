@@ -2,7 +2,12 @@
 
 import { parseWave } from './wave.js'
 
-/** Normalize supported in-memory binary inputs without unnecessary copying. */
+/**
+ * Normalize supported in-memory binary inputs without unnecessary copying.
+ *
+ * @param {Uint8Array|ArrayBuffer|ArrayBufferView} input
+ * @returns {Uint8Array}
+ */
 function asBytes(input) {
   if (input instanceof Uint8Array) return input
   if (input instanceof ArrayBuffer) return new Uint8Array(input)
@@ -16,6 +21,7 @@ function asBytes(input) {
 export class WaveReader {
   /**
    * Parse an ATRAC3 WAVE image and expose stable stream metadata.
+   *
    * @param {ArrayBuffer|ArrayBufferView} input Complete in-memory WAVE image.
    */
   constructor(input) {

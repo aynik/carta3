@@ -55,6 +55,7 @@ export class LayerState {
 
   /**
    * Copy this layer without replacing destination-owned storage.
+   *
    * @param {LayerState} destination Existing destination state.
    * @returns {LayerState} `destination` after the copy.
    */
@@ -76,6 +77,7 @@ export class LayerState {
 
   /**
    * Serialize this state into the port-compatible transaction image.
+   *
    * @param {Uint32Array} words Caller-owned transaction image.
    * @returns {Uint32Array} `words` after serialization.
    */
@@ -109,6 +111,7 @@ export class LayerState {
 
   /**
    * Commit a transaction image into this persistent layer storage.
+   *
    * @param {Uint32Array} words Completed transaction image.
    * @returns {LayerState} This layer after commit.
    */
@@ -180,7 +183,11 @@ export class ResidualSourceProfile {
     )
   }
 
-  /** Clear measurements that are rebuilt for every source spectrum. */
+  /**
+   * Clear measurements that are rebuilt for every source spectrum.
+   *
+   * @returns {ResidualSourceProfile}
+   */
   reset() {
     this.groupScaleFactors.fill(0)
     this.bandMetrics.fill(0)
@@ -206,7 +213,12 @@ export class LayeredAllocationScratch {
   }
 }
 
-/** Convert a coefficient limit to the smallest covering residual-band prefix. */
+/**
+ * Convert a coefficient limit to the smallest covering residual-band prefix.
+ *
+ * @param {number} limit
+ * @returns {number}
+ */
 function bandCountForCoefficientLimit(limit) {
   let count = 1
   while (count < SPECTRUM_GROUPS && LAYER_BAND_OFFSETS[count] < limit) count++
@@ -217,6 +229,7 @@ function bandCountForCoefficientLimit(limit) {
 export class LayeredEncoderState {
   /**
    * Configure state for a maintained 66 or 105 kbps profile.
+   *
    * @param {object} [options] Profile selector accepted by {@link resolveProfile}.
    */
   constructor(options = {}) {
@@ -263,6 +276,7 @@ export class LayeredEncoderState {
 
   /**
    * Copy this configured state into existing destination storage.
+   *
    * @param {LayeredEncoderState} destination Existing destination state.
    * @returns {LayeredEncoderState} `destination` after the copy.
    */

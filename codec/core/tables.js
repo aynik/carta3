@@ -296,12 +296,21 @@ export const RESIDUAL_VALUE_BITS = [
 const PI = Math.PI
 const FFT_FIXED_POINT_SCALE = 32768
 
-/** Clamp one rounded transform coefficient to signed 16-bit storage. */
+/**
+ * Clamp one rounded transform coefficient to signed 16-bit storage.
+ *
+ * @param {number} value
+ * @returns {number}
+ */
 function clampInt16(value) {
   return Math.max(-0x8000, Math.min(0x7fff, value))
 }
 
-/** Build every runtime transform table with pinned rounding behavior. */
+/**
+ * Build every runtime transform table with pinned rounding behavior.
+ *
+ * @returns {object}
+ */
 function buildTransformTables() {
   const tables = {
     mdctPreRotationCosines: new Float32Array(128),
@@ -398,6 +407,7 @@ let runtimeTables
 
 /**
  * Return the lazily initialized shared ATRAC3 transform tables.
+ *
  * @returns {object} Cached immutable transform-table collection.
  */
 export function transformTables() {

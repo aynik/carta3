@@ -10,6 +10,7 @@ import { float32Add, float32ToBits } from '../utils.js'
 
 /**
  * Match the reference float-to-signed-PCM conversion exactly.
+ *
  * @param {number} sample Decoder-domain signed sample value.
  * @returns {number} Clipped signed 16-bit integer.
  */
@@ -20,7 +21,13 @@ export function floatToPcm16(sample) {
   return (roundedBits << 16) >> 16
 }
 
-/** Write one four-character RIFF identifier. */
+/**
+ * Write one four-character RIFF identifier.
+ *
+ * @param {Uint8Array} output
+ * @param {number} offset
+ * @param {string} value
+ */
 function writeFourCc(output, offset, value) {
   for (let index = 0; index < 4; index++) {
     output[offset + index] = value.charCodeAt(index)
@@ -29,6 +36,7 @@ function writeFourCc(output, offset, value) {
 
 /**
  * Create a canonical signed 16-bit PCM WAVE header.
+ *
  * @param {object} geometry Output PCM geometry.
  * @param {number} geometry.sampleCount Samples per channel.
  * @param {number} [geometry.sampleRate=44100] Sample rate in hertz.
@@ -71,6 +79,7 @@ export function createPcmWaveHeader({
 
 /**
  * Interleave decoder-domain float channels as signed 16-bit PCM.
+ *
  * @param {Float32Array[]} channels Two equal planar channels.
  * @returns {Uint8Array} Little-endian interleaved PCM bytes.
  */
@@ -100,6 +109,7 @@ export function interleavePcm16(channels) {
 
 /**
  * Create a complete signed 16-bit PCM WAVE byte image.
+ *
  * @param {Float32Array[]} channels Two equal planar channels.
  * @param {object} [options] Optional sample-rate/header overrides.
  * @returns {Uint8Array} Header followed by interleaved PCM data.

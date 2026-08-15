@@ -4,7 +4,11 @@ import { FRAME_SAMPLES, WAVE_DELAY_SAMPLES } from '../core/constants.js'
 import { decode } from '../pipeline/decoder.js'
 import { parseWave } from './wave.js'
 
-/** Create the planar shape for a timeline interval with no visible samples. */
+/**
+ * Create the planar shape for a timeline interval with no visible samples.
+ *
+ * @returns {Float32Array[]}
+ */
 function emptyStereoChunk() {
   return [new Float32Array(0), new Float32Array(0)]
 }
@@ -16,6 +20,7 @@ function emptyStereoChunk() {
 export class WaveStreamingDecoder {
   /**
    * Create a frame decoder with WAVE alignment and sample-count trimming.
+   *
    * @param {object} [options] Profile and fact-timeline options.
    */
   constructor(options = {}) {
@@ -30,6 +35,7 @@ export class WaveStreamingDecoder {
 
   /**
    * Decode one frame and return samples visible on the WAVE timeline.
+   *
    * @param {Uint8Array} frame One complete encoded ATRAC3 frame.
    * @returns {Float32Array[]} Timeline-trimmed planar PCM chunk.
    */
@@ -49,6 +55,7 @@ export class WaveStreamingDecoder {
 
   /**
    * Finalize once and reject a truncated finite-length timeline.
+   *
    * @returns {void}
    */
   finish() {
@@ -67,6 +74,7 @@ export class WaveStreamingDecoder {
 
 /**
  * Create a streaming decoder that applies WAVE timeline trimming.
+ *
  * @param {object} options Profile and fact-timeline options.
  * @returns {WaveStreamingDecoder} Persistent WAVE timeline adapter.
  */
@@ -76,6 +84,7 @@ export function createWaveStreamingDecoder(options) {
 
 /**
  * Decode a complete ATRAC3 WAVE byte image to planar signed-sample PCM.
+ *
  * @param {Uint8Array} input Complete ATRAC3 WAVE byte image.
  * @returns {Float32Array[]} Two equal decoded PCM channels.
  */
