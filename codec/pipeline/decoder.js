@@ -17,6 +17,7 @@ import {
   unpackChannelSyntax,
 } from '../io/channel-decoder.js'
 import { IndependentChannelHeader, JointStereoHeader } from '../io/syntax.js'
+import { normalizePcm } from '../io/pcm.js'
 import { applyInverseGainEnvelope } from '../transforms/gain-scale.js'
 import { applyInverseBlockTransform } from '../transforms/mdct.js'
 import { synthesizeLayeredQmf } from '../transforms/qmf.js'
@@ -321,13 +322,13 @@ export function decodeCommitStage(context) {
 }
 
 /**
- * Compose one persistent streaming ATRAC3 decoder from explicit stages.
+ * Compose the internal signed-amplitude decoder stage chain.
  *
  * @param {object} [options] Profile and decoder-state options.
  * @param {BufferPool} [bufferPool] Reusable persistent and scratch storage.
  * @returns {function(Uint8Array): Float32Array[]} One-frame stereo decoder.
  */
-export function decode(options = {}, bufferPool = new BufferPool()) {
+function createCodecDecoder(options = {}, bufferPool = new BufferPool()) {
   const profile = resolveProfile(options)
   if (!profile) throw new RangeError('Unsupported ATRAC3 decoder profile')
   bufferPool.decoder.state = new DecoderState(options)
@@ -345,4 +346,16 @@ export function decode(options = {}, bufferPool = new BufferPool()) {
     synthesisStage,
     decodeCommitStage
   )
+}
+
+/**
+ * Compose one persistent decoder returning normalized Web Audio PCM.
+ *
+ * @param {object} [options] Profile and decoder-state options.
+ * @param {BufferPool} [bufferPool] Reusable persistent and scratch storage.
+ * @returns {function(Uint8Array): Float32Array[]} One-frame stereo decoder.
+ */
+export function decode(options = {}, bufferPool = new BufferPool()) {
+  const decodeFrame = createCodecDecoder(options, bufferPool)
+  return (frame) => normalizePcm(decodeFrame(frame))
 }

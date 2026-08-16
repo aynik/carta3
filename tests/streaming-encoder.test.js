@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { BufferPool } from '../codec/core/buffers.js'
 import { IndependentChannelHeader } from '../codec/io/syntax.js'
 import { createWave } from '../codec/io/wave.js'
+import { PCM_SCALE } from '../codec/io/pcm.js'
 import { encode } from '../codec/pipeline/encoder.js'
 import { createWaveStreamingEncoder } from '../codec/io/wave-encoder.js'
 
@@ -81,6 +82,24 @@ describe('ATRAC3 132 kbps staged encoder transaction', () => {
     expect(() => stream.write(stereoSignal())).toThrow(/finalized/)
   })
 
+  it('lazily emits frames without materializing a complete input chunk', () => {
+    const stream = createWaveStreamingEncoder()
+    let encodeCalls = 0
+    stream.encodeFrame = () => {
+      encodeCalls++
+      return new Uint8Array(384)
+    }
+    const channels = [new Float32Array(4096), new Float32Array(4096)]
+    const frames = stream.frames(channels)
+    expect(encodeCalls).toBe(0)
+    expect(frames.next().done).toBe(false)
+    expect(encodeCalls).toBe(1)
+    expect(stream.sampleCount).toBe(69)
+    expect([...frames]).toHaveLength(2)
+    expect(encodeCalls).toBe(4)
+    expect(stream.sampleCount).toBe(4096)
+  })
+
   it('matches the complete WAVE timeline reference vector', () => {
     const sampleCount = 10 * 1024
     const channels = [
@@ -88,12 +107,12 @@ describe('ATRAC3 132 kbps staged encoder transaction', () => {
       new Float32Array(sampleCount),
     ]
     for (let sample = 0; sample < sampleCount; sample++) {
-      channels[0][sample] = Math.round(
-        22000 * Math.sin((2 * Math.PI * 440 * sample) / 44100)
-      )
-      channels[1][sample] = Math.round(
-        16000 * Math.sin((2 * Math.PI * 660 * sample) / 44100)
-      )
+      channels[0][sample] =
+        Math.round(22000 * Math.sin((2 * Math.PI * 440 * sample) / 44100)) /
+        PCM_SCALE
+      channels[1][sample] =
+        Math.round(16000 * Math.sin((2 * Math.PI * 660 * sample) / 44100)) /
+        PCM_SCALE
     }
 
     const encoder = createWaveStreamingEncoder({ bitrateKbps: 132 })
@@ -134,7 +153,7 @@ describe('ATRAC3 132 kbps staged encoder transaction', () => {
       for (const channel of channels) {
         for (let sample = 0; sample < channel.length; sample++) {
           seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
-          channel[sample] = ((seed / 0xffffffff) * 2 - 1) * 12000
+          channel[sample] = (((seed / 0xffffffff) * 2 - 1) * 12000) / PCM_SCALE
         }
       }
       hash.update(encoder(channels))
@@ -153,12 +172,12 @@ describe('ATRAC3 105 kbps staged encoder transaction', () => {
       new Float32Array(sampleCount),
     ]
     for (let sample = 0; sample < sampleCount; sample++) {
-      channels[0][sample] = Math.round(
-        22000 * Math.sin((2 * Math.PI * 440 * sample) / 44100)
-      )
-      channels[1][sample] = Math.round(
-        16000 * Math.sin((2 * Math.PI * 660 * sample) / 44100)
-      )
+      channels[0][sample] =
+        Math.round(22000 * Math.sin((2 * Math.PI * 440 * sample) / 44100)) /
+        PCM_SCALE
+      channels[1][sample] =
+        Math.round(16000 * Math.sin((2 * Math.PI * 660 * sample) / 44100)) /
+        PCM_SCALE
     }
 
     const encoder = createWaveStreamingEncoder({ bitrateKbps: 105 })
@@ -200,12 +219,12 @@ describe('ATRAC3 66 kbps staged joint-stereo transaction', () => {
       new Float32Array(sampleCount),
     ]
     for (let sample = 0; sample < sampleCount; sample++) {
-      channels[0][sample] = Math.round(
-        22000 * Math.sin((2 * Math.PI * 440 * sample) / 44100)
-      )
-      channels[1][sample] = Math.round(
-        16000 * Math.sin((2 * Math.PI * 660 * sample) / 44100)
-      )
+      channels[0][sample] =
+        Math.round(22000 * Math.sin((2 * Math.PI * 440 * sample) / 44100)) /
+        PCM_SCALE
+      channels[1][sample] =
+        Math.round(16000 * Math.sin((2 * Math.PI * 660 * sample) / 44100)) /
+        PCM_SCALE
     }
 
     const encoder = createWaveStreamingEncoder({ bitrateKbps: 66 })

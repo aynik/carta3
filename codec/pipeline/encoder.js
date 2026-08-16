@@ -33,6 +33,7 @@ import {
   packLayeredChannel,
 } from '../io/layered-channel.js'
 import { packSoundUnit } from '../io/sound-unit.js'
+import { scalePcmFrame } from '../io/pcm.js'
 import {
   prepareGainAdjustedWindows,
   prepareLayeredGain,
@@ -708,13 +709,13 @@ export function layeredCommitStage(context) {
 }
 
 /**
- * Compose one persistent ATRAC3 encoder from the profile's stage chain.
+ * Compose the internal signed-amplitude encoder stage chain.
  *
  * @param {object} [options] Profile options for 66, 105, or 132 kbps.
  * @param {BufferPool} [bufferPool] Reusable persistent and scratch storage.
  * @returns {function(Float32Array[]): Uint8Array} One-frame stereo encoder.
  */
-export function encode(options = {}, bufferPool = new BufferPool()) {
+function createCodecEncoder(options = {}, bufferPool = new BufferPool()) {
   const profile = resolveProfile(options)
   if (!profile) throw new RangeError('Unsupported ATRAC3 encoder profile')
   const context = { options, profile, bufferPool }
@@ -761,4 +762,26 @@ export function encode(options = {}, bufferPool = new BufferPool()) {
     packingStage,
     commitStage
   )
+}
+
+/**
+ * Compose one persistent encoder accepting normalized Web Audio PCM.
+ *
+ * The adapter reuses one codec-domain frame for the lifetime of the closure.
+ *
+ * @param {object} [options] Profile options for 66, 105, or 132 kbps.
+ * @param {BufferPool} [bufferPool] Reusable persistent and scratch storage.
+ * @returns {function(Float32Array[]): Uint8Array} One-frame stereo encoder.
+ */
+export function encode(options = {}, bufferPool = new BufferPool()) {
+  const encodeFrame = createCodecEncoder(options, bufferPool)
+  const codecFrame = [
+    new Float32Array(FRAME_SAMPLES),
+    new Float32Array(FRAME_SAMPLES),
+  ]
+  const validateFrame = validateFrameStage()
+  return (channels) => {
+    validateFrame(channels)
+    return encodeFrame(scalePcmFrame(channels, codecFrame))
+  }
 }

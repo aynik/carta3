@@ -34,8 +34,7 @@ function createStereoFrame() {
 
 /**
  * Adapt arbitrary planar PCM chunks to the canonical ATRAC3 WAVE encode
- * timeline. Samples use the encoder domain (signed 16-bit PCM values
- * represented as floats); normalized browser PCM should be scaled before use.
+ * timeline. Samples use normalized Web Audio values from -1 through 1.
  */
 export class WaveStreamingEncoder {
   /**
@@ -56,19 +55,27 @@ export class WaveStreamingEncoder {
   }
 
   /**
-   * Consume one equally sized planar PCM chunk.
+   * Consume one equally sized planar PCM chunk and collect its encoded frames.
    *
-   * @param {Float32Array[]} channels Two equal encoder-domain PCM channels.
+   * @param {Float32Array[]} channels Two equal normalized PCM channels.
    * @returns {Uint8Array[]} Newly completed encoded frames.
    */
   write(channels) {
+    return [...this.frames(channels)]
+  }
+
+  /**
+   * Lazily consume one equally sized planar PCM chunk.
+   *
+   * @param {Float32Array[]} channels Two equal normalized PCM channels.
+   * @returns {Generator<Uint8Array>} Newly completed encoded frames.
+   */
+  *frames(channels) {
     if (this.finalized)
       throw new Error('ATRAC3 WAVE encoder has already been finalized')
     validateChunk(channels)
-    const output = []
     const inputLength = channels[0].length
     let inputOffset = 0
-    this.sampleCount += inputLength
 
     if (!this.alignmentPublished) {
       const count = Math.min(
@@ -85,8 +92,9 @@ export class WaveStreamingEncoder {
       }
       this.alignmentFill += count
       inputOffset += count
+      this.sampleCount += count
       if (this.alignmentFill === WAVE_DELAY_SAMPLES) {
-        output.push(this.encodeFrame(this.alignmentFrame))
+        yield this.encodeFrame(this.alignmentFrame)
         this.alignmentPublished = true
       }
     }
@@ -104,15 +112,15 @@ export class WaveStreamingEncoder {
       }
       this.pcmFill += count
       inputOffset += count
+      this.sampleCount += count
       if (this.pcmFill === FRAME_SAMPLES) {
         const frame = this.encodeFrame(this.pcmFrame)
         if (this.dropNextPcmFrame) this.dropNextPcmFrame = false
-        else output.push(frame)
+        else yield frame
         for (const channel of this.pcmFrame) channel.fill(0)
         this.pcmFill = 0
       }
     }
-    return output
   }
 
   /**
@@ -157,9 +165,9 @@ export function createWaveStreamingEncoder(options) {
 }
 
 /**
- * Encode complete planar encoder-domain PCM to ATRAC3 WAVE.
+ * Encode complete planar normalized PCM to ATRAC3 WAVE.
  *
- * @param {Float32Array[]} channels Two equal signed-sample-domain channels.
+ * @param {Float32Array[]} channels Two equal normalized PCM channels.
  * @param {object} [options] Maintained profile options.
  * @returns {Uint8Array} Complete ATRAC3 WAVE byte image.
  */

@@ -1,10 +1,11 @@
 /** Carta3 Audio Codec - High-level streaming audio processing. */
 
 import { FRAME_SAMPLES } from '../core/constants.js'
+import { resolveProfile } from '../core/profiles.js'
 import { decode } from '../pipeline/decoder.js'
 import { createWaveStreamingDecoder, decodeWavePcm } from './wave-decoder.js'
 import { createWaveStreamingEncoder, encodeWavePcm } from './wave-encoder.js'
-import { createWave, parseWave } from './wave.js'
+import { createWaveHeader, parseWave } from './wave.js'
 import { createPcmWave } from './serialization.js'
 
 /** High-level streaming audio processor facade. */
@@ -13,7 +14,7 @@ export class AudioProcessor {
    * Adapt arbitrary stereo PCM chunks to complete ATRAC3 frames.
    *
    * @param {AsyncIterable<Float32Array[]>|Iterable<Float32Array[]>} pcmChunks
-   * Planar stereo PCM chunks.
+   * Planar normalized stereo PCM chunks.
    * @param {object} [options] Encoder profile and progress options.
    * @returns {AsyncGenerator<Uint8Array>} Encoded frame stream.
    */
@@ -21,7 +22,7 @@ export class AudioProcessor {
     const encoder = createWaveStreamingEncoder(options)
     let frameIndex = 0
     for await (const chunk of pcmChunks) {
-      for (const frame of encoder.write(chunk)) {
+      for (const frame of encoder.frames(chunk)) {
         yield frame
         options.onProgress?.(frameIndex++)
       }
@@ -38,7 +39,7 @@ export class AudioProcessor {
    * @param {AsyncIterable<Uint8Array>|Iterable<Uint8Array>} encodedFrames
    * Complete encoded frames.
    * @param {object} [options] Decoder profile and progress options.
-   * @returns {AsyncGenerator<Float32Array[]>} Decoded planar frames.
+   * @returns {AsyncGenerator<Float32Array[]>} Decoded normalized planar frames.
    */
   static async *decodeStream(encodedFrames, options = {}) {
     const decodeFrame = decode(options)
@@ -55,7 +56,7 @@ export class AudioProcessor {
    * @param {AsyncIterable<Uint8Array>|Iterable<Uint8Array>} encodedFrames
    * Complete encoded frames.
    * @param {object} [options] Timeline, profile, and progress options.
-   * @returns {AsyncGenerator<Float32Array[]>} Timeline-trimmed planar chunks.
+   * @returns {AsyncGenerator<Float32Array[]>} Normalized timeline chunks.
    */
   static async *decodeWaveStream(encodedFrames, options = {}) {
     const decoder = createWaveStreamingDecoder(options)
@@ -111,7 +112,7 @@ export class AudioProcessor {
   /**
    * Encode complete planar PCM buffers into an ATRAC3 WAVE image.
    *
-   * @param {Float32Array[]} channels Complete planar stereo PCM.
+   * @param {Float32Array[]} channels Complete normalized stereo PCM.
    * @param {object} [options] Encoder profile and WAVE options.
    * @returns {Uint8Array} Complete ATRAC3 WAVE image.
    */
@@ -123,7 +124,7 @@ export class AudioProcessor {
    * Decode an ATRAC3 WAVE image into complete planar PCM buffers.
    *
    * @param {Uint8Array} input Complete ATRAC3 WAVE image.
-   * @returns {Float32Array[]} Decoded planar stereo PCM.
+   * @returns {Float32Array[]} Decoded normalized planar stereo PCM.
    */
   static decodeWavePcm(input) {
     return decodeWavePcm(input)
@@ -138,9 +139,26 @@ export class AudioProcessor {
    * @returns {Promise<Blob>} ATRAC3 WAVE blob.
    */
   static async createWaveBlob(encodedFrames, options = {}) {
+    const profile = resolveProfile(options)
+    if (!profile) throw new RangeError('Unsupported ATRAC3 WAVE profile')
     const frames = []
-    for await (const frame of encodedFrames) frames.push(frame)
-    return new Blob([createWave(frames, options)], { type: 'audio/wav' })
+    for await (const frame of encodedFrames) {
+      if (
+        !(frame instanceof Uint8Array) ||
+        frame.length !== profile.bytesPerFrame
+      ) {
+        throw new RangeError('ATRAC3 WAVE frame has the wrong block alignment')
+      }
+      frames.push(frame)
+    }
+    const header = createWaveHeader(
+      profile,
+      frames.length * profile.bytesPerFrame,
+      options.alignmentSampleCount ?? profile.frameSamples,
+      options.sampleCount ??
+        Math.max(0, (frames.length - 3) * profile.frameSamples)
+    )
+    return new Blob([header, ...frames], { type: 'audio/wav' })
   }
 
   /**
@@ -163,7 +181,7 @@ export class AudioProcessor {
   /**
    * Serialize planar PCM into a browser-compatible PCM WAVE blob.
    *
-   * @param {Float32Array[]} channels Complete planar PCM channels.
+   * @param {Float32Array[]} channels Complete normalized PCM channels.
    * @param {object} [options] PCM WAVE serialization options.
    * @returns {Blob} PCM WAVE blob.
    */

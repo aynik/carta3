@@ -4,10 +4,11 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createProgram, main } from '../bin/cli.js'
 import { createPcmWave } from '../codec/io/serialization.js'
+import { PCM_SCALE } from '../codec/io/pcm.js'
 import { parseWave } from '../codec/io/wave.js'
 
 /**
- * Build a short stereo PCM fixture in the encoder's signed-sample domain.
+ * Build a short normalized stereo PCM fixture.
  *
  * @param {number} [sampleCount]
  * @returns {Uint8Array}
@@ -18,8 +19,10 @@ function createInputWave(sampleCount = 2048) {
     new Float32Array(sampleCount),
   ]
   for (let sample = 0; sample < sampleCount; sample++) {
-    channels[0][sample] = Math.sin((2 * Math.PI * 440 * sample) / 44100) * 8000
-    channels[1][sample] = Math.sin((2 * Math.PI * 660 * sample) / 44100) * 8000
+    channels[0][sample] =
+      (Math.sin((2 * Math.PI * 440 * sample) / 44100) * 8000) / PCM_SCALE
+    channels[1][sample] =
+      (Math.sin((2 * Math.PI * 660 * sample) / 44100) * 8000) / PCM_SCALE
   }
   return createPcmWave(channels)
 }

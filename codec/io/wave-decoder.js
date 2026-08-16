@@ -83,7 +83,7 @@ export function createWaveStreamingDecoder(options) {
 }
 
 /**
- * Decode a complete ATRAC3 WAVE byte image to planar signed-sample PCM.
+ * Decode a complete ATRAC3 WAVE byte image to planar normalized PCM.
  *
  * @param {Uint8Array} input Complete ATRAC3 WAVE byte image.
  * @returns {Float32Array[]} Two equal decoded PCM channels.

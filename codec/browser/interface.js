@@ -52,7 +52,7 @@ export class Carta3Worker {
   /**
    * Encode planar PCM into an ATRAC3 WAVE blob.
    *
-   * @param {Float32Array[]} pcmData Planar stereo PCM.
+   * @param {Float32Array[]} pcmData Normalized planar stereo PCM.
    * @param {object} [options] Encoder profile options.
    * @returns {Promise<{waveBlob: Blob, info: object}>} Encoded blob and metadata.
    */

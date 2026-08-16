@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AudioProcessor } from '../codec/io/processor.js'
+import { PCM_SCALE } from '../codec/io/pcm.js'
 
 /**
  * Test helper for signal.
@@ -13,12 +14,12 @@ function signal(sampleCount = 1500) {
     new Float32Array(sampleCount),
   ]
   for (let sample = 0; sample < sampleCount; sample++) {
-    channels[0][sample] = Math.round(
-      12000 * Math.sin((2 * Math.PI * 440 * sample) / 44100)
-    )
-    channels[1][sample] = Math.round(
-      9000 * Math.sin((2 * Math.PI * 660 * sample) / 44100)
-    )
+    channels[0][sample] =
+      Math.round(12000 * Math.sin((2 * Math.PI * 440 * sample) / 44100)) /
+      PCM_SCALE
+    channels[1][sample] =
+      Math.round(9000 * Math.sin((2 * Math.PI * 660 * sample) / 44100)) /
+      PCM_SCALE
   }
   return channels
 }
@@ -61,6 +62,20 @@ describe('AudioProcessor ATRAC3 boundaries', () => {
     const decoded = AudioProcessor.decodeWavePcm(parsed.bytes)
     expect(decoded[0]).toHaveLength(channels[0].length)
     expect(AudioProcessor.createPcmWaveBlob(decoded).type).toBe('audio/wav')
+  })
+
+  it('builds a WAVE Blob directly from a frame stream', async () => {
+    const channels = signal()
+    const wave = AudioProcessor.encodeWavePcm(channels, {
+      bitrateKbps: 105,
+    })
+    const parsed = await AudioProcessor.parseWaveBlob(new Blob([wave]))
+    const blob = await AudioProcessor.createWaveBlob(parsed.frames, {
+      bitrateKbps: 105,
+      alignmentSampleCount: parsed.fact.alignmentSampleCount,
+      sampleCount: parsed.fact.sampleCount,
+    })
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(wave)
   })
 
   it('folds planar buffers into zero-padded stereo frames', () => {

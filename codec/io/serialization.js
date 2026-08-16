@@ -7,14 +7,16 @@ import {
   SAMPLE_RATE,
 } from '../core/constants.js'
 import { float32Add, float32ToBits } from '../utils.js'
+import { PCM_SCALE } from './pcm.js'
 
 /**
  * Match the reference float-to-signed-PCM conversion exactly.
  *
- * @param {number} sample Decoder-domain signed sample value.
+ * @param {number} sample Normalized PCM sample value.
  * @returns {number} Clipped signed 16-bit integer.
  */
 export function floatToPcm16(sample) {
+  sample = Math.fround(sample * PCM_SCALE)
   if (sample > 32767) return 32767
   if (Number.isNaN(sample) || sample <= -32767) return -32767
   const roundedBits = float32ToBits(float32Add(sample, 12582912))
@@ -78,7 +80,7 @@ export function createPcmWaveHeader({
 }
 
 /**
- * Interleave decoder-domain float channels as signed 16-bit PCM.
+ * Interleave normalized float channels as signed 16-bit PCM.
  *
  * @param {Float32Array[]} channels Two equal planar channels.
  * @returns {Uint8Array} Little-endian interleaved PCM bytes.

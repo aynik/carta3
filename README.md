@@ -40,21 +40,15 @@ npm run check
 ## PCM convention
 
 JavaScript encoder APIs accept planar stereo PCM as two equally sized
-`Float32Array` instances. Samples use signed 16-bit amplitude values represented
-as floats: `-32768` through `32767`, rather than normalized Web Audio values.
-
-When using an `AudioBuffer`, scale its normalized samples before encoding:
+`Float32Array` instances. Samples use the normalized Web Audio convention from
+`-1` through `1`. `AudioBuffer` channels can be passed directly:
 
 ```js
-const left = Float32Array.from(audioBuffer.getChannelData(0), (value) =>
-  Math.fround(value * 32768)
-)
-const right = Float32Array.from(audioBuffer.getChannelData(1), (value) =>
-  Math.fround(value * 32768)
-)
+const left = audioBuffer.getChannelData(0)
+const right = audioBuffer.getChannelData(1)
 ```
 
-Decoded JavaScript PCM uses the same signed-sample amplitude domain.
+Decoded JavaScript PCM uses the same normalized convention.
 
 ## JavaScript API
 
@@ -102,7 +96,7 @@ and reuse need to be explicit.
 ### Arbitrary PCM chunks
 
 `WaveStreamingEncoder` accepts arbitrary, equally sized planar PCM chunks and
-emits every complete encoded frame available after each write:
+lazily emits every complete encoded frame available from each chunk:
 
 ```js
 import { WaveStreamingEncoder, createWave } from 'carta3'
@@ -110,7 +104,7 @@ import { WaveStreamingEncoder, createWave } from 'carta3'
 const encoder = new WaveStreamingEncoder({ bitrateKbps: 105 })
 const frames = []
 
-for (const chunk of pcmChunks) frames.push(...encoder.write(chunk))
+for (const chunk of pcmChunks) frames.push(...encoder.frames(chunk))
 frames.push(...encoder.finish())
 
 const wave = createWave(frames, {
@@ -119,7 +113,9 @@ const wave = createWave(frames, {
 })
 ```
 
-Call `finish()` once to flush the partial frame and codec-delay drain frames.
+Use `frames()` for bounded streaming. `write()` remains a convenience that
+collects one chunk's output into an array. Call `finish()` once to flush the
+partial frame and codec-delay drain frames.
 `WaveStreamingDecoder` performs the inverse operation when given the profile,
 visible sample count, and alignment sample count from the WAVE container.
 `createWaveStreamingEncoder()` and `createWaveStreamingDecoder()` are factory
@@ -179,7 +175,7 @@ const profiles = await codec.getProfiles()
 codec.terminate()
 ```
 
-`encode()` accepts encoder-domain planar PCM and returns an ATRAC3 WAVE `Blob`.
+`encode()` accepts normalized planar PCM and returns an ATRAC3 WAVE `Blob`.
 `decode()` accepts a `Blob`, `ArrayBuffer`, or `Uint8Array` and returns a signed
 16-bit PCM WAVE `Blob`. `inspect()` reads container metadata without decoding.
 Always call `terminate()` when the worker is no longer needed.

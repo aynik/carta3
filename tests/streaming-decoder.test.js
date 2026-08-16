@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { BufferPool } from '../codec/core/buffers.js'
+import { PCM_SCALE } from '../codec/io/pcm.js'
 import { encodeWavePcm } from '../codec/io/wave-encoder.js'
 import { parseWave } from '../codec/io/wave.js'
 import { decode } from '../codec/pipeline/decoder.js'
@@ -22,12 +23,12 @@ function referenceWave(bitrateKbps) {
     new Float32Array(SAMPLE_COUNT),
   ]
   for (let sample = 0; sample < SAMPLE_COUNT; sample++) {
-    channels[0][sample] = Math.round(
-      22000 * Math.sin((2 * Math.PI * 440 * sample) / 44100)
-    )
-    channels[1][sample] = Math.round(
-      16000 * Math.sin((2 * Math.PI * 660 * sample) / 44100)
-    )
+    channels[0][sample] =
+      Math.round(22000 * Math.sin((2 * Math.PI * 440 * sample) / 44100)) /
+      PCM_SCALE
+    channels[1][sample] =
+      Math.round(16000 * Math.sin((2 * Math.PI * 660 * sample) / 44100)) /
+      PCM_SCALE
   }
   wave = encodeWavePcm(channels, { bitrateKbps })
   waveCache.set(bitrateKbps, wave)
@@ -87,9 +88,9 @@ function decoderStateHash(pool) {
 
 describe('ATRAC3 staged streaming decoder', () => {
   it.each([
-    [132, '2f50264480674b0cb54f6b62404fb657112a8660eb885709dcce1ada4d348494'],
-    [105, '3f97d6313045d9faca0677e504be666008291ac6fb7f4b7f8f9de7b5021a5ea1'],
-    [66, '0c17ca12296731d9f7bfcc9e1d5d10ed43b417a884544cbcde98034093c314e4'],
+    [132, '933e74b0945791083552759cd827b6ccf152c735c4e12cb0610c0855ea84fb26'],
+    [105, 'c00acd8146cb89710268452acec414bf87ca128e6dfa5c10efd68aa4ee0519c5'],
+    [66, '422b26c27b7d0641abd4ff7a987cafff1bf85f3caddcac2d80f25dcb4e254bc9'],
   ])(
     'matches the %i kbps decoded WAVE timeline reference',
     (bitrateKbps, expectedHash) => {
@@ -99,6 +100,21 @@ describe('ATRAC3 staged streaming decoder', () => {
       )
     }
   )
+
+  it('normalizes detached output without recalibrating decoder state', () => {
+    const parsed = parseWave(referenceWave(132))
+    const pool = new BufferPool()
+    const decodeFrame = decode({ bitrateKbps: 132 }, pool)
+    const decoded = decodeFrame(parsed.frames().next().value)
+    for (let channel = 0; channel < 2; channel++) {
+      const internal = pool.decoder.state.channels[channel].synthesisBuffer
+      for (let sample = 0; sample < 1024; sample++) {
+        expect(decoded[channel][sample]).toBe(
+          Math.fround(internal[sample] / PCM_SCALE)
+        )
+      }
+    }
+  })
 
   it('does not publish either channel when second-channel syntax is invalid', () => {
     const parsed = parseWave(referenceWave(105))
