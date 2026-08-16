@@ -195,13 +195,13 @@ export function parseWave(input) {
      *
      * @returns {Generator<Uint8Array>}
      */
-    frames() {
-      return Array.from({ length: this.frameCount }, (_, index) =>
-        input.subarray(
+    *frames() {
+      for (let index = 0; index < this.frameCount; index++) {
+        yield input.subarray(
           dataOffset + index * profile.bytesPerFrame,
           dataOffset + (index + 1) * profile.bytesPerFrame
         )
-      )
+      }
     },
   }
 }

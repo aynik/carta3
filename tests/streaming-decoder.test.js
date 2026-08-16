@@ -43,7 +43,7 @@ function referenceWave(bitrateKbps) {
 function decodeTimelineFloatBits(bitrateKbps) {
   const parsed = parseWave(referenceWave(bitrateKbps))
   const decodeFrame = decode({ bitrateKbps })
-  const decodedFrames = parsed.frames().map(decodeFrame)
+  const decodedFrames = Array.from(parsed.frames(), decodeFrame)
   const sampleCount = parsed.fact.sampleCount
   const skipSamples = parsed.fact.alignmentSampleCount + 69
   const bytes = new Uint8Array(sampleCount * 2 * Float32Array.BYTES_PER_ELEMENT)
@@ -102,7 +102,7 @@ describe('ATRAC3 staged streaming decoder', () => {
 
   it('does not publish either channel when second-channel syntax is invalid', () => {
     const parsed = parseWave(referenceWave(105))
-    const frames = parsed.frames()
+    const frames = [...parsed.frames()]
     const pool = new BufferPool()
     const decodeFrame = decode({ bitrateKbps: 105 }, pool)
     decodeFrame(frames[0])

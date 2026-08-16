@@ -21,11 +21,12 @@ import {
   CHANNELS,
   FRAME_SAMPLES,
   SAMPLE_RATE,
+  WAVE_FORMAT_TAG,
 } from '../codec/core/constants.js'
-import { resolveProfile } from '../codec/core/profiles.js'
+import { resolveProfile, resolveWaveProfile } from '../codec/core/profiles.js'
 import { createWaveStreamingDecoder } from '../codec/io/wave-decoder.js'
 import { createWaveStreamingEncoder } from '../codec/io/wave-encoder.js'
-import { createWaveHeader, parseWave } from '../codec/io/wave.js'
+import { createWaveHeader } from '../codec/io/wave.js'
 import {
   createPcmWaveHeader,
   interleavePcm16,
@@ -135,6 +136,94 @@ async function readExactly(handle, length, position) {
 }
 
 /**
+ * Parse ATRAC3 profile and data geometry without retaining the encoded data.
+ *
+ * @param {string} filePath
+ * @returns {Promise<object>}
+ */
+async function readAtracWaveMetadata(filePath) {
+  const handle = await open(filePath, 'r')
+  try {
+    const { size } = await handle.stat()
+    const header = await readExactly(handle, 12, 0)
+    if (
+      header.toString('ascii', 0, 4) !== 'RIFF' ||
+      header.toString('ascii', 8, 12) !== 'WAVE'
+    ) {
+      throw new RangeError('Invalid ATRAC3 RIFF/WAVE signature')
+    }
+
+    let format = null
+    let fact = null
+    let dataOffset = -1
+    let dataBytes = -1
+    for (let offset = 12; offset + 8 <= size;) {
+      const chunkHeader = await readExactly(handle, 8, offset)
+      const id = chunkHeader.toString('ascii', 0, 4)
+      const chunkBytes = chunkHeader.readUInt32LE(4)
+      const payload = offset + 8
+      if (payload + chunkBytes > size) {
+        throw new RangeError(`Truncated ATRAC3 WAVE ${id} chunk`)
+      }
+
+      if (id === 'fmt ') {
+        if (chunkBytes < 32) {
+          throw new RangeError('Unsupported ATRAC3 WAVE format chunk')
+        }
+        const bytes = await readExactly(handle, 32, payload)
+        const modeFlag = bytes.readUInt16LE(24)
+        if (
+          bytes.readUInt16LE(0) !== WAVE_FORMAT_TAG ||
+          bytes.readUInt16LE(18) !== 1 ||
+          modeFlag !== bytes.readUInt16LE(26) ||
+          bytes.readUInt16LE(28) !== 1 ||
+          bytes.readUInt16LE(30) !== 0
+        ) {
+          throw new RangeError('Malformed ATRAC3 WAVE extension')
+        }
+        format = {
+          channels: bytes.readUInt16LE(2),
+          sampleRate: bytes.readUInt32LE(4),
+          blockAlign: bytes.readUInt16LE(12),
+          modeFlag,
+        }
+      } else if (id === 'fact' && chunkBytes >= 12) {
+        const bytes = await readExactly(handle, 12, payload)
+        fact = {
+          sampleCount: bytes.readUInt32LE(0),
+          alignmentSampleCount: bytes.readUInt32LE(8),
+        }
+      } else if (id === 'data') {
+        if (dataOffset !== -1) {
+          throw new RangeError('Duplicate ATRAC3 WAVE data chunk')
+        }
+        dataOffset = payload
+        dataBytes = chunkBytes
+      }
+
+      offset = payload + chunkBytes + (chunkBytes & 1)
+    }
+
+    if (!format || !fact || dataOffset < 0) {
+      throw new RangeError('Incomplete ATRAC3 WAVE file')
+    }
+    const profile = resolveWaveProfile(format)
+    if (!profile || dataBytes % profile.bytesPerFrame !== 0) {
+      throw new RangeError('ATRAC3 WAVE profile or data alignment is invalid')
+    }
+    return {
+      dataBytes,
+      dataOffset,
+      fact,
+      frameCount: dataBytes / profile.bytesPerFrame,
+      profile,
+    }
+  } finally {
+    await handle.close()
+  }
+}
+
+/**
  * Parse the PCM format and data geometry needed for streaming input.
  *
  * @param {string} filePath
@@ -232,13 +321,52 @@ async function readPcmWaveMetadata(filePath) {
  * @param {object} metadata
  * @returns {AsyncGenerator<Uint8Array>}
  */
-async function* readPcmChunks(filePath, metadata) {
+async function* readDataChunks(filePath, metadata) {
   if (metadata.dataBytes === 0) return
   const stream = fs.createReadStream(filePath, {
     start: metadata.dataOffset,
     end: metadata.dataOffset + metadata.dataBytes - 1,
   })
   for await (const chunk of stream) yield chunk
+}
+
+/**
+ * Split the ATRAC3 data chunk into complete encoded frames.
+ *
+ * @param {string} filePath
+ * @param {object} metadata
+ * @returns {AsyncGenerator<Uint8Array>}
+ */
+async function* readAtracFrames(filePath, metadata) {
+  const frameBytes = metadata.profile.bytesPerFrame
+  let carry = null
+  let carryBytes = 0
+
+  for await (const chunk of readDataChunks(filePath, metadata)) {
+    let offset = 0
+    if (carryBytes !== 0) {
+      const count = Math.min(frameBytes - carryBytes, chunk.length)
+      carry.set(chunk.subarray(0, count), carryBytes)
+      carryBytes += count
+      offset = count
+      if (carryBytes === frameBytes) {
+        yield carry
+        carry = null
+        carryBytes = 0
+      }
+    }
+    while (chunk.length - offset >= frameBytes) {
+      yield chunk.subarray(offset, offset + frameBytes)
+      offset += frameBytes
+    }
+    if (offset < chunk.length) {
+      carry = new Uint8Array(frameBytes)
+      carry.set(chunk.subarray(offset))
+      carryBytes = chunk.length - offset
+    }
+  }
+
+  if (carryBytes !== 0) throw new RangeError('Truncated ATRAC3 WAVE frame')
 }
 
 /**
@@ -310,7 +438,7 @@ async function encodeFile(inputFile, outputFile, options) {
     await writeBytes(output, createWaveHeader(profile, 0, FRAME_SAMPLES, 0))
     let frameCount = 0
     let processedSamples = 0
-    const chunks = readPcmChunks(inputFile, metadata)
+    const chunks = readDataChunks(inputFile, metadata)
     for await (const channels of readPlanarPcm(
       chunks,
       metadata.format.channels
@@ -355,42 +483,37 @@ async function encodeFile(inputFile, outputFile, options) {
  * @param {object} options
  */
 async function decodeFile(inputFile, outputFile, options) {
-  const input = new Uint8Array(await fs.promises.readFile(inputFile))
-  const parsed = parseWave(input)
-  const sampleCount = parsed.fact?.sampleCount
-  if (sampleCount == null) {
-    throw new RangeError('ATRAC3 WAVE fact sample count is required')
-  }
+  const metadata = await readAtracWaveMetadata(inputFile)
+  const sampleCount = metadata.fact.sampleCount
   const duration = sampleCount / SAMPLE_RATE
   if (!options.quiet) {
     console.log(
-      `${inputFile} (ATRAC3 ${parsed.profile.bitrateKbps}kbps ${CHANNELS}ch ${formatTime(duration)}) → ` +
+      `${inputFile} (ATRAC3 ${metadata.profile.bitrateKbps}kbps ${CHANNELS}ch ${formatTime(duration)}) → ` +
         `${outputFile} (WAV ${SAMPLE_RATE}Hz ${CHANNELS}ch)`
     )
   }
 
   const progress = new ProgressTracker(
-    parsed.frameCount,
+    metadata.frameCount,
     'Decoding',
     options.quiet
   )
   let completed = false
   try {
     const decoder = createWaveStreamingDecoder({
-      bitrateKbps: parsed.profile.bitrateKbps,
-      alignmentSampleCount: parsed.fact.alignmentSampleCount,
+      bitrateKbps: metadata.profile.bitrateKbps,
+      alignmentSampleCount: metadata.fact.alignmentSampleCount,
       sampleCount,
     })
     const output = fs.createWriteStream(outputFile)
     await writeBytes(output, createPcmWaveHeader({ sampleCount }))
     let frameCount = 0
-    for (const frame of parsed.frames()) {
+    for await (const frame of readAtracFrames(inputFile, metadata)) {
       const pcm = decoder.write(frame)
       if (pcm[0].length !== 0) {
         await writeBytes(output, interleavePcm16(pcm))
       }
-      frameCount++
-      progress.update(frameCount)
+      progress.update(++frameCount)
     }
     decoder.finish()
     output.end()

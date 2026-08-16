@@ -69,6 +69,18 @@ export class AudioProcessor {
   }
 
   /**
+   * Collect all frames from a synchronous or asynchronous stream.
+   *
+   * @param {AsyncIterable<unknown>|Iterable<unknown>} frameStream
+   * @returns {Promise<unknown[]>} Frames in source order.
+   */
+  static async collectFrames(frameStream) {
+    const frames = []
+    for await (const frame of frameStream) frames.push(frame)
+    return frames
+  }
+
+  /**
    * Fold complete planar buffers into zero-padded stereo coding frames.
    *
    * @param {Float32Array[]} buffers Complete planar stereo PCM.

@@ -134,7 +134,7 @@ descriptor for a maintained profile, or `null` for unsupported geometry.
 `createWave(frames, options)` combines complete profile-sized frames into a
 WAVE byte image. `parseWave(bytes)` validates an ATRAC3 WAVE image and returns
 its profile, optional `fact` metadata, data geometry, frame count, and a
-`frames()` iterator.
+lazy `frames()` generator of zero-copy frame views.
 
 ### Audio processor facade
 
@@ -145,6 +145,8 @@ its profile, optional `fact` metadata, data geometry, frame count, and a
 - `decodeStream(encodedFrames, options)` yields complete untrimmed decoded
   frames.
 - `decodeWaveStream(encodedFrames, options)` yields timeline-trimmed chunks.
+- `collectFrames(frameStream)` explicitly materializes a synchronous or
+  asynchronous frame stream when an array is required.
 - `frameBufferToFrames(buffers, frameSize)` divides complete planar buffers
   into zero-padded frames.
 - `encodeWavePcm(channels, options)` and `decodeWavePcm(bytes)` expose the

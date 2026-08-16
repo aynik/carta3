@@ -27,7 +27,12 @@ describe('ATRAC3 RIFF/WAVE container', () => {
     expect(parsed.profile.bitrateKbps).toBe(132)
     expect(parsed.fact.alignmentSampleCount).toBe(1024)
     expect(parsed.frameCount).toBe(2)
-    expect(parsed.frames().map((frame) => frame[0])).toEqual([3, 7])
+    expect([...parsed.frames()].map((frame) => frame[0])).toEqual([3, 7])
+    const iterator = parsed.frames()
+    expect(iterator[Symbol.iterator]()).toBe(iterator)
+    expect(iterator.next().value[0]).toBe(3)
+    expect(iterator.next().value[0]).toBe(7)
+    expect(iterator.next().done).toBe(true)
   })
 
   it('rejects a frame with incorrect block alignment', () => {

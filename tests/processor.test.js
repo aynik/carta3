@@ -56,9 +56,8 @@ describe('AudioProcessor ATRAC3 boundaries', () => {
       new Blob([wave], { type: 'audio/wav' })
     )
     expect(parsed.fact.sampleCount).toBe(channels[0].length)
-    expect(parsed.frames).toHaveLength(
-      parsed.profile.bitrateKbps === 105 ? 5 : 0
-    )
+    const frames = await AudioProcessor.collectFrames(parsed.frames)
+    expect(frames).toHaveLength(parsed.profile.bitrateKbps === 105 ? 5 : 0)
     const decoded = AudioProcessor.decodeWavePcm(parsed.bytes)
     expect(decoded[0]).toHaveLength(channels[0].length)
     expect(AudioProcessor.createPcmWaveBlob(decoded).type).toBe('audio/wav')
