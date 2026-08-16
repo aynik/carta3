@@ -1,6 +1,6 @@
 {
   "name": "carta3",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A streaming ATRAC3 audio codec implementation in JavaScript",
   "type": "module",
   "main": "codec/index.js",
