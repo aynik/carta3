@@ -69,7 +69,7 @@ export function jointPrimaryBitBudget(
     secondaryEnergy += bandMaximum(layers[1].spectrum, band) * width
   }
 
-  const outputDefault = layers[1].stereoFlag | 0
+  const primaryDefault = layers[0].bitBudget | 0
   const targetBudget = (bytesPerLayer << 4) - 0x3b
   const mode = jointStereo.absoluteModeHints[0]
   let scaledSecondaryEnergy = secondaryEnergy + secondaryEnergy
@@ -86,8 +86,8 @@ export function jointPrimaryBitBudget(
       0,
       Math.min(1, (primaryEnergy / scaledSecondaryEnergy - 3) / 9)
     )
-    const shift = Math.trunc((targetBudget - outputDefault) * interpolation)
-    return outputDefault + (shift & ~7)
+    const shift = Math.trunc((targetBudget - primaryDefault) * interpolation)
+    return primaryDefault + (shift & ~7)
   }
   return targetBudget
 }
@@ -164,18 +164,18 @@ function uniqueShiftFrontier(seed) {
  *
  * @param {object} input Detached layer state and reusable allocation storage.
  * @param {object[]} input.layers Two transformed layer states.
- * @param {Int32Array[]} input.selectedWorks Selected allocation destinations.
+ * @param {Int32Array[]} input.outputWorks Selected allocation destinations.
  * @param {Int32Array[]} input.candidateWorks Reusable candidate images.
  * @param {object[]} input.residualSourceProfiles Reusable analysis profiles.
  * @param {object} input.jointStereo Selected joint-stereo history and hints.
  * @param {number} input.bytesPerFrame Complete shared frame size.
  * @param {function(object, Int32Array, object): number} input.measureLayerBits
  * Exact syntax counter supplied by the pipeline's I/O boundary.
- * @returns {object} Selected primary/secondary budgets, split, and distortion.
+ * @returns {number} Selected byte split between the two allocation images.
  */
-export function selectJointLayerBudget({
+export function allocateJointLayers({
   layers,
-  selectedWorks,
+  outputWorks,
   candidateWorks,
   residualSourceProfiles,
   jointStereo,
@@ -243,15 +243,14 @@ export function selectJointLayerBudget({
       reconstructionNoise(layers[1], candidateWorks[1])
     )
     if (!selected || distortion < selected.distortion) {
-      selectedWorks[0].set(candidateWorks[0])
-      selectedWorks[1].set(candidateWorks[1])
-      selected = { primaryBudget, secondaryBudget, split, distortion }
+      outputWorks[0].set(candidateWorks[0])
+      outputWorks[1].set(candidateWorks[1])
+      selected = { split, distortion }
     }
   }
 
   if (!selected) {
     throw new RangeError('No feasible ATRAC3 joint-stereo layer split')
   }
-  layers[0].bitBudget = seed
-  return selected
+  return selected.split
 }

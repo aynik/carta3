@@ -330,6 +330,91 @@ function writeResidualSymbolsInRange(source, range, mode, scaleFactor, sink) {
 }
 
 /**
+ * Materialize one residual band's selected symbols.
+ *
+ * @param {ArrayLike<number>} source Complete residual spectrum.
+ * @param {number} band Quantization-unit index.
+ * @param {number} mode Residual quantization mode.
+ * @param {number} scaleFactor Six-bit scale-factor index.
+ * @param {Int32Array} output Complete retained symbol destination.
+ * @returns {Int32Array} `output` after quantization.
+ */
+export function quantizeResidualSymbols(
+  source,
+  band,
+  mode,
+  scaleFactor,
+  output
+) {
+  const range = residualBandRange(source, band)
+  validateResidualSyntax(mode, scaleFactor)
+  if (!(output instanceof Int32Array) || output.length < range.end) {
+    throw new RangeError('Invalid ATRAC3 residual symbol storage')
+  }
+  const codebook = residualCodebook(mode)
+  const quantizerScale = residualQuantGroupScale(mode, scaleFactor)
+  if (codebook.paired) {
+    for (let line = range.start; line + 1 < range.end; line += 2) {
+      output[line] = quantizeResidualCoefficient(
+        source[line],
+        quantizerScale,
+        3
+      )
+      output[line + 1] = quantizeResidualCoefficient(
+        source[line + 1],
+        quantizerScale,
+        3
+      )
+    }
+  } else {
+    const symbolMask = RESIDUAL_SYMBOL_MASKS[mode - 2]
+    for (let line = range.start; line < range.end; line++) {
+      output[line] = quantizeResidualCoefficient(
+        source[line],
+        quantizerScale,
+        symbolMask
+      )
+    }
+  }
+  return output
+}
+
+/**
+ * Write one residual band's retained symbols.
+ *
+ * @param {Int32Array} symbols Complete retained symbol source.
+ * @param {number} band Quantization-unit index.
+ * @param {number} mode Residual quantization mode.
+ * @param {number} scaleFactor Six-bit scale-factor index.
+ * @param {{bitPosition: number, write: Function}} sink Bit writer.
+ * @returns {number} Codeword bits written.
+ */
+export function writeQuantizedResidualSymbols(
+  symbols,
+  band,
+  mode,
+  scaleFactor,
+  sink
+) {
+  const range = residualBandRange(symbols, band)
+  validateResidualSyntax(mode, scaleFactor)
+  const codebook = residualCodebook(mode)
+  const start = sink.bitPosition
+  if (codebook.paired) {
+    for (let line = range.start; line + 1 < range.end; line += 2) {
+      const symbol = symbols[line + 1] + symbols[line] * 4
+      sink.write(codebook.codes[symbol], codebook.bitLengths[symbol])
+    }
+  } else {
+    for (let line = range.start; line < range.end; line++) {
+      const symbol = symbols[line]
+      sink.write(codebook.codes[symbol], codebook.bitLengths[symbol])
+    }
+  }
+  return sink.bitPosition - start
+}
+
+/**
  * Emit only residual symbols; the allocation header owns the selector.
  *
  * @param {ArrayLike<number>} source Complete residual spectrum.

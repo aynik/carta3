@@ -1,6 +1,9 @@
 /** Carta3 Audio Codec - Layered channel bitstream emission. */
 
-import { writeResidualSymbols } from '../coding/residual.js'
+import {
+  writeQuantizedResidualSymbols,
+  writeResidualSymbols,
+} from '../coding/residual.js'
 import { AllocationWorkView } from '../coding/work.js'
 import {
   PAIR_BLOCK_GAIN_COUNT_WORD,
@@ -48,31 +51,6 @@ class LayerBitEmitter {
 }
 
 /**
- * Return the exact syntax cost of one pair-block gain record.
- *
- * @param {Uint32Array} block
- * @returns {number}
- */
-function pairBlockGainBits(block) {
-  return 3 + block[PAIR_BLOCK_GAIN_COUNT_WORD] * 9
-}
-
-/**
- * Count gain-control syntax for all active transform units.
- *
- * @param {Uint32Array[]} pairBlocks Layer pair-block records.
- * @param {number} unitCount Number of active transform units.
- * @returns {number} Exact gain syntax cost in bits.
- */
-export function countLayerGainBits(pairBlocks, unitCount) {
-  let bits = 0
-  for (let unit = 0; unit < unitCount; unit++) {
-    bits += pairBlockGainBits(pairBlocks[unit])
-  }
-  return bits
-}
-
-/**
  * Write gain syntax for every active transform unit.
  *
  * @param {Uint32Array[]} pairBlocks
@@ -110,6 +88,7 @@ function residualSpectrumView(words) {
  * @param {object} layer
  * @param {Int32Array} work
  * @param {object} sink
+ * @param {function(number, number, number, object): number} writeSymbols
  * @param {object} [options]
  * @returns {number}
  */
@@ -117,13 +96,12 @@ function writeLayeredChannel(
   layer,
   work,
   sink,
+  writeSymbols,
   { previousOutput = 0, gainSelectors } = {}
 ) {
   const allocation = new AllocationWorkView(work)
-  const spectrum = residualSpectrumView(work)
-  if (!spectrum) throw new RangeError('Missing ATRAC3 residual spectrum')
   const unitCount = allocation.unitCount
-  if (layer.stereoFlag !== 0) {
+  if (layer.jointSecondary) {
     if (gainSelectors?.length < 4) {
       throw new RangeError('ATRAC3 joint-stereo gain selectors are incomplete')
     }
@@ -155,7 +133,7 @@ function writeLayeredChannel(
   for (let band = 0; band < bandCount; band++) {
     const mode = modes[band]
     if (mode !== 0) {
-      writeResidualSymbols(spectrum, band, mode, scaleFactors[band], sink)
+      writeSymbols(band, mode, scaleFactors[band], sink)
     }
   }
   return sink.bitPosition
@@ -170,7 +148,16 @@ function writeLayeredChannel(
  * @returns {number} Exact channel length in bits, starting at bit zero.
  */
 export function countLayeredChannelBits(layer, work, options = {}) {
-  return writeLayeredChannel(layer, work, new BitCounter(), options)
+  const spectrum = residualSpectrumView(work)
+  if (!spectrum) throw new RangeError('Missing ATRAC3 residual spectrum')
+  return writeLayeredChannel(
+    layer,
+    work,
+    new BitCounter(),
+    (band, mode, scaleFactor, sink) =>
+      writeResidualSymbols(spectrum, band, mode, scaleFactor, sink),
+    options
+  )
 }
 
 /**
@@ -179,31 +166,46 @@ export function countLayeredChannelBits(layer, work, options = {}) {
  *
  * @param {object} layer Completed transformed layer state.
  * @param {Int32Array} work Completed allocation image.
+ * @param {Int32Array} symbols Retained residual symbols.
  * @param {number} outputOffsetBytes Byte-aligned frame destination offset.
  * @param {Uint8Array} output Caller-cleared complete frame image.
- * @param {object} [options] Shared-layout header and overflow options.
+ * @param {object} [options] Shared-layout header selectors.
  * @returns {number} Absolute ending bit position in `output`.
  */
 export function packLayeredChannel(
   layer,
   work,
+  symbols,
   outputOffsetBytes,
   output,
-  { previousOutput = 0, gainSelectors, allowOverflow = false } = {}
+  { previousOutput = 0, gainSelectors } = {}
 ) {
   if (!Number.isInteger(outputOffsetBytes) || outputOffsetBytes < 0) {
     throw new RangeError('ATRAC3 layered output offset must be non-negative')
   }
-  const headerBytes = layer.stereoFlag !== 0 ? 2 : 1
+  const headerBytes = layer.jointSecondary ? 2 : 1
   if (outputOffsetBytes + headerBytes > output.length) {
     throw new RangeError('ATRAC3 layered channel header exceeds output')
   }
   const sink = new LayerBitEmitter(output, outputOffsetBytes * 8)
-  const end = writeLayeredChannel(layer, work, sink, {
-    previousOutput,
-    gainSelectors,
-  })
-  if (!allowOverflow && end > output.length * 8) {
+  const end = writeLayeredChannel(
+    layer,
+    work,
+    sink,
+    (band, mode, scaleFactor, outputSink) =>
+      writeQuantizedResidualSymbols(
+        symbols,
+        band,
+        mode,
+        scaleFactor,
+        outputSink
+      ),
+    {
+      previousOutput,
+      gainSelectors,
+    }
+  )
+  if (end > output.length * 8) {
     throw new RangeError('ATRAC3 layered channel payload exceeds output')
   }
   return end

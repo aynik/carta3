@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   ANALYSIS_WORK_FLOATS,
+  DECODER_WORK_FLOATS,
   FRAME_SAMPLES,
+  LAYER_GAIN_SCRATCH_WORDS,
+  LAYER_WORDS,
+  RESIDUAL_DELAY_SAMPLES,
   SAMPLE_RATE,
+  SUBBAND_COUNT,
 } from '../codec/core/constants.js'
 import { QUANTIZATION_UNIT_OFFSETS } from '../codec/core/tables.js'
 import { BufferPool } from '../codec/core/buffers.js'
@@ -11,11 +16,21 @@ import {
   EncoderState,
   GainAnalysisScratch,
   GainScaleScratch,
+  IndependentChannelHistory,
   IndependentQmfScratch,
   MdctScratch,
   SoundUnitAllocationScratch,
 } from '../codec/state/encoder.js'
-import { DecoderFrameState } from '../codec/state/decoder.js'
+import {
+  LayeredGainScratch,
+  LayeredMdctScratch,
+} from '../codec/state/layered.js'
+import {
+  DecoderChannelHistory,
+  DecoderChannelWork,
+  DecoderFrameState,
+  DecoderState,
+} from '../codec/state/decoder.js'
 import { resolveProfile, resolveWaveProfile } from '../codec/core/profiles.js'
 import { BitCounter, BitReader, BitWriter } from '../codec/io/bitstream.js'
 import {
@@ -65,9 +80,30 @@ describe('ATRAC3 profiles and state geometry', () => {
     expect(pool.encoder).not.toHaveProperty('workspace')
     expect(pool.encoder).not.toHaveProperty('staged')
     expect(pool.encoder.state.independentChannels).toHaveLength(2)
-    expect(pool.encoder.state.independentChannels[0]).toHaveLength(
+    expect(pool.encoder.state.independentChannels[0]).toBeInstanceOf(
+      IndependentChannelHistory
+    )
+    expect(pool.encoder.state.independentChannels[0].bandTails).toHaveLength(4)
+    expect(pool.encoder.state.independentChannels[0].bandTails[0]).toHaveLength(
+      512
+    )
+    expect(
+      pool.encoder.state.independentChannels[0].transformCarry
+    ).toHaveLength(FRAME_SAMPLES)
+    expect(
+      pool.encoder.state.independentChannels[0].referenceCarry
+    ).toHaveLength(FRAME_SAMPLES)
+    expect(pool.encoder.state.independentChannels[0].qmfDelays).toHaveLength(
+      138
+    )
+    expect(pool.encoder.state.independentChannels[0].gainRecords).toHaveLength(
+      4
+    )
+    expect(pool.encoder.frame.analysisWork[0]).toHaveLength(
       ANALYSIS_WORK_FLOATS
     )
+    expect(pool.encoder.state).not.toHaveProperty('channelBlockRing')
+    expect(pool.encoder.state).not.toHaveProperty('activeChannelBlockIndices')
     expect(pool.encoder.scratch.mdct[0].preWindowed).toHaveLength(256)
     expect(pool.encoder.scratch.mdct[0]).toBeInstanceOf(MdctScratch)
     expect(pool.encoder.scratch.mdct[0].real).toHaveLength(128)
@@ -84,6 +120,23 @@ describe('ATRAC3 profiles and state geometry', () => {
       GainAnalysisScratch
     )
     expect(pool.encoder.scratch.gainScale).toBeInstanceOf(GainScaleScratch)
+    expect(pool.encoder.frame.layerWords).toHaveLength(2)
+    expect(pool.encoder.frame.layerWords[0]).toHaveLength(LAYER_WORDS)
+    expect(pool.encoder.frame).not.toHaveProperty('layeredTransformStates')
+    expect(pool.encoder.scratch.layeredGain).toBeInstanceOf(LayeredGainScratch)
+    expect(pool.encoder.scratch.layeredGain.maximumMagnitudes).toHaveLength(
+      FRAME_SAMPLES / 8
+    )
+    expect(pool.encoder.scratch.layeredGain.gainScratchBits).toHaveLength(
+      LAYER_GAIN_SCRATCH_WORDS
+    )
+    expect(pool.encoder.scratch.layeredMdct).toBeInstanceOf(LayeredMdctScratch)
+    expect(pool.encoder.scratch.layeredMdct.transformValues).toHaveLength(
+      FRAME_SAMPLES
+    )
+    expect(pool.encoder.scratch.layeredMdct.initialGainScales).toHaveLength(
+      SUBBAND_COUNT
+    )
     expect(pool.encoder.scratch.allocation.candidateSymbols).toHaveLength(128)
     expect(pool.encoder.scratch.allocation.fillCandidates.valid).toHaveLength(
       64
@@ -94,6 +147,16 @@ describe('ATRAC3 profiles and state geometry', () => {
     expect(pool.decoder.frame.decodedChannels[0].samples).toHaveLength(
       FRAME_SAMPLES
     )
+    expect(pool.decoder.frame.channels[0]).toBeInstanceOf(DecoderChannelWork)
+    expect(pool.decoder.frame.channels[0].synthesisBuffer).toHaveLength(
+      DECODER_WORK_FLOATS
+    )
+    const decoderState = new DecoderState()
+    expect(decoderState.channels[0]).toBeInstanceOf(DecoderChannelHistory)
+    expect(decoderState.channels[0].synthesisTail).toHaveLength(
+      RESIDUAL_DELAY_SAMPLES
+    )
+    expect(decoderState.channels[0]).not.toHaveProperty('synthesisBuffer')
   })
 
   it('uses the canonical 32-band, 1024-line quantization layout', () => {

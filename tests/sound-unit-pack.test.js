@@ -25,7 +25,6 @@ function minimalSyntax() {
     wordLengths: new Int32Array(32),
     scaleFactorIndices: new Int32Array(32),
     quantizedSpectrum: new Int32Array(1024),
-    scratchFlag: 0,
   }
 }
 
@@ -65,13 +64,6 @@ describe('ATRAC3 independent sound-unit packing', () => {
     expect(() =>
       packSoundUnit(syntax, exactBits + 1, new Uint8Array(64))
     ).toThrow(/expected 26, wrote 25/)
-  })
-
-  it('rejects scratch units', () => {
-    const syntax = minimalSyntax()
-    syntax.scratchFlag = 1
-    expect(countSoundUnitFixedBits(syntax)).toBe(19)
-    expect(() => countSoundUnitBits(syntax)).toThrow(/Scratch/)
   })
 
   it('rejects invalid tone and spectrum selector states', () => {

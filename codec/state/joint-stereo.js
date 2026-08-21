@@ -1,32 +1,60 @@
-/** Carta3 Audio Codec - Persistent joint-stereo state. */
+/** Carta3 Audio Codec - Joint-stereo history and frame work. */
 
-import { SUBBAND_COUNT } from '../core/constants.js'
+import { JOINT_STEREO_ALL_SLOTS, SUBBAND_COUNT } from '../core/constants.js'
 
-/**
- * Create neutral left/right energy measurements for all interleaved slots.
- *
- * @returns {{left: number, right: number}[]}
- */
-function createEnergies() {
-  return Array.from({ length: SUBBAND_COUNT }, () => ({ left: 0, right: 0 }))
-}
+/** Persistent cross-frame joint-stereo history. */
+export class JointStereoHistory {
+  /** Allocate neutral history with stable array identities. */
+  constructor() {
+    this.slotModes = new Int32Array(SUBBAND_COUNT)
+    this.outputSelector = 0
+    this.previousRatios = new Float32Array(SUBBAND_COUNT)
+  }
 
-/**
- * Copy left/right energy measurements without replacing destination records.
- *
- * @param {{left: number, right: number}[]} source
- * @param {{left: number, right: number}[]} destination
- */
-function copyEnergies(source, destination) {
-  for (let slot = 0; slot < SUBBAND_COUNT; slot++) {
-    destination[slot].left = source[slot].left
-    destination[slot].right = source[slot].right
+  /**
+   * Restore the profile-derived initial history for a layered stream.
+   *
+   * @param {boolean} jointStereo Whether the stream uses joint stereo.
+   * @returns {JointStereoHistory} This initialized history.
+   */
+  reset(jointStereo) {
+    this.slotModes.fill(jointStereo ? -3 : 0)
+    this.outputSelector = jointStereo ? JOINT_STEREO_ALL_SLOTS : 0
+    this.previousRatios.fill(jointStereo ? 1 : 0)
+    return this
+  }
+
+  /**
+   * Stage genuine history into reusable frame work.
+   *
+   * @param {JointStereoWork} destination Existing destination work.
+   * @returns {JointStereoWork} `destination` after staging.
+   */
+  stageTo(destination) {
+    destination.slotModes.set(this.slotModes)
+    destination.previousOutputSelector = this.outputSelector
+    destination.outputSelector = this.outputSelector
+    destination.previousRatios.set(this.previousRatios)
+    return destination
+  }
+
+  /**
+   * Commit genuine histories from the selected frame plan.
+   *
+   * @param {JointStereoWork} source Completed frame work.
+   * @returns {JointStereoHistory} This committed history.
+   */
+  commitFrom(source) {
+    this.slotModes.set(source.slotModes)
+    this.outputSelector = source.outputSelector
+    this.previousRatios.set(source.previousRatios)
+    return this
   }
 }
 
-/** Transactionally copyable history for all interleaved stereo slots. */
-export class JointStereoState {
-  /** Allocate neutral joint-stereo history. */
+/** Reusable current-frame joint-stereo configuration, history, and plan. */
+export class JointStereoWork {
+  /** Allocate neutral work with stable plan and history identities. */
   constructor() {
     this.ratioScaledSlotCount = 0
     this.absoluteModeHints = new Int32Array(SUBBAND_COUNT)
@@ -36,32 +64,5 @@ export class JointStereoState {
     this.previousRatios = new Float32Array(SUBBAND_COUNT)
     this.transitionStartRatios = new Float32Array(SUBBAND_COUNT)
     this.selectedRatios = new Float32Array(SUBBAND_COUNT)
-    this.energies = createEnergies()
-    this.previousEnergies = createEnergies()
-    this.secondPreviousEnergies = createEnergies()
-  }
-
-  /**
-   * Copy this history without replacing destination-owned storage.
-   *
-   * @param {JointStereoState} destination Existing destination state.
-   * @returns {JointStereoState} `destination` after the copy.
-   */
-  copyTo(destination) {
-    destination.ratioScaledSlotCount = this.ratioScaledSlotCount
-    destination.absoluteModeHints.set(this.absoluteModeHints)
-    destination.slotModes.set(this.slotModes)
-    destination.previousOutputSelector = this.previousOutputSelector
-    destination.outputSelector = this.outputSelector
-    destination.previousRatios.set(this.previousRatios)
-    destination.transitionStartRatios.set(this.transitionStartRatios)
-    destination.selectedRatios.set(this.selectedRatios)
-    copyEnergies(this.energies, destination.energies)
-    copyEnergies(this.previousEnergies, destination.previousEnergies)
-    copyEnergies(
-      this.secondPreviousEnergies,
-      destination.secondPreviousEnergies
-    )
-    return destination
   }
 }

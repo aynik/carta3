@@ -15,8 +15,6 @@ function assertBitCount(bitCount) {
   }
 }
 
-export { reverseLowBits } from '../utils.js'
-
 /** Reusable MSB-first writer used by ATRAC3 syntax objects. */
 export class BitWriter {
   /**

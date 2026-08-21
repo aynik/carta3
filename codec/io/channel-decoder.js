@@ -16,8 +16,6 @@ import {
 } from './syntax.js'
 import { float32Add, float32Multiply } from '../utils.js'
 
-export { GainPairTable } from '../state/decoder.js'
-
 /**
  * Decode pair-block gain tables for all active transform units.
  *

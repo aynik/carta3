@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { LayeredTransformState, LayerState } from '../codec/state/layered.js'
+import { LAYER_WORDS } from '../codec/core/constants.js'
+import {
+  LayeredGainScratch,
+  LayeredMdctScratch,
+  LayerWork,
+} from '../codec/state/layered.js'
 import { analyzeLayeredGain } from '../codec/analysis/layered-gain.js'
 import { prepareLayeredGain } from '../codec/transforms/gain-scale.js'
 import { runLayeredMdct } from '../codec/transforms/mdct.js'
@@ -38,8 +43,8 @@ function stateImageHash(words) {
  * @returns {object}
  */
 function createReferenceLayer() {
-  const layer = new LayerState()
-  layer.stereoFlag = 1133
+  const layer = new LayerWork()
+  layer.jointSecondary = true
   for (let index = 0; index < 1024; index++) {
     layer.spectrum[index] = Math.fround(
       (((index * 97 + 13) % 2001) + 1) * 16.25
@@ -72,33 +77,30 @@ function createReferenceLayer() {
 describe('ATRAC3 layered transform', () => {
   it('matches the persistent-state reference image', () => {
     const layer = createReferenceLayer()
-    const transformState = new LayeredTransformState()
+    const words = new Uint32Array(LAYER_WORDS)
     analyzeLayeredGain(
       layer,
       new Int32Array([0, 1, 3, 2]),
       new Int32Array([0, -1, 3, 1]),
-      transformState
+      words,
+      new LayeredGainScratch()
     )
     expect(layer.spectrum[0]).toBe(Math.fround(14 * 16.25))
-    expect(transformState.words.subarray(0x400, 0x600)).toEqual(
-      layer.windowMatrix
-    )
-    prepareLayeredGain(transformState)
-    runLayeredMdct(layer, transformState)
+    expect(words.subarray(0x400, 0x600)).toEqual(layer.windowMatrix)
+    prepareLayeredGain(words)
+    runLayeredMdct(layer, words, new LayeredMdctScratch())
 
-    expect(stateImageHash(layer.storeTo(transformState.words))).toBe(
-      'fe97eb05724c408a'
-    )
+    expect(stateImageHash(layer.storeTo(words))).toBe('fe93bf05724529c6')
     expect(layer.pairBlocks.map((block) => block[0x32])).toEqual([0, 0, 0, 0])
   })
 
   it('round-trips the complete packed layer state', () => {
     const source = createReferenceLayer()
-    source.previousPairToneEntryCount = 7
+    source.priorGainCount = 7
     source.scaleFactorBandLimit = 26
     source.bitBudget = -19
     const words = source.storeTo(new Uint32Array(0xb5a)).slice()
-    const destination = new LayerState()
+    const destination = new LayerWork()
 
     destination.loadFrom(words)
 

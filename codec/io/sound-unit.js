@@ -153,9 +153,6 @@ function writeSpectrum(syntax, sink) {
  * @param {object} sink
  */
 function writeSoundUnit(syntax, sink) {
-  if (syntax.scratchFlag === 1) {
-    throw new RangeError('Scratch ATRAC3 candidates cannot be serialized')
-  }
   writeHeader(syntax, sink)
   packGainRecords(syntax.gainRecords.slice(0, syntax.componentGroupCount), sink)
   writeToneComponents(syntax, sink)
@@ -163,7 +160,7 @@ function writeSoundUnit(syntax, sink) {
 }
 
 /**
- * Count header and raw gain bits, including scratch-candidate reservation.
+ * Count header and raw gain bits.
  *
  * @param {object} syntax Sound-unit syntax candidate.
  * @returns {number} Fixed syntax cost in bits.
@@ -171,8 +168,7 @@ function writeSoundUnit(syntax, sink) {
 export function countSoundUnitFixedBits(syntax) {
   const sink = new BitCounter()
   validateUnitCount(syntax.componentGroupCount)
-  if (syntax.scratchFlag === 1) sink.write(0, 16)
-  else writeHeader(syntax, sink)
+  writeHeader(syntax, sink)
   packGainRecords(syntax.gainRecords.slice(0, syntax.componentGroupCount), sink)
   return sink.bitPosition
 }

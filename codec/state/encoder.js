@@ -6,23 +6,29 @@ import {
   ALLOCATION_WORK_WORDS,
   ANALYSIS_WORK_FLOATS,
   ATTACK_CANDIDATE_COUNT,
+  BAND_PART_FLOATS,
+  BAND_STRIDE_FLOATS,
+  FORWARD_TRANSFORM_CARRY_OFFSET,
   FRAME_SAMPLES,
   GAIN_CANDIDATE_COUNT,
   GAIN_SCALE_SAMPLES,
   GAIN_STEP_COUNT,
+  LAYER_WORDS,
   MAX_CHANNELS,
   MAX_CODED_FRAME_BYTES,
   MAX_QUANTIZATION_BAND_COEFFICIENTS,
   MAX_SELECTED_GAIN_CANDIDATES,
   QMF_DELAY,
+  ROOT_HISTORY_OFFSET,
   SOUND_UNIT_FILL_MOVES_PER_BAND,
   SPECTRUM_WORK_FLOATS,
   SPECTRUM_GROUPS,
   SUBBAND_COUNT,
+  TRANSFORM_CARRY_OFFSET_FLOATS,
   BITSTREAM_PADDING_BYTES,
 } from '../core/constants.js'
-import { JointStereoState } from './joint-stereo.js'
-import { LayerState, LayeredTransformState } from './layered.js'
+import { JointStereoHistory, JointStereoWork } from './joint-stereo.js'
+import { LayerHistory, LayerWork } from './layered.js'
 
 /**
  * Deep-copy a dynamic list without replacing destination-owned storage.
@@ -49,7 +55,6 @@ export class EncoderChannelBlock {
     this.toneEntries = []
     this.tonePool = []
     this.toneCount = 0
-    this.scratchFlag = 0
     this.wordLengths = new Int32Array(SPECTRUM_GROUPS)
     this.scaleFactorIndices = new Int32Array(SPECTRUM_GROUPS)
     this.quantizedSpectrum = new Int32Array(FRAME_SAMPLES)
@@ -85,36 +90,120 @@ export class EncoderChannelBlock {
     destination.wordLengths.set(this.wordLengths)
     destination.scaleFactorIndices.set(this.scaleFactorIndices)
     destination.quantizedSpectrum.set(this.quantizedSpectrum)
-    destination.scratchFlag = this.scratchFlag
     return destination
   }
 
   /**
-   * Seed a destination transaction with reusable choices and clear new syntax.
+   * Reset this frame-owned syntax block for independent analysis.
    *
-   * @param {EncoderChannelBlock} destination Transaction-local destination.
-   * @returns {EncoderChannelBlock} `destination` ready for analysis.
+   * @returns {EncoderChannelBlock} This cleared block.
    */
-  stageTo(destination) {
-    destination.componentMode = this.componentMode
-    destination.spectrumTableIndex = this.spectrumTableIndex
-    destination.wordLengths.set(this.wordLengths)
-    destination.scaleFactorIndices.set(this.scaleFactorIndices)
-    destination.quantizedSpectrum.set(this.quantizedSpectrum)
-    for (const record of destination.gainRecords) {
+  reset() {
+    this.spectrumGroupCount = SPECTRUM_GROUPS - 3
+    this.componentGroupCount = 3
+    this.componentMode = 0
+    this.spectrumTableIndex = 0
+    this.wordLengths.fill(0)
+    this.scaleFactorIndices.fill(0)
+    this.quantizedSpectrum.fill(0)
+    for (const record of this.gainRecords) {
       record.entries = 0
       record.locations.fill(0)
       record.levels.fill(0)
       record.peakHistory = 0
     }
-    destination.toneEntryIndex = 0
-    destination.toneEntries.length = 0
-    destination.tonePool.length = 0
-    destination.toneCount = 0
-    destination.scratchFlag = 0
-    destination.spectrumGroupCount = SPECTRUM_GROUPS - 3
-    destination.componentGroupCount = 3
-    return destination
+    this.toneEntryIndex = 0
+    this.toneEntries.length = 0
+    this.tonePool.length = 0
+    this.toneCount = 0
+    return this
+  }
+}
+
+/** Persistent analysis and gain history for one independent channel. */
+export class IndependentChannelHistory {
+  /** Allocate compact history with stable typed-array identities. */
+  constructor() {
+    this.bandTails = Array.from(
+      { length: SUBBAND_COUNT },
+      () => new Float32Array(2 * BAND_PART_FLOATS)
+    )
+    this.transformCarry = new Float32Array(FRAME_SAMPLES)
+    this.referenceCarry = new Float32Array(FRAME_SAMPLES)
+    this.qmfDelays = new Float32Array(3 * QMF_DELAY)
+    this.gainRecords = Array.from(
+      { length: SUBBAND_COUNT },
+      () => new GainRecord()
+    )
+  }
+
+  /**
+   * Restore neutral history when starting an independent stream.
+   *
+   * @returns {IndependentChannelHistory} This cleared history.
+   */
+  reset() {
+    for (const tail of this.bandTails) tail.fill(0)
+    this.transformCarry.fill(0)
+    this.referenceCarry.fill(0)
+    this.qmfDelays.fill(0)
+    for (const record of this.gainRecords) {
+      record.entries = 0
+      record.locations.fill(0)
+      record.levels.fill(0)
+      record.peakHistory = 0
+    }
+    return this
+  }
+
+  /**
+   * Stage compact history into a frame-local native analysis image.
+   *
+   * @param {Float32Array} work Reusable complete analysis work image.
+   * @returns {Float32Array} `work` after staging.
+   */
+  stageTo(work) {
+    for (let band = 0; band < SUBBAND_COUNT; band++) {
+      const offset = band * BAND_STRIDE_FLOATS + BAND_PART_FLOATS
+      work.set(this.bandTails[band], offset)
+    }
+    work.set(this.transformCarry, TRANSFORM_CARRY_OFFSET_FLOATS)
+    work.set(this.referenceCarry, FORWARD_TRANSFORM_CARRY_OFFSET)
+    work.set(this.qmfDelays, ROOT_HISTORY_OFFSET)
+    return work
+  }
+
+  /**
+   * Commit native analysis and gain history after successful packing.
+   *
+   * @param {Float32Array} work Completed frame-local analysis image.
+   * @param {GainRecord[]} gainRecords Current frame gain records.
+   * @returns {IndependentChannelHistory} This committed history.
+   */
+  commitFrom(work, gainRecords) {
+    for (let band = 0; band < SUBBAND_COUNT; band++) {
+      const offset = band * BAND_STRIDE_FLOATS + BAND_PART_FLOATS
+      this.bandTails[band].set(
+        work.subarray(offset, offset + 2 * BAND_PART_FLOATS)
+      )
+      gainRecords[band].copyTo(this.gainRecords[band])
+    }
+    this.transformCarry.set(
+      work.subarray(
+        TRANSFORM_CARRY_OFFSET_FLOATS,
+        TRANSFORM_CARRY_OFFSET_FLOATS + FRAME_SAMPLES
+      )
+    )
+    this.referenceCarry.set(
+      work.subarray(
+        FORWARD_TRANSFORM_CARRY_OFFSET,
+        FORWARD_TRANSFORM_CARRY_OFFSET + FRAME_SAMPLES
+      )
+    )
+    this.qmfDelays.set(
+      work.subarray(ROOT_HISTORY_OFFSET, ROOT_HISTORY_OFFSET + 3 * QMF_DELAY)
+    )
+    return this
   }
 }
 
@@ -278,19 +367,15 @@ export class MdctScratch {
 export class EncoderState {
   /** Allocate neutral layered and independent encoder histories. */
   constructor() {
-    this.jointStereo = new JointStereoState()
-    this.layeredChannels = Array.from(
+    this.jointStereoHistory = new JointStereoHistory()
+    this.layeredHistories = Array.from(
       { length: MAX_CHANNELS },
-      () => new LayerState()
+      () => new LayerHistory()
     )
     this.independentChannels = Array.from(
       { length: MAX_CHANNELS },
-      () => new Float32Array(ANALYSIS_WORK_FLOATS)
+      () => new IndependentChannelHistory()
     )
-    this.channelBlockRing = Array.from({ length: MAX_CHANNELS }, () =>
-      Array.from({ length: 3 }, () => new EncoderChannelBlock())
-    )
-    this.activeChannelBlockIndices = new Uint8Array(MAX_CHANNELS)
   }
 }
 
@@ -298,12 +383,12 @@ export class EncoderState {
 export class EncoderFrameState {
   /** Allocate stable transaction storage shared by explicit frame stages. */
   constructor() {
-    this.jointStereo = new JointStereoState()
-    this.layeredChannels = Array.from(
+    this.jointStereoWork = new JointStereoWork()
+    this.layeredWork = Array.from(
       { length: MAX_CHANNELS },
-      () => new LayerState()
+      () => new LayerWork()
     )
-    this.independentChannels = Array.from(
+    this.analysisWork = Array.from(
       { length: MAX_CHANNELS },
       () => new Float32Array(ANALYSIS_WORK_FLOATS)
     )
@@ -311,14 +396,21 @@ export class EncoderFrameState {
       { length: MAX_CHANNELS },
       () => new EncoderChannelBlock()
     )
-    this.channelBlockIndices = new Uint8Array(MAX_CHANNELS)
+    this.soundUnitCandidates = Array.from(
+      { length: MAX_CHANNELS },
+      () => new EncoderChannelBlock()
+    )
     this.layeredAllocations = Array.from(
       { length: MAX_CHANNELS },
       () => new Int32Array(ALLOCATION_WORK_WORDS)
     )
-    this.layeredTransformStates = Array.from(
+    this.layerWords = Array.from(
       { length: MAX_CHANNELS },
-      () => new LayeredTransformState()
+      () => new Uint32Array(LAYER_WORDS)
+    )
+    this.layeredSymbols = Array.from(
+      { length: MAX_CHANNELS },
+      () => new Int32Array(FRAME_SAMPLES)
     )
     this.spectra = Array.from(
       { length: MAX_CHANNELS },
@@ -338,7 +430,6 @@ export class EncoderFrameState {
       { length: MAX_CHANNELS },
       () => new Float32Array(SUBBAND_COUNT * GAIN_SCALE_SAMPLES)
     )
-    this.previousChannelBlocks = new Array(MAX_CHANNELS)
     this.selectedSoundUnitBits = new Int32Array(MAX_CHANNELS)
     this.referenceTransformNeeded = new Uint8Array(MAX_CHANNELS)
     this.packedBytes = new Uint8Array(

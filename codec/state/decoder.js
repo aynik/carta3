@@ -8,6 +8,7 @@ import {
   DECODER_WORK_FLOATS,
   FRAME_SAMPLES,
   MAX_CHANNELS,
+  RESIDUAL_DELAY_SAMPLES,
   SUBBAND_COUNT,
 } from '../core/constants.js'
 import { resolveProfile } from '../core/profiles.js'
@@ -49,8 +50,62 @@ export class GainPairTable {
 }
 
 /** Persistent inverse-transform and synthesis history for one channel. */
-export class DecoderChannelState {
-  /** Allocate zeroed transform, overlap, and gain-table history. */
+export class DecoderChannelHistory {
+  /** Allocate compact transform, synthesis, and gain-table history. */
+  constructor() {
+    this.previousBlockCount = 0
+    this.synthesisTail = new Float32Array(RESIDUAL_DELAY_SAMPLES)
+    this.overlap = Array.from(
+      { length: DECODER_MAX_UNITS },
+      () => new Float32Array(DECODER_SPECTRUM_FLOATS_PER_UNIT)
+    )
+    this.pairTables = Array.from(
+      { length: DECODER_MAX_UNITS },
+      () => new GainPairTable()
+    )
+  }
+
+  /**
+   * Stage compact history into frame-local native synthesis work.
+   *
+   * @param {DecoderChannelWork} destination Existing frame work.
+   * @returns {DecoderChannelWork} `destination` after staging.
+   */
+  stageTo(destination) {
+    destination.previousBlockCount = this.previousBlockCount
+    destination.synthesisBuffer.set(this.synthesisTail, FRAME_SAMPLES)
+    for (let unit = 0; unit < DECODER_MAX_UNITS; unit++) {
+      destination.overlap[unit].set(this.overlap[unit])
+      this.pairTables[unit].copyTo(destination.pairTables[unit])
+    }
+    return destination
+  }
+
+  /**
+   * Commit genuine channel histories from completed synthesis work.
+   *
+   * @param {DecoderChannelWork} source Completed frame work.
+   * @returns {DecoderChannelHistory} This committed history.
+   */
+  commitFrom(source) {
+    this.previousBlockCount = source.previousBlockCount
+    this.synthesisTail.set(
+      source.synthesisBuffer.subarray(
+        FRAME_SAMPLES,
+        FRAME_SAMPLES + RESIDUAL_DELAY_SAMPLES
+      )
+    )
+    for (let unit = 0; unit < DECODER_MAX_UNITS; unit++) {
+      this.overlap[unit].set(source.overlap[unit])
+      source.pairTables[unit].copyTo(this.pairTables[unit])
+    }
+    return this
+  }
+}
+
+/** Frame-owned native inverse-transform and synthesis work for one channel. */
+export class DecoderChannelWork {
+  /** Allocate one reusable complete synthesis image and staged histories. */
   constructor() {
     this.previousBlockCount = 0
     this.synthesisBuffer = new Float32Array(DECODER_WORK_FLOATS)
@@ -63,21 +118,28 @@ export class DecoderChannelState {
       () => new GainPairTable()
     )
   }
+}
 
-  /**
-   * Copy this channel history into an existing decoder transaction.
-   *
-   * @param {DecoderChannelState} destination Existing destination channel.
-   * @returns {DecoderChannelState} `destination` after the copy.
-   */
-  copyTo(destination) {
-    destination.previousBlockCount = this.previousBlockCount
-    destination.synthesisBuffer.set(this.synthesisBuffer)
-    for (let unit = 0; unit < DECODER_MAX_UNITS; unit++) {
-      destination.overlap[unit].set(this.overlap[unit])
-      this.pairTables[unit].copyTo(destination.pairTables[unit])
-    }
-    return destination
+/** Validated current-frame joint header pending chronological publication. */
+export class PendingJointHeader {
+  /** Allocate fixed storage for one parsed shared-layout header. */
+  constructor() {
+    this.pairScaleIndex = -1
+    this.gainScaleSelectors = new Uint8Array(SUBBAND_COUNT)
+    this.unitMode = DECODER_UNIT_MODE_DEFAULT
+  }
+}
+
+/** Complete current-frame joint-stereo signal decision. */
+export class JointStereoMix {
+  /** Allocate fixed previous/current gain and pair scale vectors. */
+  constructor() {
+    const scaleCount = SUBBAND_COUNT * 2
+    this.previousGains = new Float32Array(scaleCount)
+    this.gains = new Float32Array(scaleCount)
+    this.previousPairs = new Float32Array(scaleCount)
+    this.pairs = new Float32Array(scaleCount)
+    this.transitions = new Uint8Array(SUBBAND_COUNT)
   }
 }
 
@@ -118,6 +180,22 @@ class DecoderHeaderState {
     destination.stepBytes = this.stepBytes
     return destination
   }
+
+  /**
+   * Advance shared-layout chronology from one successfully decoded header.
+   *
+   * @param {PendingJointHeader} pending Validated current-frame header.
+   * @returns {DecoderHeaderState} This advanced header history.
+   */
+  advanceFrom(pending) {
+    this.previousGainScaleSelectors.set(this.gainScaleSelectors)
+    this.previousPairScaleIndex = this.pairScaleIndex
+    this.previousUnitMode = this.unitMode
+    this.gainScaleSelectors.set(pending.gainScaleSelectors)
+    this.pairScaleIndex = pending.pairScaleIndex
+    this.unitMode = pending.unitMode
+    return this
+  }
 }
 
 /** Complete profile-bound persistent decoder state. */
@@ -134,23 +212,36 @@ export class DecoderState {
     this.header = new DecoderHeaderState(this.profile)
     this.channels = Array.from(
       { length: MAX_CHANNELS },
-      () => new DecoderChannelState()
+      () => new DecoderChannelHistory()
     )
   }
 
   /**
-   * Copy this complete decoder state into an existing transaction.
+   * Stage the complete committed history into frame-owned work.
    *
-   * @param {DecoderState} destination Existing destination state.
-   * @returns {DecoderState} `destination` after the copy.
+   * @param {DecoderFrameState} destination Prepared frame transaction.
+   * @returns {DecoderFrameState} `destination` after staging.
    */
-  copyTo(destination) {
-    destination.profile = this.profile
+  stageTo(destination) {
     this.header.copyTo(destination.header)
     for (let channel = 0; channel < MAX_CHANNELS; channel++) {
-      this.channels[channel].copyTo(destination.channels[channel])
+      this.channels[channel].stageTo(destination.channels[channel])
     }
     return destination
+  }
+
+  /**
+   * Commit the header and channel histories from completed frame work.
+   *
+   * @param {DecoderFrameState} source Completed frame transaction.
+   * @returns {DecoderState} This committed state.
+   */
+  commitFrom(source) {
+    source.header.copyTo(this.header)
+    for (let channel = 0; channel < MAX_CHANNELS; channel++) {
+      this.channels[channel].commitFrom(source.channels[channel])
+    }
+    return this
   }
 }
 
@@ -184,11 +275,28 @@ export class DecodedChannelFrame {
 export class DecoderFrameState {
   /** Allocate profile-neutral frame storage populated when decoding starts. */
   constructor() {
-    this.decoderState = null
+    this.header = null
+    this.pendingJointHeader = new PendingJointHeader()
+    this.jointStereoMix = new JointStereoMix()
+    this.channels = Array.from(
+      { length: MAX_CHANNELS },
+      () => new DecoderChannelWork()
+    )
     this.activeBlockCounts = new Uint8Array(MAX_CHANNELS)
     this.decodedChannels = Array.from(
       { length: MAX_CHANNELS },
       () => new DecodedChannelFrame()
     )
+  }
+
+  /**
+   * Prepare profile-bound header work when constructing a decoder.
+   *
+   * @param {object} profile Resolved decoder profile.
+   * @returns {DecoderFrameState} This prepared frame owner.
+   */
+  prepare(profile) {
+    this.header = new DecoderHeaderState(profile)
+    return this
   }
 }

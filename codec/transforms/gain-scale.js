@@ -113,20 +113,19 @@ function applyLayeredGainRegions(words, unit, pairBase, selector) {
 /**
  * Apply an analyzed low-rate gain plan to its detached transform matrix.
  *
- * @param {object} transformState State produced by layered gain analysis.
- * @returns {object} The gain-prepared `transformState`.
+ * @param {Uint32Array} words Layered transform image from gain analysis.
+ * @returns {Uint32Array} The gain-prepared `words`.
  */
-export function prepareLayeredGain(transformState) {
-  if (transformState?.words?.length < LAYER_WORDS) {
+export function prepareLayeredGain(words) {
+  if (words?.length < LAYER_WORDS) {
     throw new RangeError('ATRAC3 layered gain preparation has invalid geometry')
   }
-  const words = transformState.words
   for (let unit = SUBBAND_COUNT - 1; unit >= 0; unit--) {
     const pairBase = PAIR_BLOCK_BASE_WORD + unit * PAIR_BLOCK_WORDS
     const selector = words[pairBase + PAIR_BLOCK_GAIN_COUNT_WORD]
     applyLayeredGainRegions(words, unit, pairBase, selector)
   }
-  return transformState
+  return words
 }
 
 /**

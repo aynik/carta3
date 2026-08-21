@@ -112,16 +112,16 @@ function normalizedError(error, energy) {
 }
 
 /**
- * Combine donor and receiver moves into one exact stereo transaction.
+ * Combine donor and receiver moves into one exact stereo proposal.
  *
  * @param {object|null} donor
  * @param {object} receiver
  * @param {object[]} incumbentCosts
  * @param {object} qualityProfile
  * @param {number} residualBits
- * @returns {object|null}
+ * @returns {object}
  */
-function buildModeTransaction(
+function buildModeProposal(
   donor,
   receiver,
   incumbentCosts,
@@ -170,7 +170,7 @@ function buildModeTransaction(
 }
 
 /**
- * Select the best masked-noise transaction within the fixed bit limit.
+ * Select the best masked-noise proposal within the fixed bit limit.
  *
  * @param {object} allocation
  * @param {number} activeBands
@@ -181,7 +181,7 @@ function buildModeTransaction(
  * @param {object} qualityProfile
  * @returns {object|null}
  */
-function selectModeTransaction(
+function selectModeProposal(
   allocation,
   activeBands,
   incumbentCosts,
@@ -199,7 +199,7 @@ function selectModeTransaction(
       ...donors.filter((move) => move.band !== receiver.band),
     ]
     for (const donor of candidates) {
-      const transaction = buildModeTransaction(
+      const proposal = buildModeProposal(
         donor,
         receiver,
         incumbentCosts,
@@ -207,11 +207,11 @@ function selectModeTransaction(
         residualBits
       )
       if (
-        transaction.candidateBits <= bitLimit &&
-        transaction.maskedNmrDelta < 0 &&
-        (!selected || transaction.maskedNmrDelta < selected.maskedNmrDelta)
+        proposal.candidateBits <= bitLimit &&
+        proposal.maskedNmrDelta < 0 &&
+        (!selected || proposal.maskedNmrDelta < selected.maskedNmrDelta)
       ) {
-        selected = transaction
+        selected = proposal
       }
     }
   }
@@ -219,32 +219,31 @@ function selectModeTransaction(
 }
 
 /**
- * Apply one layer's selected syntax exchange as a single transaction.
+ * Apply one layer's accepted syntax proposal.
  *
- * @param {object} transaction Selected donor/receiver mode exchange.
+ * @param {object} proposal Accepted donor/receiver mode exchange.
  * @param {Int32Array} words Structured allocation word image.
  * @returns {number} Raw reconstruction-error delta.
  */
-export function applyResidualModeTransaction(transaction, words) {
+export function applyResidualProposal(proposal, words) {
   const allocation = new AllocationWorkMut(words)
-  for (const move of [transaction.donor, transaction.receiver]) {
+  for (const move of [proposal.donor, proposal.receiver]) {
     if (!move) continue
     allocation.setMode(move.band, move.mode)
     allocation.setScaleFactor(move.band, move.scaleFactor)
   }
-  return transaction.rawErrorDelta
+  return proposal.rawErrorDelta
 }
 
 /**
- * Reprice one layer's adjacent syntax candidates, then optionally propose a
- * quality-safe equal-rate mode exchange for the frame-level stereo stage.
+ * Refine one layer in place and optionally propose an equal-rate mode exchange.
  *
  * @param {object} layer Transaction-local transformed layer state.
  * @param {Int32Array} words Completed allocation word image.
  * @param {object|null} [qualityProfile] Optional source quality evidence.
- * @returns {object} Error delta and optional detached mode transaction.
+ * @returns {object|null} Optional detached mode proposal.
  */
-export function finalizeResidualPareto(layer, words, qualityProfile = null) {
+export function refineResidual(layer, words, qualityProfile = null) {
   const allocation = new AllocationWorkView(words)
   const activeBands = allocation.activeBandCountRaw
   if (activeBands < 0 || activeBands > 32) {
@@ -257,12 +256,11 @@ export function finalizeResidualPareto(layer, words, qualityProfile = null) {
     bits: 0,
     error: 0,
   }))
-  const transactionModeCosts = qualityProfile
+  const proposalModeCosts = qualityProfile
     ? Array.from({ length: 32 }, () => [null, null])
     : null
   let residualBits = activeBands * 3
   let bitLimit = activeBands * 3
-  let errorDelta = 0
 
   for (let band = 0; band < activeBands; band++) {
     const mode = allocation.mode(band)
@@ -283,7 +281,7 @@ export function finalizeResidualPareto(layer, words, qualityProfile = null) {
       ? measureResidualModeNeighbors(layer.spectrum, band, mode, scaleFactor)
       : null
     if (mode === 0) {
-      if (transactionModeCosts) transactionModeCosts[band] = probedModeCosts
+      if (proposalModeCosts) proposalModeCosts[band] = probedModeCosts
       continue
     }
 
@@ -328,11 +326,10 @@ export function finalizeResidualPareto(layer, words, qualityProfile = null) {
       stagedModes[band] = improvement.mode
       stagedScaleFactors[band] = improvement.scaleFactor
       residualBits += improvement.bits - selected.bits
-      errorDelta += improvement.error - selected.error
       incumbentCosts[band] = improvement
     }
-    if (transactionModeCosts) {
-      transactionModeCosts[band] = improvement
+    if (proposalModeCosts) {
+      proposalModeCosts[band] = improvement
         ? measureResidualModeNeighbors(
             layer.spectrum,
             band,
@@ -349,18 +346,15 @@ export function finalizeResidualPareto(layer, words, qualityProfile = null) {
     mutable.setScaleFactor(band, stagedScaleFactors[band])
   }
 
-  return {
-    errorDelta,
-    modeTransaction: qualityProfile
-      ? selectModeTransaction(
-          new AllocationWorkView(words),
-          activeBands,
-          incumbentCosts,
-          transactionModeCosts,
-          residualBits,
-          bitLimit,
-          qualityProfile
-        )
-      : null,
-  }
+  return qualityProfile
+    ? selectModeProposal(
+        new AllocationWorkView(words),
+        activeBands,
+        incumbentCosts,
+        proposalModeCosts,
+        residualBits,
+        bitLimit,
+        qualityProfile
+      )
+    : null
 }

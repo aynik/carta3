@@ -33,22 +33,11 @@ function zeroEnergies() {
 }
 
 /**
- * Deep-copy four left/right energy records.
+ * Select four interleaved conversion modes and return their energy evidence.
  *
- * @param {{left: number, right: number}[]} source
- * @returns {{left: number, right: number}[]}
- */
-function copyEnergies(source) {
-  return source.map(({ left, right }) => ({ left, right }))
-}
-
-/**
- * Select four interleaved conversion modes and advance energy carry.
- *
- * @param {object} state Transaction-staged joint-stereo state.
- * Detached joint-stereo transaction.
+ * @param {object} state Detached joint-stereo transaction.
  * @param {object[]} layers Two analyzed layer spectra.
- * @returns {object} The updated detached state.
+ * @returns {{left: number, right: number}[]} Current per-slot energy evidence.
  */
 export function selectJointStereoModes(state, layers) {
   if (
@@ -127,31 +116,28 @@ export function selectJointStereoModes(state, layers) {
     (float32ToBits(Math.fround(selector)) & 7) + (leftDominant ? 8 : 0)
   if (outputSelector === 0 || outputSelector === 8) outputSelector++
 
-  state.secondPreviousEnergies = copyEnergies(state.previousEnergies)
-  state.previousEnergies = copyEnergies(state.energies)
-  state.energies = energies
   state.slotModes.set(slotModes)
   state.absoluteModeHints.set(hints)
   state.previousOutputSelector = previousOutput
   state.outputSelector = outputSelector
-  return state
+  return energies
 }
 
 /**
  * Select and rate-limit ratios for modes chosen by the current frame.
  *
- * @param {object} state Transaction-staged joint-stereo state.
- * Mode-selected detached transaction.
+ * @param {object} state Mode-selected joint-stereo transaction.
+ * @param {{left: number, right: number}[]} energies Current energy evidence.
  * @returns {object} The fully selected transform plan.
  */
-export function selectJointStereoRatios(state) {
+export function selectJointStereoRatios(state, energies) {
   for (let stream = 0; stream < 4; stream++) {
     if (stream >= state.ratioScaledSlotCount) continue
     const mode = Math.abs(state.slotModes[stream])
     let selectedRatio = unity
     if (mode === 3) {
-      const leftEnergy = state.energies[stream].left
-      const rightEnergy = state.energies[stream].right
+      const leftEnergy = energies[stream].left
+      const rightEnergy = energies[stream].right
       let ratioOkay = false
       let ratio = 0
       if (!(

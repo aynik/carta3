@@ -118,30 +118,15 @@ export function applyJointStereoConversion(state, layers) {
 }
 
 /**
- * Resolve one decoder gain selector to its two mixing scales.
+ * Prepare one complete signal decision from staged joint-header history.
  *
- * @param {number} selector
- * @returns {number[]}
+ * @param {object} header Staged current/prior joint-header history.
+ * @param {object} mix Fixed destination mix product.
+ * @returns {object} `mix` containing all previous/current scales.
  */
-function gainScalePair(selector) {
-  return [
-    JOINT_STEREO_GAIN_SCALES[selector] ?? 0,
-    JOINT_STEREO_GAIN_SCALES[selector + 1] ?? 0,
-  ]
-}
-
-/**
- * Apply one preflighted inverse mix across both staged decoder channels.
- *
- * @param {object} state Staged decoder state, mutated and advanced in place.
- * @param {object} plan Validated current-frame joint-stereo header plan.
- * @returns {object} `state` after mixing and header-history publication.
- */
-export function applyDecoderJointStereoMix(state, plan) {
-  const header = state.header
-  const firstWork = state.channels[0].synthesisBuffer
-  const secondWork = state.channels[1].synthesisBuffer
+export function prepareDecoderJointStereoMix(header, mix) {
   for (let band = 0; band < 4; band++) {
+    const scale = band * 2
     let previousPairFirst = 2
     let previousPairSecond = 2
     if (header.previousUnitMode < band) {
@@ -156,19 +141,47 @@ export function applyDecoderJointStereoMix(state, plan) {
       currentPairFirst = JOINT_STEREO_PAIR_SCALES[header.pairScaleIndex]
       currentPairSecond = JOINT_STEREO_PAIR_SCALES[header.pairScaleIndex + 1]
     }
+    const currentGain = header.gainScaleSelectors[band]
+    const previousGain = header.previousGainScaleSelectors[band]
+    mix.previousGains[scale] = JOINT_STEREO_GAIN_SCALES[previousGain] ?? 0
+    mix.previousGains[scale + 1] =
+      JOINT_STEREO_GAIN_SCALES[previousGain + 1] ?? 0
+    mix.gains[scale] = JOINT_STEREO_GAIN_SCALES[currentGain] ?? 0
+    mix.gains[scale + 1] = JOINT_STEREO_GAIN_SCALES[currentGain + 1] ?? 0
+    mix.previousPairs[scale] = previousPairFirst
+    mix.previousPairs[scale + 1] = previousPairSecond
+    mix.pairs[scale] = currentPairFirst
+    mix.pairs[scale + 1] = currentPairSecond
+    mix.transitions[band] =
+      currentGain !== previousGain || previousPairFirst !== currentPairFirst
+        ? 1
+        : 0
+  }
+  return mix
+}
 
-    const [currentGainFirst, currentGainSecond] = gainScalePair(
-      header.gainScaleSelectors[band]
-    )
-    const [previousGainFirst, previousGainSecond] = gainScalePair(
-      header.previousGainScaleSelectors[band]
-    )
+/**
+ * Apply one completed inverse mix across both staged decoder channels.
+ *
+ * @param {object[]} channels Two frame-owned decoder channel work images.
+ * @param {object} mix Complete current-frame joint-stereo signal decision.
+ * @returns {object[]} `channels` after signal-only stereo reconstruction.
+ */
+export function applyDecoderJointStereoMix(channels, mix) {
+  const firstWork = channels[0].synthesisBuffer
+  const secondWork = channels[1].synthesisBuffer
+  for (let band = 0; band < 4; band++) {
+    const scale = band * 2
+    const previousGainFirst = mix.previousGains[scale]
+    const previousGainSecond = mix.previousGains[scale + 1]
+    const currentGainFirst = mix.gains[scale]
+    const currentGainSecond = mix.gains[scale + 1]
+    const previousPairFirst = mix.previousPairs[scale]
+    const previousPairSecond = mix.previousPairs[scale + 1]
+    const currentPairFirst = mix.pairs[scale]
+    const currentPairSecond = mix.pairs[scale + 1]
     let mixRow = -0x100
-    if (
-      header.gainScaleSelectors[band] !==
-        header.previousGainScaleSelectors[band] ||
-      previousPairFirst !== currentPairFirst
-    ) {
+    if (mix.transitions[band] !== 0) {
       const secondGainDelta = float32Subtract(
         currentGainSecond,
         previousGainSecond
@@ -247,12 +260,5 @@ export function applyDecoderJointStereoMix(state, plan) {
       mixRow++
     }
   }
-
-  header.previousGainScaleSelectors.set(header.gainScaleSelectors)
-  header.previousUnitMode = header.unitMode
-  header.previousPairScaleIndex = header.pairScaleIndex
-  header.unitMode = plan.unitMode
-  header.pairScaleIndex = (plan.firstHeaderByte >> 4) * 2
-  header.gainScaleSelectors.set(plan.gainScaleSelectors)
-  return state
+  return channels
 }

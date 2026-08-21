@@ -6,8 +6,8 @@
  * frame bytes are emitted from this module.
  */
 
-import { measureResidualBand } from './residual.js'
-import { AllocationWorkMut } from './work.js'
+import { measureResidualBand, quantizeResidualSymbols } from './residual.js'
+import { AllocationWorkMut, AllocationWorkView } from './work.js'
 import {
   BITS_PER_SPECTRUM_BY_MODE,
   QUANTIZATION_UNIT_OFFSETS,
@@ -146,7 +146,7 @@ function residualEstimatedBandBits(
 }
 
 /**
- * Create the semantic allocation state refined before word-image commit.
+ * Create the semantic allocation state refined before word-image publication.
  *
  * @param {ArrayLike<number>} scaleFactors
  * @param {number} bandLimit
@@ -339,11 +339,11 @@ function deriveBudgetCorrection(
  * @param {object} layer
  * @param {object} allocation
  * @param {number} stereoMode
- * @param {boolean} isMono
+ * @param {boolean} primary
  * @returns {number}
  */
-function trimBlockTail(layer, allocation, stereoMode, isMono) {
-  if (!isMono && (stereoMode & 7) !== 7) return 0
+function trimBlockTail(layer, allocation, stereoMode, primary) {
+  if (!primary && (stereoMode & 7) !== 7) return 0
   const initial = allocation.blockCount
   let last = initial - 1
   if (last >= 1) {
@@ -365,7 +365,7 @@ function trimBlockTail(layer, allocation, stereoMode, isMono) {
  * @param {object} prepared
  * @param {number} bandLimit
  * @param {number} stereoMode
- * @param {boolean} isMono
+ * @param {boolean} primary
  * @returns {object}
  */
 function convergeResidualBudget(
@@ -374,7 +374,7 @@ function convergeResidualBudget(
   prepared,
   bandLimit,
   stereoMode,
-  isMono
+  primary
 ) {
   const { allocation, metrics, modeShift } = prepared
   let availableBits = prepared.availableBits
@@ -388,7 +388,7 @@ function convergeResidualBudget(
     (bandLimit - estimate.activeBands) * SPECTRUM_ALLOCATION_BITS_PER_BAND
   allocation.activeBands = estimate.activeBands
   const totalAvailable =
-    availableBits + trimBlockTail(layer, allocation, stereoMode, isMono)
+    availableBits + trimBlockTail(layer, allocation, stereoMode, primary)
   const correction = deriveBudgetCorrection(
     allocation,
     metrics,
@@ -614,18 +614,16 @@ function fitRefinementBand(layer, band, execution) {
  *
  * @param {object} layer
  * @param {number} bitBudget
- * @param {boolean} isMono
+ * @param {boolean} primary
  * @param {object} converged
  * @returns {object}
  */
-function refineResidualAllocation(layer, bitBudget, isMono, converged) {
+function refineResidualAllocation(layer, bitBudget, primary, converged) {
   const execution = seedResidualRefinement(layer, converged)
   const activeBands = execution.allocation.activeBands
   if (
-    isMono &&
-    layer.previousPairToneEntryCount +
-      layer.pairBlocks[0][PAIR_BLOCK_GAIN_COUNT_WORD] !==
-      0
+    primary &&
+    layer.priorGainCount + layer.pairBlocks[0][PAIR_BLOCK_GAIN_COUNT_WORD] !== 0
   ) {
     for (let band = 0; band < Math.min(activeBands, 5); band++) {
       if (execution.selectKeys[band] !== DONE) {
@@ -659,7 +657,7 @@ function refineResidualAllocation(layer, bitBudget, isMono, converged) {
  * @param {object} allocation
  * @param {Int32Array} work
  */
-function commitResidualAllocation(layer, allocation, work) {
+function publishAllocation(layer, allocation, work) {
   const target = new AllocationWorkMut(work)
   target.setActiveBandCount(allocation.activeBands)
   target.setBlockCount(allocation.blockCount)
@@ -690,12 +688,12 @@ export function allocateLayeredResidual(
   stereoMode,
   work
 ) {
-  const isMono = layer.stereoFlag === 0
+  const primary = !layer.jointSecondary
   const bandLimit = initialResidualBandLimit(
     sourceProfile,
     scaleFactorBandLimit,
     bitBudget,
-    isMono
+    primary
   )
   const prepared = initializeResidualModes(
     layer,
@@ -709,9 +707,35 @@ export function allocateLayeredResidual(
     prepared,
     bandLimit,
     stereoMode,
-    isMono
+    primary
   )
-  const refined = refineResidualAllocation(layer, bitBudget, isMono, converged)
-  commitResidualAllocation(layer, refined.allocation, work)
+  const refined = refineResidualAllocation(layer, bitBudget, primary, converged)
+  publishAllocation(layer, refined.allocation, work)
   return refined.codedBits
+}
+
+/**
+ * Materialize one layer's retained residual symbols.
+ *
+ * @param {object} layer Transaction-local transformed layer state.
+ * @param {Int32Array} work Completed allocation word image.
+ * @param {Int32Array} output Caller-owned retained symbol storage.
+ * @returns {Int32Array} `output` after quantization.
+ */
+export function quantizeLayeredResidual(layer, work, output) {
+  const allocation = new AllocationWorkView(work)
+  output.fill(0)
+  for (let band = 0; band < allocation.activeBandCount; band++) {
+    const mode = allocation.mode(band)
+    if (mode !== 0) {
+      quantizeResidualSymbols(
+        layer.spectrum,
+        band,
+        mode,
+        allocation.scaleFactor(band),
+        output
+      )
+    }
+  }
+  return output
 }

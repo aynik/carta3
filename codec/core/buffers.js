@@ -10,7 +10,11 @@ import {
   SoundUnitAllocationScratch,
 } from '../state/encoder.js'
 import { DecoderFrameState } from '../state/decoder.js'
-import { LayeredAllocationScratch } from '../state/layered.js'
+import {
+  LayeredAllocationScratch,
+  LayeredGainScratch,
+  LayeredMdctScratch,
+} from '../state/layered.js'
 import {
   BITSTREAM_PADDING_BYTES,
   FRAME_SAMPLES,
@@ -45,6 +49,8 @@ export class BufferPool {
         gainAnalysis: new GainAnalysisScratch(),
         allocation: new SoundUnitAllocationScratch(),
         layeredAllocation: new LayeredAllocationScratch(),
+        layeredGain: new LayeredGainScratch(),
+        layeredMdct: new LayeredMdctScratch(),
       },
     }
 

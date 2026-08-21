@@ -193,8 +193,8 @@ export const LAYER_QMF_HISTORY_OFFSET = 0x0a00
 export const LAYER_SCALE_FACTOR_BAND_LIMIT_WORD = 0x0b57
 /** Layered residual bit-budget word. */
 export const LAYER_BIT_BUDGET_WORD = 0x0b58
-/** Layered stereo-mode word. */
-export const LAYER_STEREO_FLAG_WORD = 0x0b59
+/** Layered joint-secondary role word. */
+export const LAYER_JOINT_SECONDARY_WORD = 0x0b59
 /** Primary low-rate channel header cost in bits. */
 export const LAYER_PRIMARY_HEADER_BITS = 0x13
 /** Secondary low-rate channel header cost in bits. */

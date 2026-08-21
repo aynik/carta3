@@ -21,7 +21,7 @@ function scaleFactorEstimate(magnitudeKey) {
 }
 
 /**
- * Measure stable activity, scale, and mono-expansion evidence for one layer.
+ * Measure stable activity, scale, and primary-expansion evidence for one layer.
  *
  * @param {object} layer Transformed transaction-local layer state.
  * @param {ResidualSourceProfile} profile Reusable destination measurement profile.
@@ -34,7 +34,7 @@ export function measureResidualSource(layer, profile) {
     profile.groupScaleFactors?.length < 256 ||
     profile.bandMetrics?.length < 34 ||
     profile.scaleFactors?.length < 32 ||
-    profile.monoExpansionBudgetThresholds?.length < 32
+    profile.primaryExpansionThresholds?.length < 32
   ) {
     throw new RangeError('ATRAC3 residual source profile has invalid geometry')
   }
@@ -71,7 +71,7 @@ export function measureResidualSource(layer, profile) {
       globalPeak = peak
       const thresholdClass = (((bandStart >>> 7) ^ 1) & 1) | (band > 0x15)
       const threshold = thresholdClass === 0 ? 0x10 : 8
-      profile.monoExpansionBudgetThresholds[band] = over7Total * threshold
+      profile.primaryExpansionThresholds[band] = over7Total * threshold
     } else if (peak < 3 || sum < RESIDUAL_BAND_ENERGY_THRESHOLDS[band]) {
       peak = 0
       sum = 0
@@ -90,19 +90,19 @@ export function measureResidualSource(layer, profile) {
  * @param {object} profile Measured residual source profile.
  * @param {number} scaleFactorBandLimit Profile-derived upper band limit.
  * @param {number} bitBudget Available layer bits.
- * @param {boolean} isMono Whether the layer has no stereo dependency.
+ * @param {boolean} primary Whether this is a primary or independent layer.
  * @returns {number} Initial active band count.
  */
 export function initialResidualBandLimit(
   profile,
   scaleFactorBandLimit,
   bitBudget,
-  isMono
+  primary
 ) {
   let bandLimit = scaleFactorBandLimit | 0
-  if (isMono) {
+  if (primary) {
     for (let band = 0; band < 32; band++) {
-      const threshold = profile.monoExpansionBudgetThresholds[band]
+      const threshold = profile.primaryExpansionThresholds[band]
       if (threshold >= 0 && bitBudget > threshold) {
         const expansionLimit = band > 0x1a ? Math.min(band + 2, 0x20) : 0x1c
         bandLimit = Math.max(bandLimit, expansionLimit)

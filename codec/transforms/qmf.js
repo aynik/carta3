@@ -120,7 +120,7 @@ function analyzeBranch(
  * Advance one channel's three-deep history and analyze one PCM frame.
  *
  * @param {Float32Array} pcm One complete 1024-sample channel frame.
- * @param {Float32Array} analysisWork Persistent 132 kbps analysis image.
+ * @param {Float32Array} analysisWork Frame-local 132 kbps analysis image.
  * @param {IndependentQmfScratch} independentQmfScratch Operation-local QMF buffers.
  * @returns {Float32Array} `analysisWork` with its newest split slots populated.
  */

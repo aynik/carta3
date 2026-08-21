@@ -61,7 +61,7 @@ const maximumWordLengthThresholds = new Float32Array(
  * @param {Int32Array} values
  * @returns {object}
  */
-function scaleFactorProfile(spectrum, bandCount, values) {
+function measureScaleProfile(spectrum, bandCount, values) {
   const coefficientCount = QUANTIZATION_UNIT_OFFSETS[bandCount]
   const groupCount = coefficientCount >> 2
   let sum = 0
@@ -76,14 +76,14 @@ function scaleFactorProfile(spectrum, bandCount, values) {
 }
 
 /**
- * Reduce four-line profile values to one maximum per quantization band.
+ * Select one maximum scale factor per quantization band.
  *
  * @param {object} profile
  * @param {number} bandCount
  * @param {Int32Array} output
  * @returns {Int32Array}
  */
-function bandScaleFactors(profile, bandCount, output) {
+function selectBandScales(profile, bandCount, output) {
   for (let band = 0; band < bandCount; band++) {
     const first = QUANTIZATION_UNIT_OFFSETS[band] >> 2
     const end = QUANTIZATION_UNIT_OFFSETS[band + 1] >> 2
@@ -222,14 +222,14 @@ function normalizeSpectrum(scaleFactors, bandCount, output) {
 }
 
 /**
- * Quantize and exactly Huffman-price every active band in a candidate state.
+ * Trial-quantize and exactly Huffman-price every active candidate band.
  *
  * @param {object} state
  * @param {Float32Array} spectrum
  * @param {number} bandCount
  * @returns {number}
  */
-function priceState(state, spectrum, bandCount) {
+function priceCandidate(state, spectrum, bandCount) {
   state.sumBits = 0
   for (let band = 0; band < bandCount; band++) {
     const start = QUANTIZATION_UNIT_OFFSETS[band]
@@ -273,7 +273,7 @@ function priceBandOption(wordLength, timeFactor, spectrum, band, output) {
 }
 
 /**
- * Commit one selected band option without repricing unaffected bands.
+ * Apply one selected band option without repricing unaffected bands.
  *
  * @param {object} state Mutable sound-unit allocation state.
  * @param {Float32Array} spectrum Normalized source spectrum.
@@ -283,7 +283,7 @@ function priceBandOption(wordLength, timeFactor, spectrum, band, output) {
  * @param {Int32Array} symbolScratch Detached symbol storage for the selected band.
  * @returns {number} Exact change in the allocation's residual bit cost.
  */
-function commitBandOption(
+function applyBandOption(
   state,
   spectrum,
   band,
@@ -336,7 +336,7 @@ function tuneWeight(tune, band) {
  * @param {Int32Array} candidateSymbols
  * @returns {object}
  */
-function retunedState(
+function retuneCandidate(
   seed,
   state,
   thresholds,
@@ -357,7 +357,7 @@ function retunedState(
     if (band === 0 && runningBitSum < 10 && wordLength < 6) wordLength = 6
     if (seed.initialWordLengths[band] === 0) wordLength = 0
     if (wordLength !== seed.wordLengths[band]) {
-      commitBandOption(
+      applyBandOption(
         state,
         spectrum,
         band,
@@ -404,7 +404,7 @@ function tuneToBudget(
         high = TUNE_MAX_EXCLUSIVE
         break
       }
-      current = retunedState(
+      current = retuneCandidate(
         seed,
         allocationScratch.tuningCandidate,
         thresholds,
@@ -437,7 +437,7 @@ function tuneToBudget(
         high = previousOver
         break
       }
-      current = retunedState(
+      current = retuneCandidate(
         seed,
         allocationScratch.tuningCandidate,
         thresholds,
@@ -465,7 +465,7 @@ function tuneToBudget(
     for (let step = 0; step < TUNE_REFINEMENT_STEPS; step++) {
       const mid = low + Math.trunc((high - low) / 2)
       if (mid === low || mid === high) break
-      current = retunedState(
+      current = retuneCandidate(
         seed,
         allocationScratch.tuningCandidate,
         thresholds,
@@ -512,7 +512,7 @@ function trimTargets(transformedScaleFactors, bandCount) {
  * @param {object} operation
  * @returns {object|null}
  */
-function trimCandidate(state, target, operation) {
+function measureTrimMove(state, target, operation) {
   const { spectrum, kind, candidateSymbols, mask } = operation
   const band = target.band
   if (state.wordLengths[band] <= 0) return null
@@ -580,17 +580,17 @@ function rankTrimCandidates(candidates) {
 }
 
 /**
- * Publish one selected trim move into the current candidate state.
+ * Apply one selected trim move to the current candidate state.
  *
  * @param {object} state
  * @param {object} choice
  * @param {object} operation
  * @returns {object}
  */
-function acceptTrimChoice(state, choice, operation) {
+function applyTrimMove(state, choice, operation) {
   const { spectrum, candidateSymbols } = operation
   const band = choice.target.band
-  commitBandOption(
+  applyBandOption(
     state,
     spectrum,
     band,
@@ -640,7 +640,7 @@ function trimPhase(state, budget, operation) {
     const candidates = rankTrimCandidates(
       targets
         .filter((target) => target.band < targetLimit)
-        .map((target) => trimCandidate(state, target, operation))
+        .map((target) => measureTrimMove(state, target, operation))
         .filter(Boolean)
     )
     if (candidates.length === 0 || state.sumBits <= budget) return state
@@ -648,11 +648,11 @@ function trimPhase(state, budget, operation) {
       const overage = state.sumBits - budget
       const crossing = bestCrossingCandidate(candidates, 0, overage)
       if (crossing) {
-        return acceptTrimChoice(state, crossing, operation)
+        return applyTrimMove(state, crossing, operation)
       }
       for (const candidate of candidates) {
         if (state.sumBits <= budget) return state
-        acceptTrimChoice(state, candidate, operation)
+        applyTrimMove(state, candidate, operation)
       }
       continue
     }
@@ -662,11 +662,11 @@ function trimPhase(state, budget, operation) {
       const overage = state.sumBits - budget
       const crossing = bestCrossingCandidate(candidates, position, overage)
       if (crossing) {
-        acceptTrimChoice(state, crossing, operation)
+        applyTrimMove(state, crossing, operation)
         return state
       }
       const candidate = candidates[position]
-      acceptTrimChoice(state, candidate, operation)
+      applyTrimMove(state, candidate, operation)
       progress = true
     }
     if (!progress) return state
@@ -685,7 +685,7 @@ function trimPhase(state, budget, operation) {
  * @param {Int32Array} candidateSymbols
  * @returns {object}
  */
-function trimToBudget(
+function trimCandidate(
   state,
   budget,
   spectrum,
@@ -771,7 +771,7 @@ function measureFillCandidate(
 }
 
 /**
- * Refresh the two transitions affected by one band's committed state.
+ * Refresh the two transitions affected by one band's current state.
  *
  * @param {object} state Current mutable sound-unit allocation.
  * @param {number} band Quantization-band index.
@@ -821,7 +821,7 @@ function refreshFillBand(state, band, allowLowerTimeFactors, operation) {
  * @param {object} operation Shared fill-search evidence and scratch.
  * @returns {object} The incrementally improved `state` allocation.
  */
-function spendSlack(state, unitBits, syntaxBits, operation) {
+function fillCandidate(state, unitBits, syntaxBits, operation) {
   const { spectrum, bandCount, candidates, candidateSymbols } = operation
   const allowLowerTimeFactors = state.timeFactors
     .subarray(0, bandCount)
@@ -859,7 +859,7 @@ function spendSlack(state, unitBits, syntaxBits, operation) {
     }
     if (selected < 0) break
     const band = Math.trunc(selected / SOUND_UNIT_FILL_MOVES_PER_BAND)
-    const delta = commitBandOption(
+    const delta = applyBandOption(
       state,
       spectrum,
       band,
@@ -880,7 +880,7 @@ function spendSlack(state, unitBits, syntaxBits, operation) {
  * @param {number} reservedBandCount
  * @returns {number}
  */
-function activeBandCount(state, reservedBandCount) {
+function countActiveBands(state, reservedBandCount) {
   let count = reservedBandCount
   while (count > 1 && state.wordLengths[count - 1] === 0) count--
   return count
@@ -893,7 +893,7 @@ function activeBandCount(state, reservedBandCount) {
  * @param {Float32Array} spectrum
  * @param {number} bandCount
  */
-function refineScaleFactors(state, spectrum, bandCount) {
+function refineCandidateScales(state, spectrum, bandCount) {
   for (let band = 0; band < bandCount; band++) {
     const wordLength = state.wordLengths[band]
     if (wordLength === 0) continue
@@ -952,14 +952,34 @@ function refineScaleFactors(state, spectrum, bandCount) {
 }
 
 /**
- * Copy one completed candidate into detached sound-unit syntax storage.
+ * Reset only the detached syntax fields owned by candidate allocation.
+ * Copied gain records remain intact for attack-aware allocation policy.
  *
- * @param {object} block
- * @param {object} state
- * @param {number} componentCount
- * @param {number} bandCount
+ * @param {object} block Detached destination sound-unit candidate.
+ * @param {number} bandCount Initial spectrum-group count.
+ * @param {number} componentCount Initial component-group count.
  */
-function commitAllocation(block, state, componentCount, bandCount) {
+function resetCandidateSyntax(block, bandCount, componentCount) {
+  block.spectrumGroupCount = bandCount
+  block.componentGroupCount = componentCount
+  block.componentMode = 1
+  block.spectrumTableIndex = 0
+  block.toneEntryIndex = 0
+  block.toneEntries = []
+  block.tonePool = []
+  block.toneCount = 0
+}
+
+/**
+ * Publish one trial allocation into detached candidate syntax for exact pricing.
+ * This does not publish chronological encoder state.
+ *
+ * @param {object} block Detached candidate syntax destination.
+ * @param {object} state Trial allocation and symbols.
+ * @param {number} componentCount Retained component-group count.
+ * @param {number} bandCount Retained spectrum-group count.
+ */
+function publishCandidate(block, state, componentCount, bandCount) {
   block.spectrumGroupCount = bandCount
   block.componentGroupCount = componentCount
   block.componentMode = 1
@@ -976,189 +996,14 @@ function commitAllocation(block, state, componentCount, bandCount) {
 }
 
 /**
- * Allocate and quantize one independently packed 132 kbps channel without
- * tone extraction. This is the reference allocator's non-tone baseline; tone
- * candidate selection and perceptual fill/trim are layered on it next.
+ * Measure one completed syntax candidate by masked reconstruction error.
  *
- * @param {Float32Array} sourceSpectrum Gain-adjusted source spectrum.
- * @param {Float32Array} transformedSpectrum Zero-gain reference spectrum.
- * @param {object} block Detached destination sound-unit state.
- * @param {GainRecord[]} previousGainRecords Prior committed gain records.
- * @param {number} unitBits Exact sound-unit bit budget.
- * @param {SoundUnitAllocationScratch} allocationScratch Reusable allocation scratch.
- * @param {string} [tonePolicy] Tone candidate policy identifier.
- * @returns {number} Exact selected syntax bit count.
+ * @param {object} block Detached candidate syntax and trial symbols.
+ * @param {Float32Array} source Gain-adjusted source spectrum.
+ * @param {SoundUnitAllocationScratch} allocationScratch Reusable measurement scratch.
+ * @returns {number} Mask-normalized reconstruction error.
  */
-export function allocateNontoneSoundUnit(
-  sourceSpectrum,
-  transformedSpectrum,
-  block,
-  previousGainRecords,
-  unitBits,
-  allocationScratch,
-  tonePolicy = TONE_POLICY_NONE
-) {
-  if (
-    sourceSpectrum.length < FRAME_SAMPLES ||
-    transformedSpectrum.length < FRAME_SAMPLES
-  ) {
-    throw new RangeError('ATRAC3 allocation requires 1024 spectral values')
-  }
-  const bandCount = INITIAL_132_SPECTRUM_GROUPS
-  const componentCount = INITIAL_132_COMPONENT_GROUPS
-  const { normalizedSpectrum, candidateSymbols, fillCandidates } =
-    allocationScratch
-  block.spectrumGroupCount = bandCount
-  block.componentGroupCount = componentCount
-  block.componentMode = 1
-  block.spectrumTableIndex = 0
-  block.toneEntryIndex = 0
-  block.toneEntries = []
-  block.tonePool = []
-  block.toneCount = 0
-
-  const originalProfile = scaleFactorProfile(
-    sourceSpectrum,
-    bandCount,
-    allocationScratch.originalScaleProfile
-  )
-  const transformedProfile = scaleFactorProfile(
-    transformedSpectrum,
-    bandCount,
-    allocationScratch.transformedScaleProfile
-  )
-  normalizedSpectrum.set(sourceSpectrum.subarray(0, FRAME_SAMPLES))
-  const average =
-    transformedProfile.groupCount > 0
-      ? transformedProfile.sum / transformedProfile.groupCount
-      : 0
-  const toneBudget =
-    unitBits - countSoundUnitFixedBits(block) - bandCount * 3 - 13
-  const toneBits = extractMultitone(
-    toneBudget,
-    transformedProfile.groupCount,
-    componentCount,
-    Math.fround(average),
-    tonePolicy,
-    originalProfile.values,
-    transformedProfile.values,
-    normalizedSpectrum,
-    block
-  )
-  const originalScaleFactors = bandScaleFactors(
-    originalProfile,
-    bandCount,
-    allocationScratch.originalScaleFactors
-  )
-  const transformedScaleFactors = bandScaleFactors(
-    transformedProfile,
-    bandCount,
-    allocationScratch.transformedScaleFactors
-  )
-  const thresholds = buildThresholds(
-    transformedScaleFactors,
-    bandCount,
-    average,
-    hasAttack(block.gainRecords, previousGainRecords, componentCount),
-    allocationScratch.thresholds
-  )
-  normalizeSpectrum(originalScaleFactors, bandCount, normalizedSpectrum)
-
-  const translated = translateWordLengths(
-    thresholds,
-    transformedScaleFactors,
-    bandCount,
-    allocationScratch.translatedWordLengths
-  )
-  for (let band = 0; band < bandCount; band++) {
-    if (originalScaleFactors[band] < translated.threshold)
-      translated.output[band] = 0
-  }
-  let state = allocationScratch.seedCandidate.reset(
-    translated.output,
-    originalScaleFactors
-  )
-  priceState(state, normalizedSpectrum, bandCount)
-  const gate = translateWordLengths(
-    maximumWordLengthThresholds,
-    transformedScaleFactors,
-    bandCount,
-    allocationScratch.gateWordLengths
-  ).output
-  const residualBudget =
-    toneBudget - toneBits + (block.toneEntryIndex === 0 ? 2 : 0)
-  const coefficientCount = QUANTIZATION_UNIT_OFFSETS[bandCount]
-  state.timeFactorLimit = Math.max(
-    0,
-    Math.min(
-      12,
-      Math.round((1.15 - residualBudget / (coefficientCount + 256)) * 44)
-    )
-  )
-  state = tuneToBudget(
-    state,
-    thresholds,
-    gate,
-    residualBudget,
-    normalizedSpectrum,
-    bandCount,
-    allocationScratch
-  )
-  state = trimToBudget(
-    state,
-    residualBudget,
-    normalizedSpectrum,
-    bandCount,
-    componentCount,
-    transformedScaleFactors,
-    candidateSymbols
-  )
-  let activeBands = activeBandCount(state, bandCount)
-  commitAllocation(block, state, componentCount, activeBands)
-  // The reference water-fill keeps the original reserved spectrum-prefix
-  // cost while it spends slack.  The three bits for each now-inactive tail
-  // band are refunded only after fill selection, when the final syntax count
-  // is published.  Starting from the already-shortened wire cost here gives
-  // sparse drain frames extra budget and can select different final moves.
-  const reservedSyntaxBits =
-    countSoundUnitBits(block) + (bandCount - activeBands) * 3
-  const fillOperation = {
-    transformedScaleFactors,
-    spectrum: normalizedSpectrum,
-    bandCount: activeBands,
-    candidateSymbols,
-    candidates: fillCandidates,
-    mask: null,
-  }
-  state = spendSlack(state, unitBits, reservedSyntaxBits, fillOperation)
-  refineScaleFactors(state, normalizedSpectrum, activeBands)
-  commitAllocation(block, state, componentCount, activeBands)
-
-  while (countSoundUnitBits(block) > unitBits) {
-    const band = block.wordLengths.findLastIndex(
-      (value, index) => index < activeBands && value > 0
-    )
-    if (band < 0)
-      throw new SoundUnitCandidateError(
-        'ATRAC3 sound unit cannot fit its fixed syntax'
-      )
-    state.wordLengths[band] = 0
-    priceState(state, normalizedSpectrum, bandCount)
-    activeBands = activeBandCount(state, bandCount)
-    commitAllocation(block, state, componentCount, activeBands)
-  }
-  return countSoundUnitBits(block)
-}
-
-/**
- * Score a completed syntax candidate by masked reconstruction error.
- *
- * @param {object} block
- * @param {Float32Array} source
- * @param {SoundUnitAllocationScratch} allocationScratch
- * @returns {number}
- */
-function reconstructionError(block, source, allocationScratch) {
+function measureCandidateError(block, source, allocationScratch) {
   const reconstructed = allocationScratch.reconstructedSpectrum
   reconstructed.fill(0)
   for (let band = 0; band < block.spectrumGroupCount; band++) {
@@ -1214,7 +1059,175 @@ function reconstructionError(block, source, allocationScratch) {
 }
 
 /**
- * Lower both maintained tone policies and publish the lower-error candidate.
+ * Allocate one detached 132 kbps policy candidate, including optional tone
+ * extraction and trial residual symbols. The quantization stage later promotes
+ * only the symbols belonging to the retained candidate.
+ *
+ * @param {Float32Array} sourceSpectrum Gain-adjusted source spectrum.
+ * @param {Float32Array} transformedSpectrum Zero-gain reference spectrum.
+ * @param {object} block Detached destination sound-unit state.
+ * @param {GainRecord[]} previousGainRecords Prior committed gain records.
+ * @param {number} unitBits Exact sound-unit bit budget.
+ * @param {SoundUnitAllocationScratch} allocationScratch Reusable allocation scratch.
+ * @param {string} [tonePolicy] Tone candidate policy identifier.
+ * @returns {number} Exact candidate syntax bit count.
+ */
+export function allocateSoundUnitCandidate(
+  sourceSpectrum,
+  transformedSpectrum,
+  block,
+  previousGainRecords,
+  unitBits,
+  allocationScratch,
+  tonePolicy = TONE_POLICY_NONE
+) {
+  if (
+    sourceSpectrum.length < FRAME_SAMPLES ||
+    transformedSpectrum.length < FRAME_SAMPLES
+  ) {
+    throw new RangeError('ATRAC3 allocation requires 1024 spectral values')
+  }
+  const bandCount = INITIAL_132_SPECTRUM_GROUPS
+  const componentCount = INITIAL_132_COMPONENT_GROUPS
+  const { normalizedSpectrum, candidateSymbols, fillCandidates } =
+    allocationScratch
+  resetCandidateSyntax(block, bandCount, componentCount)
+
+  const originalProfile = measureScaleProfile(
+    sourceSpectrum,
+    bandCount,
+    allocationScratch.originalScaleProfile
+  )
+  const transformedProfile = measureScaleProfile(
+    transformedSpectrum,
+    bandCount,
+    allocationScratch.transformedScaleProfile
+  )
+  normalizedSpectrum.set(sourceSpectrum.subarray(0, FRAME_SAMPLES))
+  const average =
+    transformedProfile.groupCount > 0
+      ? transformedProfile.sum / transformedProfile.groupCount
+      : 0
+  const toneBudget =
+    unitBits - countSoundUnitFixedBits(block) - bandCount * 3 - 13
+  const toneBits = extractMultitone(
+    toneBudget,
+    transformedProfile.groupCount,
+    componentCount,
+    Math.fround(average),
+    tonePolicy,
+    originalProfile.values,
+    transformedProfile.values,
+    normalizedSpectrum,
+    block
+  )
+  const originalScaleFactors = selectBandScales(
+    originalProfile,
+    bandCount,
+    allocationScratch.originalScaleFactors
+  )
+  const transformedScaleFactors = selectBandScales(
+    transformedProfile,
+    bandCount,
+    allocationScratch.transformedScaleFactors
+  )
+  const thresholds = buildThresholds(
+    transformedScaleFactors,
+    bandCount,
+    average,
+    hasAttack(block.gainRecords, previousGainRecords, componentCount),
+    allocationScratch.thresholds
+  )
+  normalizeSpectrum(originalScaleFactors, bandCount, normalizedSpectrum)
+
+  const translated = translateWordLengths(
+    thresholds,
+    transformedScaleFactors,
+    bandCount,
+    allocationScratch.translatedWordLengths
+  )
+  for (let band = 0; band < bandCount; band++) {
+    if (originalScaleFactors[band] < translated.threshold)
+      translated.output[band] = 0
+  }
+  let state = allocationScratch.seedCandidate.reset(
+    translated.output,
+    originalScaleFactors
+  )
+  priceCandidate(state, normalizedSpectrum, bandCount)
+  const gate = translateWordLengths(
+    maximumWordLengthThresholds,
+    transformedScaleFactors,
+    bandCount,
+    allocationScratch.gateWordLengths
+  ).output
+  const residualBudget =
+    toneBudget - toneBits + (block.toneEntryIndex === 0 ? 2 : 0)
+  const coefficientCount = QUANTIZATION_UNIT_OFFSETS[bandCount]
+  state.timeFactorLimit = Math.max(
+    0,
+    Math.min(
+      12,
+      Math.round((1.15 - residualBudget / (coefficientCount + 256)) * 44)
+    )
+  )
+  state = tuneToBudget(
+    state,
+    thresholds,
+    gate,
+    residualBudget,
+    normalizedSpectrum,
+    bandCount,
+    allocationScratch
+  )
+  state = trimCandidate(
+    state,
+    residualBudget,
+    normalizedSpectrum,
+    bandCount,
+    componentCount,
+    transformedScaleFactors,
+    candidateSymbols
+  )
+  let activeBands = countActiveBands(state, bandCount)
+  publishCandidate(block, state, componentCount, activeBands)
+  // The reference water-fill keeps the original reserved spectrum-prefix
+  // cost while it spends slack.  The three bits for each now-inactive tail
+  // band are refunded only after fill selection, when the final syntax count
+  // is published.  Starting from the already-shortened wire cost here gives
+  // sparse drain frames extra budget and can select different final moves.
+  const reservedSyntaxBits =
+    countSoundUnitBits(block) + (bandCount - activeBands) * 3
+  const fillOperation = {
+    transformedScaleFactors,
+    spectrum: normalizedSpectrum,
+    bandCount: activeBands,
+    candidateSymbols,
+    candidates: fillCandidates,
+    mask: null,
+  }
+  state = fillCandidate(state, unitBits, reservedSyntaxBits, fillOperation)
+  refineCandidateScales(state, normalizedSpectrum, activeBands)
+  publishCandidate(block, state, componentCount, activeBands)
+
+  while (countSoundUnitBits(block) > unitBits) {
+    const band = block.wordLengths.findLastIndex(
+      (value, index) => index < activeBands && value > 0
+    )
+    if (band < 0)
+      throw new SoundUnitCandidateError(
+        'ATRAC3 sound unit cannot fit its fixed syntax'
+      )
+    state.wordLengths[band] = 0
+    priceCandidate(state, normalizedSpectrum, bandCount)
+    activeBands = countActiveBands(state, bandCount)
+    publishCandidate(block, state, componentCount, activeBands)
+  }
+  return countSoundUnitBits(block)
+}
+
+/**
+ * Evaluate both maintained tone policies and retain the lower-error candidate.
  *
  * @param {Float32Array} sourceSpectrum Gain-adjusted source spectrum.
  * @param {Float32Array} transformedSpectrum Zero-gain reference spectrum.
@@ -1238,7 +1251,7 @@ export function allocateSoundUnitCandidates(
   let toneBits = 0
   let toneError = Number.POSITIVE_INFINITY
   try {
-    toneBits = allocateNontoneSoundUnit(
+    toneBits = allocateSoundUnitCandidate(
       sourceSpectrum,
       transformedSpectrum,
       selectedBlock,
@@ -1248,16 +1261,16 @@ export function allocateSoundUnitCandidates(
       TONE_POLICY_THRESHOLD
     )
     if (selectedBlock.toneCount === 0) return toneBits
-    toneError = reconstructionError(
+    toneError = measureCandidateError(
       selectedBlock,
       sourceSpectrum,
       allocationScratch
     )
   } catch (error) {
     if (!(error instanceof SoundUnitCandidateError)) throw error
-    // The no-tone policy below remains the mandatory fallback transaction.
+    // The no-tone policy remains mandatory when the tone candidate is unfit.
   }
-  const nontoneBits = allocateNontoneSoundUnit(
+  const nontoneBits = allocateSoundUnitCandidate(
     sourceSpectrum,
     transformedSpectrum,
     candidateBlock,
@@ -1266,7 +1279,7 @@ export function allocateSoundUnitCandidates(
     allocationScratch,
     TONE_POLICY_NONE
   )
-  const nontoneError = reconstructionError(
+  const nontoneError = measureCandidateError(
     candidateBlock,
     sourceSpectrum,
     allocationScratch

@@ -472,27 +472,28 @@ function transformLayeredRows(words, transform, initialGainScales) {
 }
 
 /**
- * Transform a gain-prepared low-rate layer and commit its persistent history.
+ * Transform a gain-prepared low-rate layer and publish its detached result.
  *
  * @param {object} layer Transaction-local layer state.
- * @param {object} transformState State prepared by layered gain analysis.
+ * @param {Uint32Array} words Gain-prepared layered transform image.
+ * @param {object} mdctScratch Reusable layered MDCT storage.
  * @returns {object} The transformed `layer`.
  */
-export function runLayeredMdct(layer, transformState) {
+export function runLayeredMdct(layer, words, mdctScratch) {
   if (
     !layer ||
-    transformState?.words?.length < LAYER_WORDS ||
-    transformState.transformValues?.length < FRAME_SAMPLES ||
-    transformState.initialGainScales?.length < SUBBAND_COUNT
+    words?.length < LAYER_WORDS ||
+    mdctScratch.transformValues?.length < FRAME_SAMPLES ||
+    mdctScratch.initialGainScales?.length < SUBBAND_COUNT
   ) {
     throw new RangeError('ATRAC3 layered MDCT has invalid state geometry')
   }
   transformLayeredRows(
-    transformState.words,
-    transformState.transformValues,
-    transformState.initialGainScales
+    words,
+    mdctScratch.transformValues,
+    mdctScratch.initialGainScales
   )
-  return layer.loadFrom(transformState.words)
+  return layer.loadFrom(words)
 }
 
 /**

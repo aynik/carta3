@@ -160,12 +160,12 @@ export const LAYER_BAND_OFFSETS = new Uint16Array([
 /** Per-profile low-rate layer budget and work-image configuration. */
 export const LAYER_PROFILE_CONFIGURATION = Object.freeze({
   66: Object.freeze({
-    secondary: true,
+    jointStereo: true,
     budgetBases: Object.freeze([0x90, 0x30]),
     workSizes: Object.freeze([0x3070, 0x0a8c]),
   }),
   105: Object.freeze({
-    secondary: false,
+    jointStereo: false,
     budgetBases: Object.freeze([0x98, 0x98]),
     workSizes: Object.freeze([0x3584, 0x3584]),
   }),

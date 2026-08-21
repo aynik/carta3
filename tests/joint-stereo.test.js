@@ -3,7 +3,10 @@ import {
   selectJointStereoModes,
   selectJointStereoRatios,
 } from '../codec/analysis/joint-stereo.js'
-import { JointStereoState } from '../codec/state/joint-stereo.js'
+import {
+  JointStereoHistory,
+  JointStereoWork,
+} from '../codec/state/joint-stereo.js'
 import { applyJointStereoConversion } from '../codec/transforms/joint-stereo.js'
 
 /**
@@ -18,57 +21,112 @@ function layers() {
   ]
 }
 
+/**
+ * Test helper for energyEvidence.
+ *
+ * @returns {{left: number, right: number}[]}
+ */
+function energyEvidence() {
+  return Array.from({ length: 4 }, () => ({ left: 0, right: 0 }))
+}
+
 describe('ATRAC3 layered joint stereo', () => {
-  it('copies transactions without replacing destination storage', () => {
-    const source = new JointStereoState()
-    const destination = new JointStereoState()
-    const ratios = destination.selectedRatios
-    const energy = destination.energies[0]
-    source.selectedRatios[0] = 1.25
-    source.energies[0].left = 42
+  it('stages history without copying a prior frame plan', () => {
+    const source = new JointStereoHistory()
+    const destination = new JointStereoWork()
+    const selectedRatios = destination.selectedRatios
+    source.slotModes[0] = 3
+    source.outputSelector = 7
+    source.previousRatios[0] = 1.25
+    destination.ratioScaledSlotCount = 1
+    destination.absoluteModeHints[0] = 1
+    destination.transitionStartRatios[0] = 2
+    destination.selectedRatios[0] = 2.25
 
-    source.copyTo(destination)
+    source.stageTo(destination)
 
-    expect(destination.selectedRatios).toBe(ratios)
-    expect(destination.energies[0]).toBe(energy)
-    expect(destination.selectedRatios[0]).toBe(1.25)
-    expect(destination.energies[0].left).toBe(42)
+    expect(destination.ratioScaledSlotCount).toBe(1)
+    expect(destination.slotModes[0]).toBe(3)
+    expect(destination.previousOutputSelector).toBe(7)
+    expect(destination.outputSelector).toBe(7)
+    expect(destination.previousRatios[0]).toBe(1.25)
+    expect(destination.absoluteModeHints[0]).toBe(1)
+    expect(destination.transitionStartRatios[0]).toBe(2)
+    expect(destination.selectedRatios).toBe(selectedRatios)
+    expect(destination.selectedRatios[0]).toBe(2.25)
   })
 
-  it('selects silent balanced modes and shifts the three-frame history', () => {
-    const state = new JointStereoState()
+  it('commits history without publishing the frame plan', () => {
+    const source = new JointStereoWork()
+    const destination = new JointStereoHistory()
+    source.slotModes[0] = 1
+    source.outputSelector = 9
+    source.previousRatios[0] = 1.25
+    source.absoluteModeHints[0] = 3
+    source.previousOutputSelector = 7
+    source.transitionStartRatios[0] = 1.5
+    source.selectedRatios[0] = 1.75
+    destination.commitFrom(source)
+
+    expect(destination.slotModes[0]).toBe(1)
+    expect(destination.outputSelector).toBe(9)
+    expect(destination.previousRatios[0]).toBe(1.25)
+    expect(destination).not.toHaveProperty('ratioScaledSlotCount')
+    expect(destination).not.toHaveProperty('absoluteModeHints')
+    expect(destination).not.toHaveProperty('previousOutputSelector')
+    expect(destination).not.toHaveProperty('transitionStartRatios')
+    expect(destination).not.toHaveProperty('selectedRatios')
+  })
+
+  it('resets profile history without creating a frame plan', () => {
+    const history = new JointStereoHistory()
+    history.slotModes.fill(3)
+    history.outputSelector = 7
+    history.previousRatios.fill(2)
+
+    history.reset(true)
+
+    expect([...history.slotModes]).toEqual([-3, -3, -3, -3])
+    expect(history.outputSelector).toBe(15)
+    expect([...history.previousRatios]).toEqual([1, 1, 1, 1])
+
+    history.reset(false)
+
+    expect([...history.slotModes]).toEqual([0, 0, 0, 0])
+    expect(history.outputSelector).toBe(0)
+    expect([...history.previousRatios]).toEqual([0, 0, 0, 0])
+  })
+
+  it('returns silent evidence while selecting balanced modes', () => {
+    const state = new JointStereoWork()
     state.ratioScaledSlotCount = 0
-    state.energies[0] = { left: 11, right: 12 }
-    state.previousEnergies[0] = { left: 21, right: 22 }
-    selectJointStereoModes(state, layers())
+    const energies = selectJointStereoModes(state, layers())
     expect([...state.slotModes]).toEqual([-3, -3, -3, -3])
-    expect(state.energies[0]).toEqual({ left: 0, right: 0 })
-    expect(state.previousEnergies[0]).toEqual({ left: 11, right: 12 })
-    expect(state.secondPreviousEnergies[0]).toEqual({ left: 21, right: 22 })
+    expect(energies[0]).toEqual({ left: 0, right: 0 })
     expect([0, 8]).not.toContain(state.outputSelector)
   })
 
   it('selects the left-dominant mode in a scaled slot', () => {
-    const state = new JointStereoState()
+    const state = new JointStereoWork()
     state.ratioScaledSlotCount = 4
     const signal = layers()
     for (let coefficient = 0; coefficient < 256; coefficient++) {
       signal[0].spectrum[coefficient * 4] = 1000
     }
     const sourceSpectra = signal.map((layer) => layer.spectrum.slice())
-    selectJointStereoModes(state, signal)
-    selectJointStereoRatios(state)
+    const energies = selectJointStereoModes(state, signal)
+    selectJointStereoRatios(state, energies)
     expect(state.slotModes[0]).toBe(1)
     expect(signal.map((layer) => layer.spectrum)).toEqual(sourceSpectra)
   })
 
   it('applies the selected conversion in place with finite balanced output', () => {
-    const state = new JointStereoState()
+    const state = new JointStereoWork()
     state.ratioScaledSlotCount = 0
     state.outputSelector = 1
     state.previousOutputSelector = 1
     state.slotModes.fill(3)
-    selectJointStereoRatios(state)
+    selectJointStereoRatios(state, energyEvidence())
     const signal = layers()
     signal[0].spectrum.fill(2)
     signal[1].spectrum.fill(4)

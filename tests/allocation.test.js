@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SoundUnitCandidateError,
-  allocateNontoneSoundUnit,
+  allocateSoundUnitCandidate,
   allocateSoundUnitCandidates,
 } from '../codec/coding/allocation.js'
 import { TONE_POLICY_THRESHOLD } from '../codec/core/constants.js'
@@ -16,18 +16,29 @@ import { packSoundUnit } from '../codec/io/sound-unit.js'
  * @returns {object}
  */
 function blockFromPool(pool, channel = 0) {
-  return pool.encoder.state.channelBlockRing[channel][0]
+  return pool.encoder.frame.channelBlocks[channel]
 }
 
-describe('ATRAC3 132 kbps non-tone allocation baseline', () => {
+/**
+ * Test helper for previousGainRecords.
+ *
+ * @param {BufferPool} pool
+ * @param {number} [channel]
+ * @returns {object[]}
+ */
+function previousGainRecords(pool, channel = 0) {
+  return pool.encoder.state.independentChannels[channel].gainRecords
+}
+
+describe('ATRAC3 132 kbps sound-unit candidate allocation', () => {
   it('classifies an unfit speculative candidate without masking other errors', () => {
     const pool = new BufferPool()
     expect(() =>
-      allocateNontoneSoundUnit(
+      allocateSoundUnitCandidate(
         new Float32Array(1024),
         new Float32Array(1024),
         blockFromPool(pool),
-        pool.encoder.state.channelBlockRing[0][1].gainRecords,
+        previousGainRecords(pool),
         0,
         pool.encoder.scratch.allocation
       )
@@ -54,7 +65,7 @@ describe('ATRAC3 132 kbps non-tone allocation baseline', () => {
         new Float32Array(1024),
         selected,
         pool.encoder.scratch.allocation.candidateBlock,
-        pool.encoder.state.channelBlockRing[0][1].gainRecords,
+        previousGainRecords(pool),
         1536,
         pool.encoder.scratch.allocation
       )
@@ -64,11 +75,11 @@ describe('ATRAC3 132 kbps non-tone allocation baseline', () => {
   it('reduces silence to a valid minimal spectral prefix', () => {
     const pool = new BufferPool()
     const block = blockFromPool(pool)
-    const bits = allocateNontoneSoundUnit(
+    const bits = allocateSoundUnitCandidate(
       new Float32Array(1024),
       new Float32Array(1024),
       block,
-      pool.encoder.state.channelBlockRing[0][1].gainRecords,
+      previousGainRecords(pool),
       1536,
       pool.encoder.scratch.allocation
     )
@@ -90,11 +101,11 @@ describe('ATRAC3 132 kbps non-tone allocation baseline', () => {
       )
     )
     const block = blockFromPool(pool)
-    const bits = allocateNontoneSoundUnit(
+    const bits = allocateSoundUnitCandidate(
       source,
       source,
       block,
-      pool.encoder.state.channelBlockRing[0][1].gainRecords,
+      previousGainRecords(pool),
       1536,
       pool.encoder.scratch.allocation
     )
@@ -109,11 +120,11 @@ describe('ATRAC3 132 kbps non-tone allocation baseline', () => {
     const source = new Float32Array(1024)
     source.set([5000, -4200, 3100, -1700], 64)
     const block = blockFromPool(pool)
-    const bits = allocateNontoneSoundUnit(
+    const bits = allocateSoundUnitCandidate(
       source,
       source,
       block,
-      pool.encoder.state.channelBlockRing[0][1].gainRecords,
+      previousGainRecords(pool),
       1536,
       pool.encoder.scratch.allocation,
       TONE_POLICY_THRESHOLD

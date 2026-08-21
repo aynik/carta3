@@ -1,8 +1,15 @@
 /**
  * Carta3 Audio Codec - Streaming decoder pipeline.
+ *
+ * Encoded bytes pass through unpacking, dequantization, and synthesis. Frame
+ * validation, detached state, atomic commit, and PCM normalization surround
+ * that semantic recipe.
  */
 
-import { applyDecoderJointStereoMix } from '../transforms/joint-stereo.js'
+import {
+  applyDecoderJointStereoMix,
+  prepareDecoderJointStereoMix,
+} from '../transforms/joint-stereo.js'
 import { DecoderState } from '../state/decoder.js'
 import { BufferPool } from '../core/buffers.js'
 import {
@@ -56,27 +63,27 @@ function prepareJointStereoRegion(source, stepBytes, previousBitPosition) {
 }
 
 /**
- * Convert a validated wire header into a semantic transform plan.
+ * Read a validated wire header into fixed pending-header storage.
  *
- * @param {object} state
  * @param {object} header
- * @param {number} unitMode
+ * @param {object} pending
  * @returns {object}
  */
-function createJointStereoMixPlan(state, header, unitMode) {
-  const selectors = header.gainSelectors
-  const gainScaleSelectors = Uint8Array.from(state.header.gainScaleSelectors)
+function readPendingJointHeader(header, pending) {
   for (let band = 3; band >= 0; band--) {
-    if (selectors[band] === 2) {
+    let selector
+    if (band === 0) selector = (header.first >> 2) & 3
+    else if (band === 1) selector = header.first & 3
+    else if (band === 2) selector = (header.second >> 6) & 3
+    else selector = (header.second >> 4) & 3
+    if (selector === 2) {
       throw new RangeError(`Invalid ATRAC3 joint selector in band ${band}`)
     }
-    gainScaleSelectors[band] = selectors[band]
+    pending.gainScaleSelectors[band] = selector
   }
-  return {
-    firstHeaderByte: header.first,
-    gainScaleSelectors,
-    unitMode,
-  }
+  pending.pairScaleIndex = (header.first >> 4) * 2
+  pending.unitMode = header.unitMode
+  return pending
 }
 
 /**
@@ -85,7 +92,7 @@ function createJointStereoMixPlan(state, header, unitMode) {
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(Uint8Array): DecoderFrame} Reusable validation stage.
  */
-export function validateDecodeFrameStage(context) {
+export function validateFrame(context) {
   const bytes = context.profile.bytesPerFrame
   return (input) => {
     if (!(input instanceof Uint8Array) || input.length !== bytes) {
@@ -101,10 +108,10 @@ export function validateDecodeFrameStage(context) {
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): DecoderFrame} State-capture stage.
  */
-export function decodeTransactionStage(context) {
+export function beginTransaction(context) {
   return (frame) => {
     const decoder = context.bufferPool.decoder
-    decoder.state.copyTo(decoder.frame.decoderState)
+    decoder.state.stageTo(decoder.frame)
     return frame
   }
 }
@@ -113,22 +120,19 @@ export function decodeTransactionStage(context) {
  * Parse both syntax regions and preflight shared selectors without mutation.
  *
  * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(DecoderFrame): DecoderFrame} Syntax stage.
+ * @returns {function(DecoderFrame): DecoderFrame} Unpacking stage with decoded syntax and stereo plan.
  */
-export function channelSyntaxStage(context) {
+export function unpack(context) {
   const decoder = context.bufferPool.decoder
-  const { profile } = context
+  const { jointStereoLayout: joint, stepBytes } = decoder.state.header
   return (frame) => {
     const padded = decoder.scratch.paddedFrame
     padded.fill(0)
     padded.set(frame.input)
-    const stagedState = decoder.frame.decoderState
-    const stepBytes = stagedState.header.stepBytes
-    const joint = stagedState.header.jointStereoLayout
     let channelOffset = 0
     let bitLimitBytes = stepBytes
     let bitPosition = 0
-    const headers = [null, null]
+    let pendingJointHeader = null
 
     for (let channel = 0; channel < 2; channel++) {
       const swapped = joint && channel === 1
@@ -161,21 +165,18 @@ export function channelSyntaxStage(context) {
       if (bitPosition > bitLimit) {
         throw new RangeError(`ATRAC3 channel ${channel} exceeds its bit limit`)
       }
-      headers[channel] = { unitMode, swapped, jointHeader }
+      if (swapped) {
+        pendingJointHeader = readPendingJointHeader(
+          jointHeader,
+          decoder.frame.pendingJointHeader
+        )
+      }
       channelOffset += stepBytes
       if (!joint) bitLimitBytes += stepBytes
     }
 
-    frame.headers = headers
     frame.decodedChannels = decoder.frame.decodedChannels
-    frame.jointMixPlan = headers[1].swapped
-      ? createJointStereoMixPlan(
-          stagedState,
-          headers[1].jointHeader,
-          headers[1].unitMode
-        )
-      : null
-    frame.profile = profile
+    frame.pendingJointHeader = pendingJointHeader
     return frame
   }
 }
@@ -183,9 +184,9 @@ export function channelSyntaxStage(context) {
 /**
  * Reconstruct spectra after both channels pass complete syntax checks.
  *
- * @returns {function(DecoderFrame): DecoderFrame} Inverse-quantization stage.
+ * @returns {function(DecoderFrame): DecoderFrame} Dequantization stage.
  */
-export function spectrumReconstructionStage() {
+export function dequantize() {
   return (frame) => {
     for (const decoded of frame.decodedChannels) {
       reconstructChannelSpectrum(decoded)
@@ -195,17 +196,17 @@ export function spectrumReconstructionStage() {
 }
 
 /**
- * Transform reconstructed spectra into detached frame band histories.
+ * Synthesize detached band histories from reconstructed spectra.
  *
  * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(DecoderFrame): DecoderFrame} Inverse-transform stage.
+ * @returns {function(DecoderFrame): DecoderFrame} Spectrum synthesis application.
  */
-export function inverseTransformStage(context) {
+function synthesizeSpectrum(context) {
   const decoderFrame = context.bufferPool.decoder.frame
   const activeBlockCounts = decoderFrame.activeBlockCounts
   return (frame) => {
     for (let channelIndex = 0; channelIndex < 2; channelIndex++) {
-      const channel = decoderFrame.decoderState.channels[channelIndex]
+      const channel = decoderFrame.channels[channelIndex]
       const decoded = frame.decodedChannels[channelIndex]
       const currentBlockCount = decoded.coefficientBlocks
       const blockCount = Math.max(currentBlockCount, channel.previousBlockCount)
@@ -254,10 +255,10 @@ export function inverseTransformStage(context) {
  * Apply prior-frame gain envelopes after all inverse transforms are complete.
  *
  * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(DecoderFrame): DecoderFrame} Inverse-gain stage.
+ * @returns {function(DecoderFrame): DecoderFrame} Gain synthesis application.
  */
-export function inverseGainStage(context) {
-  const stagedState = context.bufferPool.decoder.frame.decoderState
+function synthesizeGain(context) {
+  const stagedState = context.bufferPool.decoder.frame
   return (frame) => {
     for (let channelIndex = 0; channelIndex < 2; channelIndex++) {
       const channel = stagedState.channels[channelIndex]
@@ -274,29 +275,52 @@ export function inverseGainStage(context) {
 }
 
 /**
- * Apply shared-layout stereo reconstruction after both inverse transforms.
+ * Prepare the current signal decision from staged header history.
  *
  * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(DecoderFrame): DecoderFrame} Joint-stereo transform stage.
+ * @returns {function(DecoderFrame): DecoderFrame} Stereo preparation operation.
  */
-export function jointStereoDecodeStage(context) {
-  const stagedState = context.bufferPool.decoder.frame.decoderState
+function prepareStereo(context) {
+  const stagedState = context.bufferPool.decoder.frame
   return (frame) => {
-    if (frame.jointMixPlan) {
-      applyDecoderJointStereoMix(stagedState, frame.jointMixPlan)
-    }
+    prepareDecoderJointStereoMix(stagedState.header, stagedState.jointStereoMix)
+    frame.jointStereoMix = stagedState.jointStereoMix
     return frame
   }
+}
+
+/**
+ * Apply the completed current-frame stereo decision to signal work only.
+ *
+ * @param {DecoderContext} context Pipeline ownership context.
+ * @returns {function(DecoderFrame): DecoderFrame} Stereo mixing operation.
+ */
+function mixStereo(context) {
+  const channels = context.bufferPool.decoder.frame.channels
+  return (frame) => {
+    applyDecoderJointStereoMix(channels, frame.jointStereoMix)
+    return frame
+  }
+}
+
+/**
+ * Reconstruct shared-layout stereo from completed inverse transforms.
+ *
+ * @param {DecoderContext} context Pipeline ownership context.
+ * @returns {function(DecoderFrame): DecoderFrame} Stereo synthesis application.
+ */
+function synthesizeStereo(context) {
+  return pipe(context, prepareStereo, mixStereo)
 }
 
 /**
  * Run fixed four-band synthesis independently for each frame channel.
  *
  * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(DecoderFrame): DecoderFrame} QMF synthesis stage.
+ * @returns {function(DecoderFrame): DecoderFrame} PCM synthesis application.
  */
-export function synthesisStage(context) {
-  const stagedState = context.bufferPool.decoder.frame.decoderState
+function synthesizePcm(context) {
+  const stagedState = context.bufferPool.decoder.frame
   return (frame) => {
     for (const channel of stagedState.channels) {
       synthesizeLayeredQmf(channel)
@@ -306,16 +330,43 @@ export function synthesisStage(context) {
 }
 
 /**
+ * Reconstruct PCM from the dequantized channel spectra.
+ *
+ * @param {DecoderContext} context Pipeline ownership context.
+ * @returns {function(DecoderFrame): DecoderFrame} Synthesis stage.
+ */
+export function synthesize(context) {
+  return context.profile.bitrateKbps === 66
+    ? pipe(
+        context,
+        synthesizeSpectrum,
+        synthesizeGain,
+        synthesizeStereo,
+        synthesizePcm
+      )
+    : pipe(context, synthesizeSpectrum, synthesizeGain, synthesizePcm)
+}
+
+/**
  * Publish both histories atomically and detach the planar PCM result.
  *
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): Float32Array[]} Commit stage.
  */
-export function decodeCommitStage(context) {
+export function commitFrame(context) {
   const decoder = context.bufferPool.decoder
+  if (context.profile.bitrateKbps === 66) {
+    return (frame) => {
+      decoder.frame.header.advanceFrom(frame.pendingJointHeader)
+      decoder.state.commitFrom(decoder.frame)
+      return decoder.frame.channels.map((channel) =>
+        channel.synthesisBuffer.slice(0, FRAME_SAMPLES)
+      )
+    }
+  }
   return () => {
-    decoder.frame.decoderState.copyTo(decoder.state)
-    return decoder.state.channels.map((channel) =>
+    decoder.state.commitFrom(decoder.frame)
+    return decoder.frame.channels.map((channel) =>
       channel.synthesisBuffer.slice(0, FRAME_SAMPLES)
     )
   }
@@ -332,19 +383,17 @@ function createCodecDecoder(options = {}, bufferPool = new BufferPool()) {
   const profile = resolveProfile(options)
   if (!profile) throw new RangeError('Unsupported ATRAC3 decoder profile')
   bufferPool.decoder.state = new DecoderState(options)
-  bufferPool.decoder.frame.decoderState = new DecoderState(options)
-  const context = { options, profile, bufferPool }
+  bufferPool.decoder.frame.prepare(profile)
+  const context = { profile, bufferPool }
+
   return pipe(
     context,
-    validateDecodeFrameStage,
-    decodeTransactionStage,
-    channelSyntaxStage,
-    spectrumReconstructionStage,
-    inverseTransformStage,
-    inverseGainStage,
-    jointStereoDecodeStage,
-    synthesisStage,
-    decodeCommitStage
+    validateFrame,
+    beginTransaction,
+    unpack,
+    dequantize,
+    synthesize,
+    commitFrame
   )
 }
 

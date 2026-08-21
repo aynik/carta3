@@ -3,7 +3,14 @@ import {
   initialResidualBandLimit,
   measureResidualSource,
 } from '../codec/analysis/residual.js'
-import { allocateLayeredResidual } from '../codec/coding/layered.js'
+import {
+  allocateLayeredResidual,
+  quantizeLayeredResidual,
+} from '../codec/coding/layered.js'
+import {
+  createResidualQualityProfile,
+  refineResidual,
+} from '../codec/coding/finalization.js'
 import {
   AllocationWorkMut,
   AllocationWorkView,
@@ -20,8 +27,11 @@ import {
   writeResidualBand,
 } from '../codec/coding/residual.js'
 import { BitCounter } from '../codec/io/bitstream.js'
-import { packLayeredChannel } from '../codec/io/layered-channel.js'
-import { LayerState, ResidualSourceProfile } from '../codec/state/layered.js'
+import {
+  countLayeredChannelBits,
+  packLayeredChannel,
+} from '../codec/io/layered-channel.js'
+import { LayerWork, ResidualSourceProfile } from '../codec/state/layered.js'
 
 const numberBits = new DataView(new ArrayBuffer(8))
 const floatBits = new DataView(new ArrayBuffer(4))
@@ -140,7 +150,7 @@ function sourceProfileHash(profile) {
     for (const value of values) add(value)
   }
   add(profile.sumRunning)
-  for (const value of profile.monoExpansionBudgetThresholds) add(value)
+  for (const value of profile.primaryExpansionThresholds) add(value)
   return hash.toString(16).padStart(16, '0')
 }
 
@@ -161,7 +171,7 @@ function wordImageHash(words) {
 
 describe('ATRAC3 layered residual coding', () => {
   it('matches the residual source-analysis reference image', () => {
-    const layer = new LayerState()
+    const layer = new LayerWork()
     layer.spectrum.set(referenceSpectrum())
     const profile = measureResidualSource(layer, new ResidualSourceProfile())
     expect(sourceProfileHash(profile)).toBe('b720b245f658a5fe')
@@ -169,10 +179,10 @@ describe('ATRAC3 layered residual coding', () => {
     expect(initialResidualBandLimit(profile, 12, 357, false)).toBe(12)
   })
 
-  it('matches complete mono and secondary allocation reference images', () => {
+  it('matches primary and joint-secondary allocation reference images', () => {
     const cases = [
       {
-        stereoFlag: 0,
+        jointSecondary: false,
         limit: 25,
         budget: 1133,
         stereoMode: 0,
@@ -180,7 +190,7 @@ describe('ATRAC3 layered residual coding', () => {
         hash: '4da92bd46b3d77d8',
       },
       {
-        stereoFlag: 1133,
+        jointSecondary: true,
         limit: 12,
         budget: 357,
         stereoMode: 7,
@@ -189,8 +199,8 @@ describe('ATRAC3 layered residual coding', () => {
       },
     ]
     for (const expected of cases) {
-      const layer = new LayerState()
-      layer.stereoFlag = expected.stereoFlag
+      const layer = new LayerWork()
+      layer.jointSecondary = expected.jointSecondary
       layer.spectrum.set(referenceSpectrum())
       layer.pairBlocks[0][0x32] = 1
       const profile = measureResidualSource(layer, new ResidualSourceProfile())
@@ -209,14 +219,52 @@ describe('ATRAC3 layered residual coding', () => {
     }
   })
 
+  it('applies local refinement while returning an unapplied mode proposal', () => {
+    const layer = new LayerWork()
+    layer.spectrum.set(referenceSpectrum())
+    layer.pairBlocks[0][0x32] = 1
+    const work = createAllocationWork()
+    allocateLayeredResidual(
+      layer,
+      measureResidualSource(layer, new ResidualSourceProfile()),
+      25,
+      1133,
+      0,
+      work
+    )
+    const allocated = work.slice()
+
+    const proposal = refineResidual(
+      layer,
+      work,
+      createResidualQualityProfile(layer)
+    )
+    const refined = new AllocationWorkView(work)
+
+    expect(work).not.toEqual(allocated)
+    expect(proposal).not.toBeNull()
+    expect(refined.mode(proposal.donor.band)).not.toBe(proposal.donor.mode)
+    expect(refined.mode(proposal.receiver.band)).not.toBe(
+      proposal.receiver.mode
+    )
+  })
+
   it('matches complete layered channel emission reference vectors', () => {
     const cases = [
-      [0, 25, 1133, 0, 384, 1150, '30556e26e9fda7f5'],
-      [1133, 12, 357, 7, 192, 383, '84d6276eda6ae26e'],
+      [false, 25, 1133, 0, 384, 1150, '30556e26e9fda7f5'],
+      [true, 12, 357, 7, 192, 383, '84d6276eda6ae26e'],
     ]
-    for (const [flag, limit, budget, mode, bytes, end, hash] of cases) {
-      const layer = new LayerState()
-      layer.stereoFlag = flag
+    for (const [
+      jointSecondary,
+      limit,
+      budget,
+      mode,
+      bytes,
+      end,
+      hash,
+    ] of cases) {
+      const layer = new LayerWork()
+      layer.jointSecondary = jointSecondary
       layer.spectrum.set(referenceSpectrum())
       layer.pairBlocks[0][0x32] = 1
       const work = createAllocationWork()
@@ -228,13 +276,16 @@ describe('ATRAC3 layered residual coding', () => {
         mode,
         work
       )
+      const symbols = quantizeLayeredResidual(layer, work, new Int32Array(1024))
       const output = new Uint8Array(bytes)
-      expect(
-        packLayeredChannel(layer, work, 0, output, {
-          previousOutput: 3,
-          gainSelectors: new Int32Array([0, 1, 2, 3]),
-        })
-      ).toBe(end)
+      const options = {
+        previousOutput: 3,
+        gainSelectors: new Int32Array([0, 1, 2, 3]),
+      }
+      expect(countLayeredChannelBits(layer, work, options)).toBe(end)
+      expect(packLayeredChannel(layer, work, symbols, 0, output, options)).toBe(
+        end
+      )
       expect(wordImageHash(output)).toBe(hash)
     }
   })

@@ -23,6 +23,39 @@ function stereoSignal() {
   ]
 }
 
+/**
+ * Snapshot persistent independent-channel history.
+ *
+ * @param {object} history
+ * @returns {object}
+ */
+function snapshotHistory(history) {
+  return {
+    bandTails: history.bandTails.map((tail) => tail.slice()),
+    transformCarry: history.transformCarry.slice(),
+    referenceCarry: history.referenceCarry.slice(),
+    qmfDelays: history.qmfDelays.slice(),
+    gainRecords: history.gainRecords.map((record) => record.clone()),
+  }
+}
+
+describe('ATRAC3 encoder stream setup', () => {
+  it.each([132, 105, 66])(
+    'restarts %i kbps on a reused buffer pool',
+    (bitrateKbps) => {
+      const buffers = new BufferPool()
+      const previous = encode({ bitrateKbps }, buffers)
+      previous(stereoSignal())
+      previous(stereoSignal())
+
+      const restarted = encode({ bitrateKbps }, buffers)
+      const fresh = encode({ bitrateKbps })
+
+      expect(restarted(stereoSignal())).toEqual(fresh(stereoSignal()))
+    }
+  )
+})
+
 describe('ATRAC3 132 kbps staged encoder transaction', () => {
   it('packs both independent channels into one 384-byte frame', () => {
     const buffers = new BufferPool()
@@ -33,41 +66,54 @@ describe('ATRAC3 132 kbps staged encoder transaction', () => {
         entries: [...block.gainRecords],
       })
     )
+    const persistentGainRecords = buffers.encoder.state.independentChannels.map(
+      (history) => ({
+        records: history.gainRecords,
+        entries: [...history.gainRecords],
+      })
+    )
     const frame = encoder(stereoSignal())
     expect(frame).toHaveLength(384)
     expect(IndependentChannelHeader.isValid(frame[0])).toBe(true)
     expect(IndependentChannelHeader.isValid(frame[192])).toBe(true)
-    expect([...buffers.encoder.state.activeChannelBlockIndices]).toEqual([2, 2])
     for (let channel = 0; channel < 2; channel++) {
       const block = buffers.encoder.frame.channelBlocks[channel]
       expect(block.gainRecords).toBe(stagedGainRecords[channel].records)
+      expect(
+        buffers.encoder.state.independentChannels[channel].gainRecords
+      ).toBe(persistentGainRecords[channel].records)
       for (let band = 0; band < block.gainRecords.length; band++) {
         expect(block.gainRecords[band]).toBe(
           stagedGainRecords[channel].entries[band]
         )
+        expect(
+          buffers.encoder.state.independentChannels[channel].gainRecords[band]
+        ).toBe(persistentGainRecords[channel].entries[band])
       }
     }
     const second = encoder(stereoSignal())
     expect(second).toHaveLength(384)
-    expect([...buffers.encoder.state.activeChannelBlockIndices]).toEqual([1, 1])
+    for (let channel = 0; channel < 2; channel++) {
+      expect(
+        buffers.encoder.state.independentChannels[channel].gainRecords
+      ).toBe(persistentGainRecords[channel].records)
+    }
   })
 
   it('validates the complete stereo input before advancing state', () => {
     const buffers = new BufferPool()
     const encoder = encode({}, buffers)
-    const before = buffers.encoder.state.independentChannels.map((state) =>
-      state.slice()
-    )
+    const before =
+      buffers.encoder.state.independentChannels.map(snapshotHistory)
     expect(() =>
       encoder([new Float32Array(1024), new Float32Array(1000)])
     ).toThrow(/1024/)
-    expect([...buffers.encoder.state.activeChannelBlockIndices]).toEqual([0, 0])
-    expect([...buffers.encoder.state.independentChannels[0]]).toEqual([
-      ...before[0],
-    ])
-    expect([...buffers.encoder.state.independentChannels[1]]).toEqual([
-      ...before[1],
-    ])
+    expect(
+      snapshotHistory(buffers.encoder.state.independentChannels[0])
+    ).toEqual(before[0])
+    expect(
+      snapshotHistory(buffers.encoder.state.independentChannels[1])
+    ).toEqual(before[1])
   })
 
   it('keeps stream lifetime and three-frame drain outside the frame stages', () => {

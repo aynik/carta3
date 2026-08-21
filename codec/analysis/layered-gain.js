@@ -161,13 +161,13 @@ function stagePairMagnitudeHistory(
  * Select the history scan bound implied by layer and joint-stereo modes.
  *
  * @param {number} unit
- * @param {number} layerFlag
+ * @param {boolean} jointSecondary
  * @param {Int32Array} hints
  * @param {Int32Array} modes
  * @returns {number}
  */
-function pairModeSelector(unit, layerFlag, hints, modes) {
-  if (layerFlag === 0) return unit
+function pairModeSelector(unit, jointSecondary, hints, modes) {
+  if (!jointSecondary) return unit
   const hint = hints[unit] >>> 0
   const mode = modes[unit] >>> 0
   return hint === mode ? (hint === 3 ? -1 : 0) : 5
@@ -371,7 +371,7 @@ function selectPairAttackPoints(
  * @param {number} levelsBase
  * @param {number} selector
  * @param {number} unit
- * @param {number} layerFlag
+ * @param {boolean} jointSecondary
  * @param {number} previousCount
  * @param {number} pairBase
  * @returns {number}
@@ -383,11 +383,11 @@ function seedPairedGainPoint(
   levelsBase,
   selector,
   unit,
-  layerFlag,
+  jointSecondary,
   previousCount,
   pairBase
 ) {
-  if (selector !== 0 || unit !== 0 || layerFlag !== 0 || previousCount !== 0) {
+  if (selector !== 0 || unit !== 0 || jointSecondary || previousCount !== 0) {
     return selector
   }
   const pairedBase = PAIR_BLOCK_BASE_WORD + PAIR_BLOCK_WORDS
@@ -425,7 +425,7 @@ function seedPairedGainPoint(
  * @param {Uint32Array} maximumMagnitudes
  * @param {Uint32Array} gainScratchBits
  * @param {Int32Array} gainSelectionScratch
- * @param {number} layerFlag
+ * @param {boolean} jointSecondary
  * @param {Int32Array} hints
  * @param {Int32Array} modes
  */
@@ -434,7 +434,7 @@ function analyzePairBlocks(
   maximumMagnitudes,
   gainScratchBits,
   gainSelectionScratch,
-  layerFlag,
+  jointSecondary,
   hints,
   modes
 ) {
@@ -454,7 +454,7 @@ function analyzePairBlocks(
       unit,
       pairBase
     )
-    const modeSelector = pairModeSelector(unit, layerFlag, hints, modes)
+    const modeSelector = pairModeSelector(unit, jointSecondary, hints, modes)
     const lastMaximum = measurePairGroupMaxima(words, gainScratchBits, pairBase)
     if (unit === 0) words[TONE_HISTORY_WORD] = previousCount
     selectPairReleasePoints(
@@ -483,7 +483,7 @@ function analyzePairBlocks(
       levelsBase,
       entryCount,
       unit,
-      layerFlag,
+      jointSecondary,
       previousCount,
       pairBase
     )
@@ -501,38 +501,38 @@ function analyzePairBlocks(
  * @param {object} layer Transaction-local layer state.
  * @param {Int32Array} absoluteModeHints Joint-stereo gain hints.
  * @param {Int32Array} slotModes Joint-stereo slot modes.
- * @param {LayeredTransformState} transformState Cross-stage frame state.
- * @returns {LayeredTransformState} State containing the selected gain plan.
+ * @param {Uint32Array} words Retained layered transform image.
+ * @param {object} gainScratch Reusable gain-analysis storage.
+ * @returns {Uint32Array} `words` containing the selected gain plan.
  */
 export function analyzeLayeredGain(
   layer,
   absoluteModeHints,
   slotModes,
-  transformState
+  words,
+  gainScratch
 ) {
   if (
     !layer ||
     absoluteModeHints.length < 4 ||
     slotModes.length < 4 ||
-    transformState.words?.length < LAYER_WORDS ||
-    transformState.maximumMagnitudes?.length < FRAME_SAMPLES / 8 ||
-    transformState.gainScratchBits?.length < LAYER_GAIN_SCRATCH_WORDS ||
-    transformState.gainSelectionScratch?.length < 2 ||
-    transformState.transformValues?.length < FRAME_SAMPLES ||
-    transformState.initialGainScales?.length < SUBBAND_COUNT
+    words?.length < LAYER_WORDS ||
+    gainScratch.maximumMagnitudes?.length < FRAME_SAMPLES / 8 ||
+    gainScratch.gainScratchBits?.length < LAYER_GAIN_SCRATCH_WORDS ||
+    gainScratch.gainSelectionScratch?.length < 2
   ) {
     throw new RangeError('ATRAC3 layered transform has invalid state geometry')
   }
-  const words = layer.storeTo(transformState.words)
-  analyzeMaximumMagnitudes(words, transformState.maximumMagnitudes)
+  layer.storeTo(words)
+  analyzeMaximumMagnitudes(words, gainScratch.maximumMagnitudes)
   analyzePairBlocks(
     words,
-    transformState.maximumMagnitudes,
-    transformState.gainScratchBits,
-    transformState.gainSelectionScratch,
-    layer.stereoFlag,
+    gainScratch.maximumMagnitudes,
+    gainScratch.gainScratchBits,
+    gainScratch.gainSelectionScratch,
+    layer.jointSecondary,
     absoluteModeHints,
     slotModes
   )
-  return transformState
+  return words
 }
