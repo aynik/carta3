@@ -5,7 +5,9 @@
  * and packing in one linear recipe. Atomic commit publishes successful frames.
  */
 
-import { BufferPool } from '../state/storage.js'
+import { allocate } from '../allocation/stage.js'
+import { analyze } from '../analysis/stage.js'
+import { scalePcmFrame } from '../boundary/pcm.js'
 import {
   FRAME_SAMPLES,
   JOINT_STEREO_SLOT_ROUNDING,
@@ -19,47 +21,11 @@ import {
   LAYER_BAND_OFFSETS,
   LAYER_PROFILE_CONFIGURATION,
 } from '../core/tables.js'
-import { scalePcmFrame } from '../boundary/pcm.js'
+import { pack } from '../packing.js'
+import { quantize } from '../quantization/stage.js'
+import { BufferPool } from '../state/storage.js'
 import { beginEncoderFrame, commitEncoderFrame } from '../state/stream.js'
 import { pipe } from '../utils.js'
-
-/** Identify a failed pre-transform sound-unit phase and channel. */
-import { analyze } from '../analysis/stage.js'
-/**
- * Validate a complete stereo frame before transactional scratch advances.
- *
- * @returns {function(Float32Array[]): EncoderFrame} Reusable validation stage.
- */
-import { allocate } from '../allocation/stage.js'
-import { quantize } from '../quantization/stage.js'
-import { pack } from '../packing.js'
-export function validateFrame() {
-  return (channels) => {
-    if (!Array.isArray(channels) || channels.length !== 2) {
-      throw new RangeError('ATRAC3 encode requires one stereo PCM frame')
-    }
-    for (const channel of channels) {
-      if (
-        !(channel instanceof Float32Array) ||
-        channel.length !== FRAME_SAMPLES
-      ) {
-        throw new RangeError(
-          'Each ATRAC3 PCM channel must contain 1024 float samples'
-        )
-      }
-    }
-    return {
-      channels,
-    }
-  }
-}
-
-/**
- * Capture reusable destination nodes for one all-channel transaction.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Transaction capture stage.
- */
 
 /**
  * Count the residual-band prefix covering one coefficient limit.
@@ -157,6 +123,32 @@ function createCodecEncoder(options = {}, bufferPool = new BufferPool()) {
     pack,
     commitEncoderFrame
   )
+}
+
+/**
+ * Validate a complete stereo frame before transactional scratch advances.
+ *
+ * @returns {function(Float32Array[]): EncoderFrame} Reusable validation stage.
+ */
+export function validateFrame() {
+  return (channels) => {
+    if (!Array.isArray(channels) || channels.length !== 2) {
+      throw new RangeError('ATRAC3 encode requires one stereo PCM frame')
+    }
+    for (const channel of channels) {
+      if (
+        !(channel instanceof Float32Array) ||
+        channel.length !== FRAME_SAMPLES
+      ) {
+        throw new RangeError(
+          'Each ATRAC3 PCM channel must contain 1024 float samples'
+        )
+      }
+    }
+    return {
+      channels,
+    }
+  }
 }
 
 /**
