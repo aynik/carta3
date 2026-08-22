@@ -1,89 +1,17 @@
-/** Carta3 Audio Codec - Gain-control syntax and validation. */
+/** Carta3 gain-control syntax. */
 
 import {
   GAIN_LEVEL_MAX,
   GAIN_LOCATION_MAX,
   GAIN_SLOT_COUNT,
 } from '../core/constants.js'
+import { GainRecord } from '../state/gain.js'
 
 /**
- * Coded gain-control record plus the detector history carried with that record.
+ * Validate one wire-visible gain record.
  *
- * `entries`, `locations`, and `levels` are syntax. `peakHistory` is explicitly
- * local encoder history and is never packed by this module.
- */
-export class GainRecord {
-  /** Create an inactive record with fixed-capacity point storage. */
-  constructor() {
-    this.entries = 0
-    this.locations = new Uint32Array(GAIN_SLOT_COUNT)
-    this.levels = new Uint32Array(GAIN_SLOT_COUNT)
-    this.peakHistory = 0
-  }
-
-  /**
-   * Copy wire-visible fields while preserving destination-local detector state.
-   *
-   * @param {GainRecord} source Record whose coded fields should be copied.
-   * @returns {GainRecord} This destination record.
-   */
-  copyCodedFieldsFrom(source) {
-    this.entries = source.entries
-    const count = Math.min(source.entries, GAIN_SLOT_COUNT)
-    this.locations.set(source.locations.subarray(0, count), 0)
-    this.levels.set(source.levels.subarray(0, count), 0)
-    return this
-  }
-
-  /**
-   * Copy coded fields and detector history into existing destination storage.
-   *
-   * @param {GainRecord} destination Existing destination record.
-   * @returns {GainRecord} `destination` after the copy.
-   */
-  copyTo(destination) {
-    destination.entries = this.entries
-    destination.locations.set(this.locations)
-    destination.levels.set(this.levels)
-    destination.peakHistory = this.peakHistory
-    return destination
-  }
-
-  /**
-   * Create a detached copy including local detector history.
-   *
-   * @returns {GainRecord} Independent record copy.
-   */
-  clone() {
-    return this.copyTo(new GainRecord())
-  }
-
-  /**
-   * Compare only fields that affect encoded gain syntax.
-   *
-   * @param {GainRecord} other Record to compare.
-   * @returns {boolean} Whether both records encode identical syntax.
-   */
-  codedEquals(other) {
-    if (this.entries !== other.entries) return false
-    const count = Math.min(this.entries, GAIN_SLOT_COUNT)
-    for (let index = 0; index < count; index++) {
-      if (
-        this.locations[index] !== other.locations[index] ||
-        this.levels[index] !== other.levels[index]
-      ) {
-        return false
-      }
-    }
-    return true
-  }
-}
-
-/**
- * Validate the wire-visible geometry and ordering of one gain record.
- *
- * @param {GainRecord} record Record to validate.
- * @returns {GainRecord} The validated input record.
+ * @param {GainRecord} record
+ * @returns {GainRecord}
  */
 export function validateGainRecord(record) {
   if (
@@ -115,10 +43,10 @@ export function validateGainRecord(record) {
 }
 
 /**
- * Return the exact number of bits needed to code one gain record.
+ * Return the exact encoded length of one gain record.
  *
- * @param {GainRecord} record Gain record to measure.
- * @returns {number} Exact encoded length in bits.
+ * @param {GainRecord} record
+ * @returns {number}
  */
 export function gainRecordBits(record) {
   if (record.entries < 0 || record.entries > GAIN_SLOT_COUNT) {
@@ -128,10 +56,10 @@ export function gainRecordBits(record) {
 }
 
 /**
- * Pack gain records to a bit-writer-compatible sink.
+ * Pack ordered transform-unit gain records.
  *
- * @param {GainRecord[]} records Ordered transform-unit gain records.
- * @param {{write: Function}} sink Bit writer or exact counter.
+ * @param {GainRecord[]} records
+ * @param {{write: Function}} sink
  * @returns {void}
  */
 export function packGainRecords(records, sink) {
@@ -148,10 +76,10 @@ export function packGainRecords(records, sink) {
 }
 
 /**
- * Read one gain record from a bit-reader-compatible source.
+ * Read one gain record.
  *
- * @param {{read: Function}} reader Reader positioned at the record count.
- * @returns {GainRecord} Decoded gain record.
+ * @param {{read: Function}} reader
+ * @returns {GainRecord}
  */
 export function readGainRecord(reader) {
   const record = new GainRecord()

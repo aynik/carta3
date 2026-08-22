@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GainRecord } from '../codec/syntax/gain.js'
+import { GainRecord } from '../codec/state/gain.js'
 import {
   countSoundUnitBits,
   countSoundUnitFixedBits,

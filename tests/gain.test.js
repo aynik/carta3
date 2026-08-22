@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  GainRecord,
   gainRecordBits,
   packGainRecords,
   readGainRecord,
   validateGainRecord,
 } from '../codec/syntax/gain.js'
+import { GainRecord } from '../codec/state/gain.js'
 import { BitCounter, BitReader, BitWriter } from '../codec/syntax/bitstream.js'
 
 /**
