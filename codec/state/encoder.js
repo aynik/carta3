@@ -13,6 +13,9 @@ import {
   GAIN_CANDIDATE_COUNT,
   GAIN_SCALE_SAMPLES,
   GAIN_STEP_COUNT,
+  JOINT_STEREO_SLOT_ROUNDING,
+  LAYER_PRIMARY_HEADER_BITS,
+  LAYER_SECONDARY_HEADER_BITS,
   LAYER_WORDS,
   MAX_CHANNELS,
   MAX_CODED_FRAME_BYTES,
@@ -20,6 +23,7 @@ import {
   MAX_SELECTED_GAIN_CANDIDATES,
   QMF_DELAY,
   ROOT_HISTORY_OFFSET,
+  SAMPLE_RATE,
   SOUND_UNIT_FILL_MOVES_PER_BAND,
   SPECTRUM_WORK_FLOATS,
   SPECTRUM_GROUPS,
@@ -27,6 +31,11 @@ import {
   TRANSFORM_CARRY_OFFSET_FLOATS,
   BITSTREAM_PADDING_BYTES,
 } from '../core/constants.js'
+import { selectEncoderMode } from '../core/profiles.js'
+import {
+  LAYER_BAND_OFFSETS,
+  LAYER_PROFILE_CONFIGURATION,
+} from '../core/tables.js'
 import { JointStereoHistory, JointStereoWork } from './stereo.js'
 import { LayerHistory, LayerWork } from './layered.js'
 
@@ -41,6 +50,62 @@ function copyCloneList(source, destination) {
   for (let index = 0; index < source.length; index++) {
     destination[index] = structuredClone(source[index])
   }
+}
+
+/**
+ * Count the residual-band prefix covering one coefficient limit.
+ *
+ * @param {number} limit Coefficient limit.
+ * @returns {number} Covering residual-band count.
+ */
+function countBands(limit) {
+  let count = 1
+  while (count < SPECTRUM_GROUPS && LAYER_BAND_OFFSETS[count] < limit) count++
+  return count
+}
+
+/**
+ * Restore independent histories when initializing one encoder stream.
+ *
+ * @param {object} _profile Resolved stream profile.
+ * @param {object} encoder Encoder pool ownership root.
+ */
+function resetIndependent(_profile, encoder) {
+  for (const history of encoder.state.independentChannels) history.reset()
+}
+
+/**
+ * Configure layered frame geometry and restore persistent histories.
+ *
+ * @param {object} profile Resolved stream profile.
+ * @param {object} encoder Encoder pool ownership root.
+ */
+function configureLayered(profile, encoder) {
+  const configuration = LAYER_PROFILE_CONFIGURATION[profile.bitrateKbps]
+  const work = encoder.frame.layeredWork
+  const jointWork = encoder.frame.jointStereoWork
+  jointWork.ratioScaledSlotCount = -1
+  for (let layer = 0; layer < work.length; layer++) {
+    const jointSecondary = configuration.jointStereo && layer === 1
+    const coefficientLimit = Math.trunc(
+      (configuration.workSizes[layer] * (FRAME_SAMPLES * 2)) / SAMPLE_RATE
+    )
+    work[layer].bitBudget =
+      (configuration.budgetBases[layer] << 3) -
+      (jointSecondary ? LAYER_SECONDARY_HEADER_BITS : LAYER_PRIMARY_HEADER_BITS)
+    work[layer].scaleFactorBandLimit = countBands(coefficientLimit)
+    work[layer].jointSecondary = jointSecondary
+    encoder.state.layeredHistories[layer].reset()
+    if (jointSecondary) {
+      jointWork.ratioScaledSlotCount = Math.max(
+        1,
+        Math.trunc(
+          (coefficientLimit + JOINT_STEREO_SLOT_ROUNDING) / (FRAME_SAMPLES / 4)
+        )
+      )
+    }
+  }
+  encoder.state.jointStereoHistory.reset(configuration.jointStereo)
 }
 
 /** Detached 132 kbps sound-unit syntax and reusable allocation state. */
@@ -436,4 +501,22 @@ export class EncoderFrameState {
       MAX_CODED_FRAME_BYTES + BITSTREAM_PADDING_BYTES
     )
   }
+}
+
+/**
+ * Configure frame geometry and restore histories for one encoder stream.
+ *
+ * @param {object} profile Resolved stream profile.
+ * @param {object} encoder Encoder pool ownership root.
+ * @returns {object} Initialized encoder storage.
+ */
+export function initializeEncoderStream(profile, encoder) {
+  const initialize = selectEncoderMode(
+    profile,
+    resetIndependent,
+    configureLayered,
+    configureLayered
+  )
+  initialize(profile, encoder)
+  return encoder
 }

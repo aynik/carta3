@@ -8,121 +8,27 @@
 import { allocate } from '../allocation/stage.js'
 import { analyze } from '../analysis/stage.js'
 import { scalePcmFrame } from '../boundary/pcm.js'
-import {
-  FRAME_SAMPLES,
-  JOINT_STEREO_SLOT_ROUNDING,
-  LAYER_PRIMARY_HEADER_BITS,
-  LAYER_SECONDARY_HEADER_BITS,
-  SAMPLE_RATE,
-  SPECTRUM_GROUPS,
-} from '../core/constants.js'
-import { resolveProfile, selectEncoderMode } from '../core/profiles.js'
-import {
-  LAYER_BAND_OFFSETS,
-  LAYER_PROFILE_CONFIGURATION,
-} from '../core/tables.js'
+import { FRAME_SAMPLES } from '../core/constants.js'
+import { resolveProfile } from '../core/profiles.js'
 import { pack } from '../packing.js'
 import { quantize } from '../quantization/stage.js'
+import { initializeEncoderStream } from '../state/encoder.js'
 import { BufferPool } from '../state/storage.js'
 import { beginEncoderFrame, commitEncoderFrame } from '../state/stream.js'
 import { pipe } from '../utils.js'
 
 /**
- * Count the residual-band prefix covering one coefficient limit.
+ * Allocate stream state and stable construction context.
  *
- * @param {number} limit Coefficient limit.
- * @returns {number} Covering residual-band count.
+ * @param {object} options Profile options for 66, 105, or 132 kbps.
+ * @param {BufferPool} bufferPool Reusable persistent and scratch storage.
+ * @returns {EncoderContext} Pipeline ownership context.
  */
-function countBands(limit) {
-  let count = 1
-  while (count < SPECTRUM_GROUPS && LAYER_BAND_OFFSETS[count] < limit) count++
-  return count
-}
-
-/**
- * Restore independent histories when starting one encoder stream.
- *
- * @param {EncoderContext} context Encoder ownership context.
- */
-function setupIndependent(context) {
-  const histories = context.bufferPool.encoder.state.independentChannels
-  for (const history of histories) history.reset()
-}
-
-/**
- * Configure layered frame work and restore its persistent histories.
- *
- * @param {EncoderContext} context Encoder ownership context.
- */
-function setupLayered(context) {
-  const encoder = context.bufferPool.encoder
-  const configuration = LAYER_PROFILE_CONFIGURATION[context.profile.bitrateKbps]
-  const work = encoder.frame.layeredWork
-  const jointWork = encoder.frame.jointStereoWork
-  jointWork.ratioScaledSlotCount = -1
-  for (let layer = 0; layer < work.length; layer++) {
-    const jointSecondary = configuration.jointStereo && layer === 1
-    const coefficientLimit = Math.trunc(
-      (configuration.workSizes[layer] * (FRAME_SAMPLES * 2)) / SAMPLE_RATE
-    )
-    work[layer].bitBudget =
-      (configuration.budgetBases[layer] << 3) -
-      (jointSecondary ? LAYER_SECONDARY_HEADER_BITS : LAYER_PRIMARY_HEADER_BITS)
-    work[layer].scaleFactorBandLimit = countBands(coefficientLimit)
-    work[layer].jointSecondary = jointSecondary
-    encoder.state.layeredHistories[layer].reset()
-    if (jointSecondary) {
-      jointWork.ratioScaledSlotCount = Math.max(
-        1,
-        Math.trunc(
-          (coefficientLimit + JOINT_STEREO_SLOT_ROUNDING) / (FRAME_SAMPLES / 4)
-        )
-      )
-    }
-  }
-  encoder.state.jointStereoHistory.reset(configuration.jointStereo)
-}
-
-/**
- * Select construction setup for the resolved stream profile.
- *
- * @param {EncoderContext} context Encoder ownership context.
- */
-function setupEncoder(context) {
-  const setup = selectEncoderMode(
-    context.profile,
-    setupIndependent,
-    setupLayered,
-    setupLayered
-  )
-  setup(context)
-}
-
-/**
- * Compose the internal signed-amplitude encoder stage chain.
- *
- * @param {object} [options] Profile options for 66, 105, or 132 kbps.
- * @param {BufferPool} [bufferPool] Reusable persistent and scratch storage.
- * @returns {function(Float32Array[]): Uint8Array} One-frame stereo encoder.
- */
-function createCodecEncoder(options = {}, bufferPool = new BufferPool()) {
+function createEncoderContext(options, bufferPool) {
   const profile = resolveProfile(options)
   if (!profile) throw new RangeError('Unsupported ATRAC3 encoder profile')
-  const context = {
-    profile,
-    bufferPool,
-  }
-  setupEncoder(context)
-  return pipe(
-    context,
-    validateFrame,
-    beginEncoderFrame,
-    analyze,
-    allocate,
-    quantize,
-    pack,
-    commitEncoderFrame
-  )
+  initializeEncoderStream(profile, bufferPool.encoder)
+  return { profile, bufferPool }
 }
 
 /**
@@ -161,7 +67,17 @@ export function validateFrame() {
  * @returns {function(Float32Array[]): Uint8Array} One-frame stereo encoder.
  */
 export function encode(options = {}, bufferPool = new BufferPool()) {
-  const encodeFrame = createCodecEncoder(options, bufferPool)
+  const context = createEncoderContext(options, bufferPool)
+  const encodeFrame = pipe(
+    context,
+    validateFrame,
+    beginEncoderFrame,
+    analyze,
+    allocate,
+    quantize,
+    pack,
+    commitEncoderFrame
+  )
   const codecFrame = [
     new Float32Array(FRAME_SAMPLES),
     new Float32Array(FRAME_SAMPLES),
