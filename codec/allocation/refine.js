@@ -1,13 +1,13 @@
 /** Carta3 Audio Codec - Pareto-safe layered residual refinement. */
 
-import { AllocationWorkMut, AllocationWorkView } from './work.js'
+import { AllocationWorkMut, AllocationWorkView } from '../coding/work.js'
 import {
   measureResidualBand,
   measureResidualModeNeighbors,
   measureResidualScaleNeighbors,
-} from './residual.js'
+} from '../coding/residual.js'
 import { QUANTIZATION_UNIT_OFFSETS } from '../core/tables.js'
-import { buildMaskFromBandMeasures } from '../analysis/perceptual.js'
+import { buildMaskFromBandMeasures } from '../allocation/distortion.js'
 
 /**
  * Select a no-more-bits candidate that strictly lowers error.

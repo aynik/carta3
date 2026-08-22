@@ -7,7 +7,7 @@ import {
   applyResidualProposal,
   createResidualQualityProfile,
   refineResidual,
-} from '../coding/finalization.js'
+} from '../allocation/refine.js'
 import { allocateLayeredResidual } from '../allocation/layered.js'
 import { PAIR_BLOCK_GAIN_COUNT_WORD } from '../core/constants.js'
 import { countLayeredChannelBits } from '../syntax/unit/writer/layered.js'

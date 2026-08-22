@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractMultitone } from '../codec/coding/tones.js'
+import { extractMultitone } from '../codec/allocation/tones.js'
 import {
   TONE_POLICY_NONE,
   TONE_POLICY_THRESHOLD,

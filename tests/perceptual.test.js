@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildReconstructionMask } from '../codec/analysis/perceptual.js'
+import { buildReconstructionMask } from '../codec/allocation/distortion.js'
 
 describe('ATRAC3 reconstruction masking profile', () => {
   it('keeps silence thresholds finite and strictly positive', () => {

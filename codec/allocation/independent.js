@@ -38,12 +38,12 @@ import {
   countSoundUnitBits,
   countSoundUnitFixedBits,
 } from '../syntax/unit/writer/independent.js'
-import { extractMultitone } from '../coding/tones.js'
+import { extractMultitone } from '../allocation/tones.js'
 import {
   buildReconstructionMask,
   measureBandReconstructionNoise,
   measureBandOptionReconstructionNoise,
-} from '../analysis/perceptual.js'
+} from '../allocation/distortion.js'
 import { absoluteMaximum, float32Add, float32Multiply } from '../utils.js'
 
 /** Expected rejection of one speculative sound-unit candidate. */

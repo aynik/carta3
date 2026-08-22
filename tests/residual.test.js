@@ -10,7 +10,7 @@ import {
 import {
   createResidualQualityProfile,
   refineResidual,
-} from '../codec/coding/finalization.js'
+} from '../codec/allocation/refine.js'
 import {
   AllocationWorkMut,
   AllocationWorkView,
