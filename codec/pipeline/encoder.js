@@ -5,25 +5,13 @@
  * and packing in one linear recipe. Atomic commit publishes successful frames.
  */
 
-import { allocateSoundUnitCandidates } from '../coding/allocation.js'
-import {
-  allocateLayeredResidual,
-  quantizeLayeredResidual,
-} from '../coding/layered.js'
-import { allocateJointLayers } from '../coding/budget.js'
-import {
-  applyResidualProposal,
-  createResidualQualityProfile,
-  refineResidual,
-} from '../coding/finalization.js'
-import { measureResidualSource } from '../analysis/residual.js'
+import { quantizeLayeredResidual } from '../coding/layered.js'
 import { BufferPool } from '../core/buffers.js'
 import {
   FRAME_SAMPLES,
   JOINT_STEREO_SLOT_ROUNDING,
   LAYER_PRIMARY_HEADER_BITS,
   LAYER_SECONDARY_HEADER_BITS,
-  PAIR_BLOCK_GAIN_COUNT_WORD,
   SAMPLE_RATE,
   SPECTRUM_GROUPS,
 } from '../core/constants.js'
@@ -32,10 +20,7 @@ import {
   LAYER_BAND_OFFSETS,
   LAYER_PROFILE_CONFIGURATION,
 } from '../core/tables.js'
-import {
-  countLayeredChannelBits,
-  packLayeredChannel,
-} from '../io/layered-channel.js'
+import { packLayeredChannel } from '../io/layered-channel.js'
 import { packSoundUnit } from '../io/sound-unit.js'
 import { scalePcmFrame } from '../io/pcm.js'
 import { pipe } from '../utils.js'
@@ -47,6 +32,7 @@ import { analyze } from '../analysis/stage.js'
  *
  * @returns {function(Float32Array[]): EncoderFrame} Reusable validation stage.
  */
+import { allocate } from '../allocation/stage.js'
 export function validateFrame() {
   return (channels) => {
     if (!Array.isArray(channels) || channels.length !== 2) {
@@ -105,30 +91,6 @@ function beginIndependent(context) {
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Allocation stage.
  */
-function allocateIndependent(context) {
-  const { profile } = context
-  const encoder = context.bufferPool.encoder
-  const unitBits = (profile.bytesPerFrame / 2) * 8
-  return (frame) => {
-    const candidates = encoder.frame.soundUnitCandidates
-    for (let channel = 0; channel < 2; channel++) {
-      frame.channelBlocks[channel].copyTo(candidates[channel])
-      encoder.frame.selectedSoundUnitBits[channel] =
-        allocateSoundUnitCandidates(
-          frame.spectra[channel],
-          frame.referenceSpectra[channel],
-          candidates[channel],
-          encoder.scratch.allocation.candidateBlock,
-          frame.previousGainRecords[channel],
-          unitBits,
-          encoder.scratch.allocation
-        )
-    }
-    frame.soundUnits = candidates
-    frame.soundUnitBits = encoder.frame.selectedSoundUnitBits
-    return frame
-  }
-}
 
 /**
  * Pack the complete stereo frame after all coding decisions are final.
@@ -212,121 +174,6 @@ export function beginLayered(context) {
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Joint allocation operation.
  */
-function allocateJoint(context) {
-  const encoder = context.bufferPool.encoder
-  return (frame) => {
-    const split = allocateJointLayers({
-      layers: frame.layers,
-      outputWorks: encoder.frame.layeredAllocations,
-      candidateWorks: encoder.scratch.layeredAllocation.candidateWorks,
-      residualSourceProfiles: encoder.scratch.layeredAllocation.sourceProfiles,
-      jointStereo: frame.jointStereo,
-      bytesPerFrame: context.profile.bytesPerFrame,
-      measureLayerBits: countLayeredChannelBits,
-    })
-    frame.layeredOffsets = [0, split]
-    frame.layeredAllocationWork = encoder.frame.layeredAllocations
-    return frame
-  }
-}
-
-/**
- * Allocate the two independent 105 kbps residual layers.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Layer allocation operation.
- */
-function allocateSeparate(context) {
-  const encoder = context.bufferPool.encoder
-  return (frame) => {
-    const stereoMode = frame.jointStereo.previousOutputSelector
-    for (let layer = 0; layer < 2; layer++) {
-      const state = frame.layers[layer]
-      const profile = measureResidualSource(
-        state,
-        encoder.scratch.layeredAllocation.sourceProfiles[layer]
-      )
-      const work = encoder.frame.layeredAllocations[layer]
-      work.fill(0)
-      allocateLayeredResidual(
-        state,
-        profile,
-        state.scaleFactorBandLimit,
-        state.bitBudget,
-        stereoMode,
-        work
-      )
-    }
-    frame.layeredAllocationWork = encoder.frame.layeredAllocations
-    return frame
-  }
-}
-
-/**
- * Lower transformed layers into detached allocation images.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Layer allocation stage.
- */
-export function allocateResiduals(context) {
-  return context.profile.bitrateKbps === 66
-    ? allocateJoint(context)
-    : allocateSeparate(context)
-}
-
-/**
- * Return whether gain syntax makes equal-rate stereo exchange unsafe.
- *
- * @param {object[]} states
- * @returns {boolean}
- */
-function layeredHasGainPoints(states) {
-  return states.some((state) =>
-    state.pairBlocks.some((block) => block[PAIR_BLOCK_GAIN_COUNT_WORD] !== 0)
-  )
-}
-
-/**
- * Refine each completed layer, then atomically publish only a jointly viable
- * pair of equal-rate residual-mode exchanges. This is the shared stereo
- * decision boundary between channel-local allocation and channel emission.
- *
- * @returns {function(EncoderFrame): EncoderFrame} Residual finalization stage.
- */
-export function finalizeLayered() {
-  return (frame) => {
-    const states = frame.layers
-    const works = frame.layeredAllocationWork
-    const canPropose = !layeredHasGainPoints(states)
-    let canApply = true
-    let hasProposal = false
-    const proposals = [null, null]
-    for (let layer = 0; layer < 2; layer++) {
-      const qualityProfile =
-        canPropose && canApply
-          ? createResidualQualityProfile(states[layer])
-          : null
-      const proposal = refineResidual(
-        states[layer],
-        works[layer],
-        qualityProfile
-      )
-      proposals[layer] = proposal
-      if (proposal) {
-        hasProposal = true
-        if (!proposal.strictlyImprovesAll) canApply = false
-      }
-    }
-    if (hasProposal && canApply) {
-      for (let layer = 0; layer < 2; layer++) {
-        if (proposals[layer]) {
-          applyResidualProposal(proposals[layer], works[layer])
-        }
-      }
-    }
-    return frame
-  }
-}
 
 /**
  * Pack completed layers into their final independent or shared spans.
@@ -418,21 +265,6 @@ export function beginTransaction(context) {
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Allocation application.
  */
-function allocateLayered(context) {
-  return pipe(context, allocateResiduals, finalizeLayered)
-}
-
-/**
- * Select bit allocation for the configured profile.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Allocation stage.
- */
-export function allocate(context) {
-  return context.profile.bitrateKbps === 132
-    ? allocateIndependent(context)
-    : allocateLayered(context)
-}
 
 /**
  * Publish selected sound-unit candidates as final syntax.

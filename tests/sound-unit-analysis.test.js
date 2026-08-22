@@ -20,8 +20,8 @@ import {
   transformReference,
   transformSpectrum,
 } from '../codec/analysis/stage.js'
+import { allocate } from '../codec/allocation/stage.js'
 import {
-  allocate,
   beginTransaction,
   encode,
   pack,
