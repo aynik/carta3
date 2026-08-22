@@ -1,6 +1,6 @@
 /** Carta3 spectral dequantization stage. */
 
-import { reconstructChannelSpectrum } from '../syntax/unit/reader.js'
+import { dequantizeChannel } from './spectrum.js'
 
 /**
  * Reconstruct spectra after both channels pass complete syntax checks.
@@ -10,7 +10,7 @@ import { reconstructChannelSpectrum } from '../syntax/unit/reader.js'
 export function dequantize() {
   return (frame) => {
     for (const decoded of frame.decodedChannels) {
-      reconstructChannelSpectrum(decoded)
+      dequantizeChannel(decoded)
     }
     return frame
   }

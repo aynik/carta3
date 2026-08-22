@@ -14,7 +14,6 @@ import {
   ToneRegionHeader,
   ToneSectionHeader,
 } from '../records.js'
-import { float32Add, float32Multiply } from '../../utils.js'
 
 /**
  * Decode pair-block gain tables for all active transform units.
@@ -198,24 +197,4 @@ export function unpackChannelSyntax(stream, bitPosition, unitMode, decoded) {
   )
   decoded.coefficientBlocks = (coefficientExtent + 0xff) >> 8
   return reader.bitPosition
-}
-
-/**
- * Apply staged inverse quantization after every channel passes preflight.
- *
- * @param {object} decoded Workspace returned by {@link unpackChannelSyntax}.
- * @returns {Float32Array} Reconstructed channel spectrum.
- */
-export function reconstructChannelSpectrum(decoded) {
-  decoded.samples.fill(0)
-  for (const run of decoded.runs) {
-    for (let index = 0; index < run.values.length; index++) {
-      const output = run.outputStart + index
-      decoded.samples[output] = float32Add(
-        decoded.samples[output],
-        float32Multiply(run.values[index], run.scale)
-      )
-    }
-  }
-  return decoded.samples
 }
