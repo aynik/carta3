@@ -41,36 +41,6 @@ import { float32Add, float32Multiply } from '../utils.js'
 /** @import { IndependentQmfScratch } from '../state/encoder.js' */
 
 /**
- * Locate a subband's oldest gain-analysis half in the 132 kbps work image.
- *
- * @param {number} subband Subband index from zero through three.
- * @returns {number} Float offset in the analysis work image.
- */
-export function bandGainOffset(subband) {
-  return subband * BAND_STRIDE_FLOATS
-}
-
-/**
- * Locate a subband's middle MDCT half in the 132 kbps work image.
- *
- * @param {number} subband Subband index from zero through three.
- * @returns {number} Float offset in the analysis work image.
- */
-export function bandMdctOffset(subband) {
-  return bandGainOffset(subband) + BAND_PART_FLOATS
-}
-
-/**
- * Locate a subband's newest QMF half in the 132 kbps work image.
- *
- * @param {number} subband Subband index from zero through three.
- * @returns {number} Float offset in the analysis work image.
- */
-export function bandSplitOffset(subband) {
-  return bandGainOffset(subband) + 2 * BAND_PART_FLOATS
-}
-
-/**
  * Convolve one QMF branch and publish its updated delay line.
  *
  * @param {Float32Array} input
@@ -116,6 +86,36 @@ function analyzeQmfPair(
     low[outputIndex] = evenSum + oddSum
     high[outputIndex] = evenSum - oddSum
   }
+}
+
+/**
+ * Locate a subband's oldest gain-analysis half in the 132 kbps work image.
+ *
+ * @param {number} subband Subband index from zero through three.
+ * @returns {number} Float offset in the analysis work image.
+ */
+export function bandGainOffset(subband) {
+  return subband * BAND_STRIDE_FLOATS
+}
+
+/**
+ * Locate a subband's middle MDCT half in the 132 kbps work image.
+ *
+ * @param {number} subband Subband index from zero through three.
+ * @returns {number} Float offset in the analysis work image.
+ */
+export function bandMdctOffset(subband) {
+  return bandGainOffset(subband) + BAND_PART_FLOATS
+}
+
+/**
+ * Locate a subband's newest QMF half in the 132 kbps work image.
+ *
+ * @param {number} subband Subband index from zero through three.
+ * @returns {number} Float offset in the analysis work image.
+ */
+export function bandSplitOffset(subband) {
+  return bandGainOffset(subband) + 2 * BAND_PART_FLOATS
 }
 
 /**

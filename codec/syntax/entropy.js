@@ -52,12 +52,6 @@ function buildFamily(pairs) {
  */
 const primaryHuffmanFamily = buildFamily(HUFFMAN_PAIRS_A)
 const secondaryHuffmanFamily = buildFamily(HUFFMAN_PAIRS_B)
-export const HUFFMAN_FAMILIES = Object.freeze([
-  primaryHuffmanFamily,
-  secondaryHuffmanFamily,
-  primaryHuffmanFamily,
-  secondaryHuffmanFamily,
-])
 
 /**
  * Traverse symbols using the table's one- or two-value grouping rule.
@@ -91,45 +85,6 @@ function visitSymbols(table, values, count, visitor) {
     return
   }
   throw new RangeError('Unsupported ATRAC3 Huffman grouping')
-}
-
-/**
- * Measure the exact Huffman cost of a symbol run.
- *
- * @param {object} table One word-length table from {@link HUFFMAN_FAMILIES}.
- * @param {ArrayLike<number>} values Signed symbols in encoder representation.
- * @param {number} [count] Number of values to traverse.
- * @returns {number} Required codeword bits.
- */
-export function measureHuffmanBits(table, values, count = values.length) {
-  let bits = 0
-  visitSymbols(table, values, count, (symbol) => {
-    if (symbol >= table.bitLengths.length) {
-      throw new RangeError('Missing ATRAC3 Huffman codeword')
-    }
-    bits += table.bitLengths[symbol]
-  })
-  return bits
-}
-
-/**
- * Write a Huffman symbol run using the table's grouping rule.
- *
- * @param {object} table One word-length Huffman table.
- * @param {ArrayLike<number>} values Signed symbols in encoder representation.
- * @param {{bitPosition: number, write: Function}} sink Bit writer or counter.
- * @param {number} [count] Number of values to write.
- * @returns {number} Number of bits written.
- */
-export function writeHuffman(table, values, sink, count = values.length) {
-  const start = sink.bitPosition
-  visitSymbols(table, values, count, (symbol) => {
-    if (symbol >= table.codes.length) {
-      throw new RangeError('Missing ATRAC3 Huffman codeword')
-    }
-    sink.write(table.codes[symbol], table.bitLengths[symbol])
-  })
-  return sink.bitPosition - start
 }
 
 /**
@@ -176,6 +131,52 @@ function reconstructionRank(symbol, wordLength) {
   const negativeStart = mask - stepCount + 1
   if (symbol >= negativeStart) return symbol - (mask - stepCount * 2)
   throw new RangeError('Invalid ATRAC3 spectral symbol')
+}
+
+export const HUFFMAN_FAMILIES = Object.freeze([
+  primaryHuffmanFamily,
+  secondaryHuffmanFamily,
+  primaryHuffmanFamily,
+  secondaryHuffmanFamily,
+])
+
+/**
+ * Measure the exact Huffman cost of a symbol run.
+ *
+ * @param {object} table One word-length table from {@link HUFFMAN_FAMILIES}.
+ * @param {ArrayLike<number>} values Signed symbols in encoder representation.
+ * @param {number} [count] Number of values to traverse.
+ * @returns {number} Required codeword bits.
+ */
+export function measureHuffmanBits(table, values, count = values.length) {
+  let bits = 0
+  visitSymbols(table, values, count, (symbol) => {
+    if (symbol >= table.bitLengths.length) {
+      throw new RangeError('Missing ATRAC3 Huffman codeword')
+    }
+    bits += table.bitLengths[symbol]
+  })
+  return bits
+}
+
+/**
+ * Write a Huffman symbol run using the table's grouping rule.
+ *
+ * @param {object} table One word-length Huffman table.
+ * @param {ArrayLike<number>} values Signed symbols in encoder representation.
+ * @param {{bitPosition: number, write: Function}} sink Bit writer or counter.
+ * @param {number} [count] Number of values to write.
+ * @returns {number} Number of bits written.
+ */
+export function writeHuffman(table, values, sink, count = values.length) {
+  const start = sink.bitPosition
+  visitSymbols(table, values, count, (symbol) => {
+    if (symbol >= table.codes.length) {
+      throw new RangeError('Missing ATRAC3 Huffman codeword')
+    }
+    sink.write(table.codes[symbol], table.bitLengths[symbol])
+  })
+  return sink.bitPosition - start
 }
 
 /**

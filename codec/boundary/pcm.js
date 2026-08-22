@@ -8,6 +8,19 @@ import {
 } from '../core/constants.js'
 import { float32Add, float32ToBits } from '../utils.js'
 
+/**
+ * Write one four-character RIFF identifier.
+ *
+ * @param {Uint8Array} output
+ * @param {number} offset
+ * @param {string} value
+ */
+function writeFourCc(output, offset, value) {
+  for (let index = 0; index < 4; index++) {
+    output[offset + index] = value.charCodeAt(index)
+  }
+}
+
 export const PCM_SCALE = 32768
 
 /**
@@ -55,19 +68,6 @@ export function floatToPcm16(sample) {
   if (Number.isNaN(sample) || sample <= -32767) return -32767
   const roundedBits = float32ToBits(float32Add(sample, 12582912))
   return (roundedBits << 16) >> 16
-}
-
-/**
- * Write one four-character RIFF identifier.
- *
- * @param {Uint8Array} output
- * @param {number} offset
- * @param {string} value
- */
-function writeFourCc(output, offset, value) {
-  for (let index = 0; index < 4; index++) {
-    output[offset + index] = value.charCodeAt(index)
-  }
 }
 
 /**

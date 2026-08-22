@@ -49,9 +49,6 @@ import { absoluteMaximum, float32Add, float32Multiply } from '../utils.js'
 /** @import { SoundUnitAllocationScratch } from '../state/encoder.js' */
 /** @import { GainRecord } from '../state/gain.js' */
 
-/** Expected rejection of one speculative sound-unit candidate. */
-export class SoundUnitCandidateError extends RangeError {}
-
 const maximumWordLengthThresholds = new Float32Array(
   ALLOCATION_BAND_COUNT
 ).fill(WORD_LENGTH_LIMIT)
@@ -1060,6 +1057,9 @@ function measureCandidateError(block, source, allocationScratch) {
   }
   return score
 }
+
+/** Expected rejection of one speculative sound-unit candidate. */
+export class SoundUnitCandidateError extends RangeError {}
 
 /**
  * Allocate one detached 132 kbps policy candidate, including optional tone

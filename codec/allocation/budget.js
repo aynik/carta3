@@ -34,65 +34,6 @@ function bandMaximum(spectrum, band) {
 }
 
 /**
- * Compute the energy-dependent primary joint-layer seed budget.
- *
- * @param {object[]} layers Two transformed layered-channel states.
- * @param {number} bytesPerLayer Nominal half-frame byte span.
- * @param {object} jointStereo Selected joint-stereo hints and history.
- * @param {number} candidateBandLimit Shared active-band ceiling.
- * @returns {number} Seed bit budget for the primary layer.
- */
-export function jointPrimaryBitBudget(
-  layers,
-  bytesPerLayer,
-  jointStereo,
-  candidateBandLimit
-) {
-  let primaryBand =
-    Math.min(layers[0].scaleFactorBandLimit, candidateBandLimit) - 1
-  primaryBand = Math.min(primaryBand, 0x12)
-  let primaryEnergy = 0
-  for (let band = primaryBand; band >= 0; band--) {
-    const width =
-      QUANTIZATION_UNIT_OFFSETS[band + 1] - QUANTIZATION_UNIT_OFFSETS[band]
-    primaryEnergy += bandMaximum(layers[0].spectrum, band) * width
-  }
-
-  let secondaryEnergy = 0
-  const secondaryBandLimit = Math.min(
-    layers[1].scaleFactorBandLimit,
-    candidateBandLimit
-  )
-  for (let band = 0; band < secondaryBandLimit; band++) {
-    const width =
-      QUANTIZATION_UNIT_OFFSETS[band + 1] - QUANTIZATION_UNIT_OFFSETS[band]
-    secondaryEnergy += bandMaximum(layers[1].spectrum, band) * width
-  }
-
-  const primaryDefault = layers[0].bitBudget | 0
-  const targetBudget = (bytesPerLayer << 4) - 0x3b
-  const mode = jointStereo.absoluteModeHints[0]
-  let scaledSecondaryEnergy = secondaryEnergy + secondaryEnergy
-  if (mode !== 3) scaledSecondaryEnergy += scaledSecondaryEnergy
-  if (
-    Number.isNaN(scaledSecondaryEnergy) ||
-    scaledSecondaryEnergy < 1 ||
-    (mode !== 3 && scaledSecondaryEnergy < 4)
-  ) {
-    return targetBudget
-  }
-  if (scaledSecondaryEnergy > 0) {
-    const interpolation = Math.max(
-      0,
-      Math.min(1, (primaryEnergy / scaledSecondaryEnergy - 3) / 9)
-    )
-    const shift = Math.trunc((targetBudget - primaryDefault) * interpolation)
-    return primaryDefault + (shift & ~7)
-  }
-  return targetBudget
-}
-
-/**
  * Build one masking curve from the energy evidence of both source layers.
  *
  * @param {object[]} layers
@@ -156,6 +97,65 @@ function uniqueShiftFrontier(seed) {
     if (!frontier.includes(candidate)) frontier.push(candidate)
   }
   return frontier
+}
+
+/**
+ * Compute the energy-dependent primary joint-layer seed budget.
+ *
+ * @param {object[]} layers Two transformed layered-channel states.
+ * @param {number} bytesPerLayer Nominal half-frame byte span.
+ * @param {object} jointStereo Selected joint-stereo hints and history.
+ * @param {number} candidateBandLimit Shared active-band ceiling.
+ * @returns {number} Seed bit budget for the primary layer.
+ */
+export function jointPrimaryBitBudget(
+  layers,
+  bytesPerLayer,
+  jointStereo,
+  candidateBandLimit
+) {
+  let primaryBand =
+    Math.min(layers[0].scaleFactorBandLimit, candidateBandLimit) - 1
+  primaryBand = Math.min(primaryBand, 0x12)
+  let primaryEnergy = 0
+  for (let band = primaryBand; band >= 0; band--) {
+    const width =
+      QUANTIZATION_UNIT_OFFSETS[band + 1] - QUANTIZATION_UNIT_OFFSETS[band]
+    primaryEnergy += bandMaximum(layers[0].spectrum, band) * width
+  }
+
+  let secondaryEnergy = 0
+  const secondaryBandLimit = Math.min(
+    layers[1].scaleFactorBandLimit,
+    candidateBandLimit
+  )
+  for (let band = 0; band < secondaryBandLimit; band++) {
+    const width =
+      QUANTIZATION_UNIT_OFFSETS[band + 1] - QUANTIZATION_UNIT_OFFSETS[band]
+    secondaryEnergy += bandMaximum(layers[1].spectrum, band) * width
+  }
+
+  const primaryDefault = layers[0].bitBudget | 0
+  const targetBudget = (bytesPerLayer << 4) - 0x3b
+  const mode = jointStereo.absoluteModeHints[0]
+  let scaledSecondaryEnergy = secondaryEnergy + secondaryEnergy
+  if (mode !== 3) scaledSecondaryEnergy += scaledSecondaryEnergy
+  if (
+    Number.isNaN(scaledSecondaryEnergy) ||
+    scaledSecondaryEnergy < 1 ||
+    (mode !== 3 && scaledSecondaryEnergy < 4)
+  ) {
+    return targetBudget
+  }
+  if (scaledSecondaryEnergy > 0) {
+    const interpolation = Math.max(
+      0,
+      Math.min(1, (primaryEnergy / scaledSecondaryEnergy - 3) / 9)
+    )
+    const shift = Math.trunc((targetBudget - primaryDefault) * interpolation)
+    return primaryDefault + (shift & ~7)
+  }
+  return targetBudget
 }
 
 /**

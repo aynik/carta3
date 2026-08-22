@@ -13,6 +13,61 @@ import {
 } from '../core/constants.js'
 import { resolveProfile } from '../core/profiles.js'
 
+/** Shared current/prior decoder header history. */
+class DecoderHeaderState {
+  /**
+   * Derive initial header history from one resolved profile.
+   *
+   * @param {object} profile Immutable decoder profile.
+   */
+  constructor(profile) {
+    this.jointStereoLayout = profile.bitrateKbps === 66
+    this.gainScaleSelectors = new Uint8Array([3, 3, 3, 3])
+    this.pairScaleIndex = -1
+    this.unitMode = DECODER_UNIT_MODE_DEFAULT
+    this.previousGainScaleSelectors = new Uint8Array([3, 3, 3, 3])
+    this.previousPairScaleIndex = -1
+    this.previousUnitMode = DECODER_UNIT_MODE_DEFAULT
+    this.stepBytes = this.jointStereoLayout
+      ? profile.bytesPerFrame
+      : profile.bytesPerFrame / MAX_CHANNELS
+  }
+
+  /**
+   * Copy this header history into existing destination storage.
+   *
+   * @param {DecoderHeaderState} destination
+   * @returns {DecoderHeaderState}
+   */
+  copyTo(destination) {
+    destination.jointStereoLayout = this.jointStereoLayout
+    destination.gainScaleSelectors.set(this.gainScaleSelectors)
+    destination.pairScaleIndex = this.pairScaleIndex
+    destination.unitMode = this.unitMode
+    destination.previousGainScaleSelectors.set(this.previousGainScaleSelectors)
+    destination.previousPairScaleIndex = this.previousPairScaleIndex
+    destination.previousUnitMode = this.previousUnitMode
+    destination.stepBytes = this.stepBytes
+    return destination
+  }
+
+  /**
+   * Advance shared-layout chronology from one successfully decoded header.
+   *
+   * @param {PendingJointHeader} pending Validated current-frame header.
+   * @returns {DecoderHeaderState} This advanced header history.
+   */
+  advanceFrom(pending) {
+    this.previousGainScaleSelectors.set(this.gainScaleSelectors)
+    this.previousPairScaleIndex = this.pairScaleIndex
+    this.previousUnitMode = this.unitMode
+    this.gainScaleSelectors.set(pending.gainScaleSelectors)
+    this.pairScaleIndex = pending.pairScaleIndex
+    this.unitMode = pending.unitMode
+    return this
+  }
+}
+
 /** Fixed-capacity sentinel-terminated decoded gain-pair table. */
 export class GainPairTable {
   /** Allocate an inactive table with an explicit terminal sentinel. */
@@ -140,61 +195,6 @@ export class JointStereoMix {
     this.previousPairs = new Float32Array(scaleCount)
     this.pairs = new Float32Array(scaleCount)
     this.transitions = new Uint8Array(SUBBAND_COUNT)
-  }
-}
-
-/** Shared current/prior decoder header history. */
-class DecoderHeaderState {
-  /**
-   * Derive initial header history from one resolved profile.
-   *
-   * @param {object} profile Immutable decoder profile.
-   */
-  constructor(profile) {
-    this.jointStereoLayout = profile.bitrateKbps === 66
-    this.gainScaleSelectors = new Uint8Array([3, 3, 3, 3])
-    this.pairScaleIndex = -1
-    this.unitMode = DECODER_UNIT_MODE_DEFAULT
-    this.previousGainScaleSelectors = new Uint8Array([3, 3, 3, 3])
-    this.previousPairScaleIndex = -1
-    this.previousUnitMode = DECODER_UNIT_MODE_DEFAULT
-    this.stepBytes = this.jointStereoLayout
-      ? profile.bytesPerFrame
-      : profile.bytesPerFrame / MAX_CHANNELS
-  }
-
-  /**
-   * Copy this header history into existing destination storage.
-   *
-   * @param {DecoderHeaderState} destination
-   * @returns {DecoderHeaderState}
-   */
-  copyTo(destination) {
-    destination.jointStereoLayout = this.jointStereoLayout
-    destination.gainScaleSelectors.set(this.gainScaleSelectors)
-    destination.pairScaleIndex = this.pairScaleIndex
-    destination.unitMode = this.unitMode
-    destination.previousGainScaleSelectors.set(this.previousGainScaleSelectors)
-    destination.previousPairScaleIndex = this.previousPairScaleIndex
-    destination.previousUnitMode = this.previousUnitMode
-    destination.stepBytes = this.stepBytes
-    return destination
-  }
-
-  /**
-   * Advance shared-layout chronology from one successfully decoded header.
-   *
-   * @param {PendingJointHeader} pending Validated current-frame header.
-   * @returns {DecoderHeaderState} This advanced header history.
-   */
-  advanceFrom(pending) {
-    this.previousGainScaleSelectors.set(this.gainScaleSelectors)
-    this.previousPairScaleIndex = this.pairScaleIndex
-    this.previousUnitMode = this.unitMode
-    this.gainScaleSelectors.set(pending.gainScaleSelectors)
-    this.pairScaleIndex = pending.pairScaleIndex
-    this.unitMode = pending.unitMode
-    return this
   }
 }
 

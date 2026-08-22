@@ -41,24 +41,6 @@ function fillAbsMaxChunks(values, start, chunkLength, output) {
 }
 
 /**
- * Detect an adaptive logarithmic rise and advance detector smoothing.
- *
- * @param {number} value Candidate peak magnitude.
- * @param {number} ceiling Previous running peak.
- * @param {{smoothedRise: number}} state Mutable detector history.
- * @returns {boolean} Whether the current rise triggers an event.
- */
-export function detectGainLogFlux(value, ceiling, state) {
-  const rise =
-    ceiling > 0 && value > ceiling
-      ? Math.max(0, Math.log(value / ceiling) * LOG2_E_F32)
-      : 0
-  const detected = rise > state.smoothedRise + 0.7
-  state.smoothedRise = 0.3 * rise + 0.7 * state.smoothedRise
-  return detected
-}
-
-/**
  * Convert a positive gain ratio to the codec's rounded log2 step.
  *
  * @param {number} value
@@ -344,46 +326,6 @@ function buildGainRecord(seed, peakHistory, levels) {
 }
 
 /**
- * Plan one band's coded gain record without publishing persistent state.
- *
- * @param {Float32Array} spectrum Complete 768-float rolling band slot.
- * @param {GainRecord} previousRecord Prior committed gain record.
- * @param {GainRecord} outputSeed Detached destination seed.
- * @param {GainAnalysisScratch} gainAnalysisScratch
- * @returns {GainRecord|null} Planned record, or `null` when unrepresentable.
- */
-export function planBandGainRecord(
-  spectrum,
-  previousRecord,
-  outputSeed,
-  gainAnalysisScratch
-) {
-  if (spectrum.length < 768) {
-    throw new RangeError('ATRAC3 band gain analysis requires 768 samples')
-  }
-  const detection = detectGainCandidates(
-    spectrum,
-    512,
-    previousRecord,
-    gainAnalysisScratch
-  )
-  if (!detection) return null
-  if (previousRecord.entries === 0 && detection.detectedCount === 0) {
-    outputSeed.entries = 0
-    outputSeed.peakHistory = detection.peakHistory
-    return outputSeed
-  }
-  return buildGainRecord(
-    outputSeed,
-    detection.peakHistory,
-    gainLevelEnvelope(
-      lowerGainCandidates(detection, previousRecord),
-      gainAnalysisScratch.levels
-    )
-  )
-}
-
-/**
  * Measure the strongest prefix excursion around the minimum coded level.
  *
  * @param {GainRecord} record
@@ -426,6 +368,64 @@ function compareSignals(candidate, reference) {
     differenceEnergy += difference * difference
   }
   return { candidateEnergy, differenceEnergy }
+}
+
+/**
+ * Detect an adaptive logarithmic rise and advance detector smoothing.
+ *
+ * @param {number} value Candidate peak magnitude.
+ * @param {number} ceiling Previous running peak.
+ * @param {{smoothedRise: number}} state Mutable detector history.
+ * @returns {boolean} Whether the current rise triggers an event.
+ */
+export function detectGainLogFlux(value, ceiling, state) {
+  const rise =
+    ceiling > 0 && value > ceiling
+      ? Math.max(0, Math.log(value / ceiling) * LOG2_E_F32)
+      : 0
+  const detected = rise > state.smoothedRise + 0.7
+  state.smoothedRise = 0.3 * rise + 0.7 * state.smoothedRise
+  return detected
+}
+
+/**
+ * Plan one band's coded gain record without publishing persistent state.
+ *
+ * @param {Float32Array} spectrum Complete 768-float rolling band slot.
+ * @param {GainRecord} previousRecord Prior committed gain record.
+ * @param {GainRecord} outputSeed Detached destination seed.
+ * @param {GainAnalysisScratch} gainAnalysisScratch
+ * @returns {GainRecord|null} Planned record, or `null` when unrepresentable.
+ */
+export function planBandGainRecord(
+  spectrum,
+  previousRecord,
+  outputSeed,
+  gainAnalysisScratch
+) {
+  if (spectrum.length < 768) {
+    throw new RangeError('ATRAC3 band gain analysis requires 768 samples')
+  }
+  const detection = detectGainCandidates(
+    spectrum,
+    512,
+    previousRecord,
+    gainAnalysisScratch
+  )
+  if (!detection) return null
+  if (previousRecord.entries === 0 && detection.detectedCount === 0) {
+    outputSeed.entries = 0
+    outputSeed.peakHistory = detection.peakHistory
+    return outputSeed
+  }
+  return buildGainRecord(
+    outputSeed,
+    detection.peakHistory,
+    gainLevelEnvelope(
+      lowerGainCandidates(detection, previousRecord),
+      gainAnalysisScratch.levels
+    )
+  )
 }
 
 /**

@@ -114,24 +114,6 @@ function applyLayeredGainRegions(words, unit, pairBase, selector) {
 }
 
 /**
- * Apply an analyzed low-rate gain plan to its detached transform matrix.
- *
- * @param {Uint32Array} words Layered transform image from gain analysis.
- * @returns {Uint32Array} The gain-prepared `words`.
- */
-export function applyLayeredGainScale(words) {
-  if (words?.length < LAYER_WORDS) {
-    throw new RangeError('ATRAC3 layered gain preparation has invalid geometry')
-  }
-  for (let unit = SUBBAND_COUNT - 1; unit >= 0; unit--) {
-    const pairBase = PAIR_BLOCK_BASE_WORD + unit * PAIR_BLOCK_WORDS
-    const selector = words[pairBase + PAIR_BLOCK_GAIN_COUNT_WORD]
-    applyLayeredGainRegions(words, unit, pairBase, selector)
-  }
-  return words
-}
-
-/**
  * Expand one coded gain record into the 64-step intermediate envelope.
  *
  * @param {Int32Array} destination
@@ -154,6 +136,24 @@ function applyRecordSteps(destination, record, endBias, add) {
     }
   }
   return true
+}
+
+/**
+ * Apply an analyzed low-rate gain plan to its detached transform matrix.
+ *
+ * @param {Uint32Array} words Layered transform image from gain analysis.
+ * @returns {Uint32Array} The gain-prepared `words`.
+ */
+export function applyLayeredGainScale(words) {
+  if (words?.length < LAYER_WORDS) {
+    throw new RangeError('ATRAC3 layered gain preparation has invalid geometry')
+  }
+  for (let unit = SUBBAND_COUNT - 1; unit >= 0; unit--) {
+    const pairBase = PAIR_BLOCK_BASE_WORD + unit * PAIR_BLOCK_WORDS
+    const selector = words[pairBase + PAIR_BLOCK_GAIN_COUNT_WORD]
+    applyLayeredGainRegions(words, unit, pairBase, selector)
+  }
+  return words
 }
 
 /**

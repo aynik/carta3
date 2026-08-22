@@ -26,38 +26,6 @@ import {
 import { absoluteMaximum } from '../utils.js'
 
 /**
- * Create one fixed-capacity tone-region syntax entry.
- *
- * @returns {object} Empty region with group and list storage.
- */
-export function createToneRegionEntry() {
-  return {
-    huffmanTableBaseIndex: TONE_WORD_LENGTH,
-    descriptorIndex: TONE_DESCRIPTOR,
-    huffmanTableSetIndex: TONE_TABLE_SET,
-    groupFlags: new Int32Array(4),
-    listCounts: new Int32Array(16),
-    lists: Array.from({ length: 16 }, () => new Uint32Array(7)),
-  }
-}
-
-/**
- * Create one fixed-capacity quantized tone component.
- *
- * @returns {object} Empty tone syntax and coefficient storage.
- */
-export function createToneSpec() {
-  return {
-    start: 0,
-    scaleFactorIndex: 0,
-    coefficients: new Int32Array(8),
-    descriptorIndex: TONE_DESCRIPTOR,
-    wordLength: TONE_WORD_LENGTH,
-    tableIndex: TONE_TABLE_SET,
-  }
-}
-
-/**
  * Select the first tone scale factor strictly above a magnitude.
  *
  * @param {number} value
@@ -146,6 +114,38 @@ function preflight(scaleFactors, count, threshold, existingToneCount) {
     candidates++
   }
   return candidates
+}
+
+/**
+ * Create one fixed-capacity tone-region syntax entry.
+ *
+ * @returns {object} Empty region with group and list storage.
+ */
+export function createToneRegionEntry() {
+  return {
+    huffmanTableBaseIndex: TONE_WORD_LENGTH,
+    descriptorIndex: TONE_DESCRIPTOR,
+    huffmanTableSetIndex: TONE_TABLE_SET,
+    groupFlags: new Int32Array(4),
+    listCounts: new Int32Array(16),
+    lists: Array.from({ length: 16 }, () => new Uint32Array(7)),
+  }
+}
+
+/**
+ * Create one fixed-capacity quantized tone component.
+ *
+ * @returns {object} Empty tone syntax and coefficient storage.
+ */
+export function createToneSpec() {
+  return {
+    start: 0,
+    scaleFactorIndex: 0,
+    coefficients: new Int32Array(8),
+    descriptorIndex: TONE_DESCRIPTOR,
+    wordLength: TONE_WORD_LENGTH,
+    tableIndex: TONE_TABLE_SET,
+  }
 }
 
 /**

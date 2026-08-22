@@ -14,6 +14,32 @@ import {
 import { HUFFMAN_FAMILIES, measureHuffmanBits } from '../syntax/entropy.js'
 
 /**
+ * Truncate a finite f64 to the codec's saturated signed integer domain.
+ *
+ * @param {number} value
+ * @returns {number}
+ */
+function truncateF64ToI32(value) {
+  if (Number.isNaN(value)) return -0x80000000
+  if (value >= 0x7fffffff) return 0x7fffffff
+  if (value <= -0x80000000) return -0x80000000
+  return Math.trunc(value)
+}
+
+/**
+ * Clamp one quantized symbol to the selected mode's signed range.
+ *
+ * @param {number} symbol
+ * @param {number} stepCount
+ * @returns {number}
+ */
+function clampSymbol(symbol, stepCount) {
+  if (symbol > stepCount) return stepCount
+  if (symbol < -stepCount) return -stepCount
+  return symbol
+}
+
+/**
  * Resolve a coded spectral scale-factor index.
  *
  * @param {number} index Six-bit scale-factor index.
@@ -49,32 +75,6 @@ export function quantZeroThreshold(timeFactor, wordLength) {
   return Math.fround(
     ZERO_THRESHOLD_NUMERATORS[clamped] / ZERO_THRESHOLD_DIVISORS[wordLength]
   )
-}
-
-/**
- * Truncate a finite f64 to the codec's saturated signed integer domain.
- *
- * @param {number} value
- * @returns {number}
- */
-function truncateF64ToI32(value) {
-  if (Number.isNaN(value)) return -0x80000000
-  if (value >= 0x7fffffff) return 0x7fffffff
-  if (value <= -0x80000000) return -0x80000000
-  return Math.trunc(value)
-}
-
-/**
- * Clamp one quantized symbol to the selected mode's signed range.
- *
- * @param {number} symbol
- * @param {number} stepCount
- * @returns {number}
- */
-function clampSymbol(symbol, stepCount) {
-  if (symbol > stepCount) return stepCount
-  if (symbol < -stepCount) return -stepCount
-  return symbol
 }
 
 /**

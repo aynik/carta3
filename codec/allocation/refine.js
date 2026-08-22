@@ -38,42 +38,6 @@ function chooseParetoImprovement(selected, candidates) {
 }
 
 /**
- * Measure source energy, peak, and width for every residual band.
- *
- * @param {Float32Array} spectrum Transformed source spectrum.
- * @returns {object[]} Thirty-two source measurement records.
- */
-export function measureResidualBandMeasures(spectrum) {
-  return Array.from({ length: 32 }, (_, band) => {
-    const start = QUANTIZATION_UNIT_OFFSETS[band]
-    const end = QUANTIZATION_UNIT_OFFSETS[band + 1]
-    let energy = 0
-    let peak = 0
-    for (let coefficient = start; coefficient < end; coefficient++) {
-      const sample = Math.fround(spectrum[coefficient])
-      const square = sample * sample
-      energy += square
-      if (square > peak) peak = square
-    }
-    return { energy, peak, width: end - start }
-  })
-}
-
-/**
- * Capture source evidence used to judge equal-rate mode exchange.
- *
- * @param {object} layer Transaction-local transformed layer state.
- * @returns {object} Source energies and masking thresholds.
- */
-export function createResidualQualityProfile(layer) {
-  const bands = measureResidualBandMeasures(layer.spectrum)
-  return {
-    sourceEnergy: Float64Array.from(bands, (band) => band.energy),
-    maskThresholds: buildMaskFromBandMeasures(bands),
-  }
-}
-
-/**
  * Enumerate feasible adjacent residual-mode moves.
  *
  * @param {object} allocation
@@ -216,6 +180,42 @@ function selectModeProposal(
     }
   }
   return selected
+}
+
+/**
+ * Measure source energy, peak, and width for every residual band.
+ *
+ * @param {Float32Array} spectrum Transformed source spectrum.
+ * @returns {object[]} Thirty-two source measurement records.
+ */
+export function measureResidualBandMeasures(spectrum) {
+  return Array.from({ length: 32 }, (_, band) => {
+    const start = QUANTIZATION_UNIT_OFFSETS[band]
+    const end = QUANTIZATION_UNIT_OFFSETS[band + 1]
+    let energy = 0
+    let peak = 0
+    for (let coefficient = start; coefficient < end; coefficient++) {
+      const sample = Math.fround(spectrum[coefficient])
+      const square = sample * sample
+      energy += square
+      if (square > peak) peak = square
+    }
+    return { energy, peak, width: end - start }
+  })
+}
+
+/**
+ * Capture source evidence used to judge equal-rate mode exchange.
+ *
+ * @param {object} layer Transaction-local transformed layer state.
+ * @returns {object} Source energies and masking thresholds.
+ */
+export function createResidualQualityProfile(layer) {
+  const bands = measureResidualBandMeasures(layer.spectrum)
+  return {
+    sourceEnergy: Float64Array.from(bands, (band) => band.energy),
+    maskThresholds: buildMaskFromBandMeasures(bands),
+  }
 }
 
 /**
