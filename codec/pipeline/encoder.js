@@ -20,6 +20,7 @@ import {
   LAYER_PROFILE_CONFIGURATION,
 } from '../core/tables.js'
 import { scalePcmFrame } from '../io/pcm.js'
+import { beginEncoderFrame, commitEncoderFrame } from '../state/stream.js'
 import { pipe } from '../utils.js'
 
 /** Identify a failed pre-transform sound-unit phase and channel. */
@@ -59,178 +60,6 @@ export function validateFrame() {
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Transaction capture stage.
  */
-function beginIndependent(context) {
-  const encoder = context.bufferPool.encoder
-  const histories = encoder.state.independentChannels
-  const work = encoder.frame.analysisWork
-  const blocks = encoder.frame.channelBlocks
-  const previousGainRecords = histories.map((history) => history.gainRecords)
-  return (frame) => {
-    for (let channel = 0; channel < 2; channel++) {
-      histories[channel].stageTo(work[channel])
-      blocks[channel].reset()
-    }
-    frame.analysisWork = work
-    frame.channelBlocks = blocks
-    frame.previousGainRecords = previousGainRecords
-    return frame
-  }
-}
-
-/**
- * Advance the four-band QMF histories for both frame-transaction channels.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Independent band analysis.
- */
-
-/**
- * Choose exact sound-unit syntax without publishing persistent state.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Allocation stage.
- */
-
-/**
- * Pack the complete stereo frame after all coding decisions are final.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Wire-publication stage.
- */
-
-/**
- * Publish all histories only after the complete frame has packed.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): Uint8Array} Atomic commit stage.
- */
-function commitIndependent(context) {
-  const encoder = context.bufferPool.encoder
-  const histories = encoder.state.independentChannels
-  return (frame) => {
-    for (let channel = 0; channel < 2; channel++) {
-      histories[channel].commitFrom(
-        frame.analysisWork[channel],
-        frame.channelBlocks[channel].gainRecords
-      )
-    }
-    return frame.output.slice()
-  }
-}
-
-/**
- * Capture layered states and shared stereo history into the frame transaction.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Layer transaction stage.
- */
-export function beginLayered(context) {
-  const encoder = context.bufferPool.encoder
-  const histories = encoder.state.layeredHistories
-  const work = encoder.frame.layeredWork
-  const jointHistory = encoder.state.jointStereoHistory
-  const jointWork = encoder.frame.jointStereoWork
-  return (frame) => {
-    for (let layer = 0; layer < 2; layer++) {
-      histories[layer].stageTo(work[layer])
-    }
-    jointHistory.stageTo(jointWork)
-    frame.layers = work
-    frame.jointStereo = jointWork
-    return frame
-  }
-}
-
-/**
- * Run the stateful low-rate QMF over the complete stereo transaction.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Layered band analysis.
- */
-
-/**
- * Select a shared 66 kbps budget without writing the frame buffer.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Joint allocation operation.
- */
-
-/**
- * Pack completed layers into their final independent or shared spans.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Layer packing stage.
- */
-
-/**
- * Publish both layered histories only after successful packing.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): Uint8Array} Layer commit stage.
- */
-export function commitLayered(context) {
-  const encoder = context.bufferPool.encoder
-  const histories = encoder.state.layeredHistories
-  const jointHistory = encoder.state.jointStereoHistory
-  return (frame) => {
-    for (let layer = 0; layer < 2; layer++) {
-      histories[layer].commitFrom(frame.layers[layer])
-    }
-    jointHistory.commitFrom(frame.jointStereo)
-    return frame.output.slice()
-  }
-}
-
-/**
- * Select the detached transaction for the configured profile.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Transaction stage.
- */
-export function beginTransaction(context) {
-  return context.profile.bitrateKbps === 132
-    ? beginIndependent(context)
-    : beginLayered(context)
-}
-
-/**
- * Build the gain-adjusted independent spectrum.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Spectrum application.
- */
-
-/**
- * Compose layered allocation and shared finalization.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Allocation application.
- */
-
-/**
- * Publish selected sound-unit candidates as final syntax.
- *
- * @returns {function(EncoderFrame): EncoderFrame} Quantization operation.
- */
-
-/**
- * Select byte packing for the configured profile.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Packing stage.
- */
-
-/**
- * Select atomic state publication for the configured profile.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): Uint8Array} Commit stage.
- */
-export function commitFrame(context) {
-  return context.profile.bitrateKbps === 132
-    ? commitIndependent(context)
-    : commitLayered(context)
-}
 
 /**
  * Count the residual-band prefix covering one coefficient limit.
@@ -317,12 +146,12 @@ function createCodecEncoder(options = {}, bufferPool = new BufferPool()) {
   return pipe(
     context,
     validateFrame,
-    beginTransaction,
+    beginEncoderFrame,
     analyze,
     allocate,
     quantize,
     pack,
-    commitFrame
+    commitEncoderFrame
   )
 }
 

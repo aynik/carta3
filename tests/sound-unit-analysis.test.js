@@ -23,12 +23,9 @@ import {
 import { allocate } from '../codec/allocation/stage.js'
 import { pack } from '../codec/packing.js'
 import { quantize } from '../codec/quantization/stage.js'
-import {
-  beginTransaction,
-  encode,
-  validateFrame,
-} from '../codec/pipeline/encoder.js'
+import { encode, validateFrame } from '../codec/pipeline/encoder.js'
 import { IndependentChannelHistory } from '../codec/state/encoder.js'
+import { beginEncoderFrame } from '../codec/state/stream.js'
 
 /**
  * Test helper for context.
@@ -51,7 +48,7 @@ function context() {
  */
 function beginFrame(codec, channels) {
   let frame = validateFrame()(channels)
-  frame = beginTransaction(codec)(frame)
+  frame = beginEncoderFrame(codec)(frame)
   frame = analyzeBands(codec)(frame)
   return frame
 }
