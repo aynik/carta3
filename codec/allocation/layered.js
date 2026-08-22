@@ -7,8 +7,7 @@
  */
 
 import { measureResidualBand } from './residual.js'
-import { quantizeResidualSymbols } from '../quantization/symbols/residual.js'
-import { AllocationWorkMut, AllocationWorkView } from '../state/allocation.js'
+import { AllocationWorkMut } from '../state/allocation.js'
 import {
   BITS_PER_SPECTRUM_BY_MODE,
   QUANTIZATION_UNIT_OFFSETS,
@@ -713,30 +712,4 @@ export function allocateLayeredResidual(
   const refined = refineResidualAllocation(layer, bitBudget, primary, converged)
   publishAllocation(layer, refined.allocation, work)
   return refined.codedBits
-}
-
-/**
- * Materialize one layer's retained residual symbols.
- *
- * @param {object} layer Transaction-local transformed layer state.
- * @param {Int32Array} work Completed allocation word image.
- * @param {Int32Array} output Caller-owned retained symbol storage.
- * @returns {Int32Array} `output` after quantization.
- */
-export function quantizeLayeredResidual(layer, work, output) {
-  const allocation = new AllocationWorkView(work)
-  output.fill(0)
-  for (let band = 0; band < allocation.activeBandCount; band++) {
-    const mode = allocation.mode(band)
-    if (mode !== 0) {
-      quantizeResidualSymbols(
-        layer.spectrum,
-        band,
-        mode,
-        allocation.scaleFactor(band),
-        output
-      )
-    }
-  }
-  return output
 }

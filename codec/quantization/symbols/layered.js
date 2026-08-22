@@ -1,6 +1,33 @@
 /** Carta3 layered retained-symbol materialization. */
 
-import { quantizeLayeredResidual } from '../../allocation/layered.js'
+import { AllocationWorkView } from '../../state/allocation.js'
+import { quantizeResidualSymbols } from './residual.js'
+
+/**
+ * Materialize one layer's retained residual symbols.
+ *
+ * @param {object} layer Transaction-local transformed layer state.
+ * @param {Int32Array} work Completed allocation word image.
+ * @param {Int32Array} output Caller-owned retained symbol storage.
+ * @returns {Int32Array} `output` after quantization.
+ */
+export function quantizeLayeredResidual(layer, work, output) {
+  const allocation = new AllocationWorkView(work)
+  output.fill(0)
+  for (let band = 0; band < allocation.activeBandCount; band++) {
+    const mode = allocation.mode(band)
+    if (mode !== 0) {
+      quantizeResidualSymbols(
+        layer.spectrum,
+        band,
+        mode,
+        allocation.scaleFactor(band),
+        output
+      )
+    }
+  }
+  return output
+}
 
 /**
  * Materialize both layers' retained residual symbols.

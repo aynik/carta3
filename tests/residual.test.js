@@ -3,10 +3,7 @@ import {
   initialResidualBandLimit,
   measureResidualSource,
 } from '../codec/allocation/source.js'
-import {
-  allocateLayeredResidual,
-  quantizeLayeredResidual,
-} from '../codec/allocation/layered.js'
+import { allocateLayeredResidual } from '../codec/allocation/layered.js'
 import {
   createResidualQualityProfile,
   refineResidual,
@@ -27,6 +24,7 @@ import {
   residualCodebook,
   residualQuantGroupScale,
 } from '../codec/quantization/symbols/residual.js'
+import { quantizeLayeredResidual } from '../codec/quantization/symbols/layered.js'
 import { BitCounter } from '../codec/syntax/bitstream.js'
 import { writeResidualBand } from '../codec/syntax/residual.js'
 import {
