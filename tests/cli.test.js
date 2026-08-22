@@ -3,8 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createProgram, main } from '../bin/cli.js'
-import { createPcmWave } from '../codec/io/serialization.js'
-import { PCM_SCALE } from '../codec/io/pcm.js'
+import { createPcmWave, PCM_SCALE } from '../codec/boundary/pcm.js'
 import { parseWave } from '../codec/boundary/container.js'
 
 /**

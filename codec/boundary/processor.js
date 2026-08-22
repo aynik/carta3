@@ -12,7 +12,7 @@ import {
   encodeWavePcm,
 } from '../io/wave-encoder.js'
 import { createWaveHeader, parseWave } from './container.js'
-import { createPcmWave } from '../io/serialization.js'
+import { createPcmWave } from './pcm.js'
 
 /** High-level streaming audio processor facade. */
 export class AudioProcessor {

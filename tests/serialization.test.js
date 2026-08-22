@@ -4,7 +4,7 @@ import {
   createPcmWave,
   createPcmWaveHeader,
   interleavePcm16,
-} from '../codec/io/serialization.js'
+} from '../codec/boundary/pcm.js'
 
 describe('ATRAC3 PCM serialization', () => {
   it('matches the codec float-to-PCM saturation and rounding contract', () => {

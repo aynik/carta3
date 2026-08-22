@@ -19,7 +19,7 @@ import {
   LAYER_BAND_OFFSETS,
   LAYER_PROFILE_CONFIGURATION,
 } from '../core/tables.js'
-import { scalePcmFrame } from '../io/pcm.js'
+import { scalePcmFrame } from '../boundary/pcm.js'
 import { beginEncoderFrame, commitEncoderFrame } from '../state/stream.js'
 import { pipe } from '../utils.js'
 

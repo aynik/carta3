@@ -30,8 +30,8 @@ import { createWaveHeader } from '../codec/boundary/container.js'
 import {
   createPcmWaveHeader,
   interleavePcm16,
-} from '../codec/io/serialization.js'
-import { PCM_SCALE } from '../codec/io/pcm.js'
+  PCM_SCALE,
+} from '../codec/boundary/pcm.js'
 
 /**
  * Format a duration in seconds as MM:SS.
