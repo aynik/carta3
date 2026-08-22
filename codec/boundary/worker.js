@@ -11,7 +11,7 @@ import {
   createWaveStreamingDecoder,
   createWaveStreamingEncoder,
 } from './stream.js'
-import { createWaveHeader, parseWave } from '../boundary/container.js'
+import { createWaveHeader, parseWave } from './container.js'
 import { createPcmWaveHeader, interleavePcm16 } from './pcm.js'
 
 /**

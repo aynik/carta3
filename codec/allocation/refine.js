@@ -7,7 +7,7 @@ import {
   measureResidualScaleNeighbors,
 } from './residual.js'
 import { QUANTIZATION_UNIT_OFFSETS } from '../core/tables.js'
-import { buildMaskFromBandMeasures } from '../allocation/distortion.js'
+import { buildMaskFromBandMeasures } from './distortion.js'
 
 /**
  * Select a no-more-bits candidate that strictly lowers error.

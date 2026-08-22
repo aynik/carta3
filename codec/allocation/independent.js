@@ -38,12 +38,12 @@ import {
   countSoundUnitBits,
   countSoundUnitFixedBits,
 } from '../syntax/unit/writer/independent.js'
-import { extractMultitone } from '../allocation/tones.js'
+import { extractMultitone } from './tones.js'
 import {
   buildReconstructionMask,
   measureBandReconstructionNoise,
   measureBandOptionReconstructionNoise,
-} from '../allocation/distortion.js'
+} from './distortion.js'
 import { absoluteMaximum, float32Add, float32Multiply } from '../utils.js'
 
 /** @import { SoundUnitAllocationScratch } from '../state/encoder.js' */

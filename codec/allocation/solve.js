@@ -1,14 +1,14 @@
 /** Carta3 construction-selected allocation solver. */
 
-import { measureResidualSource } from '../allocation/source.js'
-import { allocateSoundUnitCandidates } from '../allocation/independent.js'
-import { allocateJointLayers } from '../allocation/budget.js'
+import { measureResidualSource } from './source.js'
+import { allocateSoundUnitCandidates } from './independent.js'
+import { allocateJointLayers } from './budget.js'
 import {
   applyResidualProposal,
   createResidualQualityProfile,
   refineResidual,
-} from '../allocation/refine.js'
-import { allocateLayeredResidual } from '../allocation/layered.js'
+} from './refine.js'
+import { allocateLayeredResidual } from './layered.js'
 import { PAIR_BLOCK_GAIN_COUNT_WORD } from '../core/constants.js'
 import { selectEncoderMode } from '../core/profiles.js'
 import { countLayeredChannelBits } from '../syntax/unit/writer/layered.js'
