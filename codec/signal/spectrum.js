@@ -42,6 +42,8 @@ import {
   float32ToBits,
 } from '../utils.js'
 
+/** @import { MdctScratch } from '../state/encoder.js' */
+
 // Preserve the readable table shape without pair iteration in the hot loop.
 const bitReverseIndices = Uint8Array.from(MDCT_BIT_REVERSE_PAIRS.flat())
 

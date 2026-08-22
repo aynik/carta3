@@ -46,6 +46,7 @@ import {
 } from '../allocation/distortion.js'
 import { absoluteMaximum, float32Add, float32Multiply } from '../utils.js'
 
+/** @import { SoundUnitAllocationScratch } from '../state/encoder.js' */
 /** @import { GainRecord } from '../state/gain.js' */
 
 /** Expected rejection of one speculative sound-unit candidate. */

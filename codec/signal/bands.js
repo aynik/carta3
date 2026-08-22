@@ -38,6 +38,8 @@ import {
 } from '../core/tables.js'
 import { float32Add, float32Multiply } from '../utils.js'
 
+/** @import { IndependentQmfScratch } from '../state/encoder.js' */
+
 /**
  * Locate a subband's oldest gain-analysis half in the 132 kbps work image.
  *

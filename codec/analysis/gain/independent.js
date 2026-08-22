@@ -19,6 +19,7 @@ import { reconstructGainPairSignal } from '../../signal/gain.js'
 import { bandGainOffset } from '../../signal/bands.js'
 import { absoluteMaximum } from '../../utils.js'
 
+/** @import { GainAnalysisScratch, GainScaleScratch } from '../../state/encoder.js' */
 /** @import { GainRecord } from '../../state/gain.js' */
 
 /**

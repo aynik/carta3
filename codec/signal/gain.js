@@ -26,6 +26,9 @@ import {
   INVERSE_TRANSFORM_SCALES,
 } from '../core/tables.js'
 
+/** @import { GainScaleScratch } from '../state/encoder.js' */
+/** @import { GainRecord } from '../state/gain.js' */
+
 const LAYER_GAIN_ROW_OFFSETS = Object.freeze([0, 4, 8, 12, 16, 20, 24, 28])
 
 /**
