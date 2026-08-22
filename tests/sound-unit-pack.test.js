@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { GainRecord } from '../codec/coding/gain.js'
+import { GainRecord } from '../codec/syntax/gain.js'
 import {
   countSoundUnitBits,
   countSoundUnitFixedBits,
   packSoundUnit,
-} from '../codec/io/sound-unit.js'
-import { BitReader } from '../codec/io/bitstream.js'
+} from '../codec/syntax/unit/writer/independent.js'
+import { BitReader } from '../codec/syntax/bitstream.js'
 
 /**
  * Test helper for minimalSyntax.

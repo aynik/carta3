@@ -1,20 +1,20 @@
 /** Carta3 Audio Codec - Transactional channel syntax decoding. */
 
-import { readHuffmanRun } from '../coding/entropy.js'
-import { FRAME_SAMPLES } from '../core/constants.js'
+import { readHuffmanRun } from '../entropy.js'
+import { FRAME_SAMPLES } from '../../core/constants.js'
 import {
   QUANTIZATION_UNIT_OFFSETS,
   SPECTRAL_SCALE_FACTORS,
-} from '../core/tables.js'
-import { BitReader } from './bitstream.js'
+} from '../../core/tables.js'
+import { BitReader } from '../bitstream.js'
 import {
   SpectrumAllocation,
   ToneItemHeader,
   ToneListCount,
   ToneRegionHeader,
   ToneSectionHeader,
-} from './syntax.js'
-import { float32Add, float32Multiply } from '../utils.js'
+} from '../records.js'
+import { float32Add, float32Multiply } from '../../utils.js'
 
 /**
  * Decode pair-block gain tables for all active transform units.

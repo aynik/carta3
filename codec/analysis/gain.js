@@ -6,7 +6,7 @@
  * either channel's plan.
  */
 
-import { gainRecordBits } from '../coding/gain.js'
+import { gainRecordBits } from '../syntax/gain.js'
 import {
   ATTACK_CANDIDATE_COUNT,
   BAND_PART_FLOATS,

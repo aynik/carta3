@@ -1,6 +1,6 @@
 /** Carta3 Audio Codec - Sound-unit tone analysis and coding. */
 
-import { HUFFMAN_FAMILIES, measureHuffmanBits } from './entropy.js'
+import { HUFFMAN_FAMILIES, measureHuffmanBits } from '../syntax/entropy.js'
 import {
   scaleFactorIndexForAbs,
   spectralScaleForIndex,

@@ -10,7 +10,7 @@ import {
 } from '../coding/finalization.js'
 import { allocateLayeredResidual } from '../coding/layered.js'
 import { PAIR_BLOCK_GAIN_COUNT_WORD } from '../core/constants.js'
-import { countLayeredChannelBits } from '../io/layered-channel.js'
+import { countLayeredChannelBits } from '../syntax/unit/writer/layered.js'
 import { pipe } from '../utils.js'
 
 /**

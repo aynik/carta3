@@ -1,7 +1,7 @@
 /** Carta3 byte-packing stage. */
 
-import { packLayeredChannel } from './io/layered-channel.js'
-import { packSoundUnit } from './io/sound-unit.js'
+import { packLayeredChannel } from './syntax/unit/writer/layered.js'
+import { packSoundUnit } from './syntax/unit/writer/independent.js'
 
 /**
  * Pack an independent frame after all decisions are final.

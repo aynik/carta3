@@ -1,6 +1,6 @@
 /** Carta3 Audio Codec - Encoder state, frame transactions, and scratch. */
 
-import { GainRecord } from '../coding/gain.js'
+import { GainRecord } from '../syntax/gain.js'
 import {
   ALLOCATION_BAND_COUNT,
   ALLOCATION_WORK_WORDS,

@@ -1,6 +1,6 @@
 /** Carta3 spectral dequantization stage. */
 
-import { reconstructChannelSpectrum } from '../io/channel-decoder.js'
+import { reconstructChannelSpectrum } from '../syntax/unit/reader.js'
 
 /**
  * Reconstruct spectra after both channels pass complete syntax checks.

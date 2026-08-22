@@ -1,13 +1,13 @@
 /** Carta3 Audio Codec - Independent sound-unit costing and emission. */
 
-import { packGainRecords } from '../coding/gain.js'
-import { HUFFMAN_FAMILIES, writeHuffman } from '../coding/entropy.js'
+import { packGainRecords } from '../../gain.js'
+import { HUFFMAN_FAMILIES, writeHuffman } from '../../entropy.js'
 import {
   QUANTIZATION_UNIT_OFFSETS,
   TONE_COEFFICIENT_COUNT_BY_DESCRIPTOR,
   TONE_GROUP_BY_ENTRY,
-} from '../core/tables.js'
-import { BitCounter, BitWriter } from './bitstream.js'
+} from '../../../core/tables.js'
+import { BitCounter, BitWriter } from '../../bitstream.js'
 import {
   IndependentChannelHeader,
   SpectrumAllocation,
@@ -15,7 +15,7 @@ import {
   ToneListCount,
   ToneRegionHeader,
   ToneSectionHeader,
-} from './syntax.js'
+} from '../../records.js'
 
 /**
  * Validate the one-to-four transform-unit syntax geometry.

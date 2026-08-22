@@ -37,7 +37,7 @@ import {
 import {
   countSoundUnitBits,
   countSoundUnitFixedBits,
-} from '../io/sound-unit.js'
+} from '../syntax/unit/writer/independent.js'
 import { extractMultitone } from './tones.js'
 import {
   buildReconstructionMask,

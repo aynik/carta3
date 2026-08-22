@@ -6,7 +6,7 @@ import {
 } from '../codec/coding/allocation.js'
 import { TONE_POLICY_THRESHOLD } from '../codec/core/constants.js'
 import { BufferPool } from '../codec/core/buffers.js'
-import { packSoundUnit } from '../codec/io/sound-unit.js'
+import { packSoundUnit } from '../codec/syntax/unit/writer/independent.js'
 
 /**
  * Test helper for blockFromPool.

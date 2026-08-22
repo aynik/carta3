@@ -32,7 +32,7 @@ import {
   DecoderState,
 } from '../codec/state/decoder.js'
 import { resolveProfile, resolveWaveProfile } from '../codec/core/profiles.js'
-import { BitCounter, BitReader, BitWriter } from '../codec/io/bitstream.js'
+import { BitCounter, BitReader, BitWriter } from '../codec/syntax/bitstream.js'
 import {
   IndependentChannelHeader,
   JointStereoHeader,
@@ -41,7 +41,7 @@ import {
   ToneListCount,
   ToneRegionHeader,
   ToneSectionHeader,
-} from '../codec/io/syntax.js'
+} from '../codec/syntax/records.js'
 
 describe('ATRAC3 profiles and state geometry', () => {
   it.each([

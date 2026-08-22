@@ -3,8 +3,8 @@ import {
   HUFFMAN_FAMILIES,
   measureHuffmanBits,
   writeHuffman,
-} from '../codec/coding/entropy.js'
-import { BitCounter, BitReader, BitWriter } from '../codec/io/bitstream.js'
+} from '../codec/syntax/entropy.js'
+import { BitCounter, BitReader, BitWriter } from '../codec/syntax/bitstream.js'
 
 describe('ATRAC3 grouped Huffman families', () => {
   it('eagerly materializes the exact family geometry', () => {

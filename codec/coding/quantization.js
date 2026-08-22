@@ -11,7 +11,7 @@ import {
   QUANTIZATION_BIAS_SCALE,
   QUANTIZATION_LIMIT_BIAS,
 } from '../core/constants.js'
-import { HUFFMAN_FAMILIES, measureHuffmanBits } from './entropy.js'
+import { HUFFMAN_FAMILIES, measureHuffmanBits } from '../syntax/entropy.js'
 
 /**
  * Resolve a coded spectral scale-factor index.

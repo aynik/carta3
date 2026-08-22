@@ -5,8 +5,8 @@ import {
   packGainRecords,
   readGainRecord,
   validateGainRecord,
-} from '../codec/coding/gain.js'
-import { BitCounter, BitReader, BitWriter } from '../codec/io/bitstream.js'
+} from '../codec/syntax/gain.js'
+import { BitCounter, BitReader, BitWriter } from '../codec/syntax/bitstream.js'
 
 /**
  * Test helper for record.

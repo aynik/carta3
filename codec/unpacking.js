@@ -1,7 +1,10 @@
 /** Carta3 syntax-unpacking stage. */
 
-import { unpackChannelSyntax } from './io/channel-decoder.js'
-import { IndependentChannelHeader, JointStereoHeader } from './io/syntax.js'
+import { unpackChannelSyntax } from './syntax/unit/reader.js'
+import {
+  IndependentChannelHeader,
+  JointStereoHeader,
+} from './syntax/records.js'
 
 /**
  * Reverse the second shared-layout region into decoder-facing order.

@@ -3,18 +3,18 @@
 import {
   writeQuantizedResidualSymbols,
   writeResidualSymbols,
-} from '../coding/residual.js'
-import { AllocationWorkView } from '../coding/work.js'
+} from '../../../coding/residual.js'
+import { AllocationWorkView } from '../../../coding/work.js'
 import {
   PAIR_BLOCK_GAIN_COUNT_WORD,
   PAIR_BLOCK_GAIN_LEVEL_OFFSET,
-} from '../core/constants.js'
-import { BitCounter } from './bitstream.js'
+} from '../../../core/constants.js'
+import { BitCounter } from '../../bitstream.js'
 import {
   IndependentChannelHeader,
   JointStereoHeader,
   SpectrumAllocation,
-} from './syntax.js'
+} from '../../records.js'
 
 /** Bit sink implementing the layered channel's two-byte merge behavior. */
 class LayerBitEmitter {

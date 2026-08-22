@@ -26,11 +26,11 @@ import {
   quantizeResidualCoefficient,
   writeResidualBand,
 } from '../codec/coding/residual.js'
-import { BitCounter } from '../codec/io/bitstream.js'
+import { BitCounter } from '../codec/syntax/bitstream.js'
 import {
   countLayeredChannelBits,
   packLayeredChannel,
-} from '../codec/io/layered-channel.js'
+} from '../codec/syntax/unit/writer/layered.js'
 import { LayerWork, ResidualSourceProfile } from '../codec/state/layered.js'
 
 const numberBits = new DataView(new ArrayBuffer(8))

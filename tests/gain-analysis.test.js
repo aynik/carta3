@@ -4,7 +4,7 @@ import {
   planBandGainRecord,
   planGainContinuityEdit,
 } from '../codec/analysis/gain.js'
-import { GainRecord } from '../codec/coding/gain.js'
+import { GainRecord } from '../codec/syntax/gain.js'
 import { BufferPool } from '../codec/core/buffers.js'
 
 describe('ATRAC3 sound-unit gain analysis', () => {
