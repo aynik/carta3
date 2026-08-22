@@ -27,29 +27,6 @@ function beginIndependent(context) {
 }
 
 /**
- * Capture layered histories into detached frame work.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Layered capture.
- */
-function beginLayered(context) {
-  const encoder = context.bufferPool.encoder
-  const histories = encoder.state.layeredHistories
-  const work = encoder.frame.layeredWork
-  const jointHistory = encoder.state.jointStereoHistory
-  const jointWork = encoder.frame.jointStereoWork
-  return (frame) => {
-    for (let layer = 0; layer < 2; layer++) {
-      histories[layer].stageTo(work[layer])
-    }
-    jointHistory.stageTo(jointWork)
-    frame.layers = work
-    frame.jointStereo = jointWork
-    return frame
-  }
-}
-
-/**
  * Publish independent histories after successful frame packing.
  *
  * @param {EncoderContext} context Pipeline ownership context.
@@ -65,25 +42,6 @@ function commitIndependent(context) {
         frame.channelBlocks[channel].gainRecords
       )
     }
-    return frame.output.slice()
-  }
-}
-
-/**
- * Publish layered histories after successful frame packing.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): Uint8Array} Layered publication.
- */
-function commitLayered(context) {
-  const encoder = context.bufferPool.encoder
-  const histories = encoder.state.layeredHistories
-  const jointHistory = encoder.state.jointStereoHistory
-  return (frame) => {
-    for (let layer = 0; layer < 2; layer++) {
-      histories[layer].commitFrom(frame.layers[layer])
-    }
-    jointHistory.commitFrom(frame.jointStereo)
     return frame.output.slice()
   }
 }
@@ -112,6 +70,48 @@ function commitJointDecoder(decoder) {
     decoder.frame.header.advanceFrom(frame.pendingJointHeader)
     decoder.state.commitFrom(decoder.frame)
     return frame
+  }
+}
+
+/**
+ * Capture layered histories into detached frame work.
+ *
+ * @param {EncoderContext} context Pipeline ownership context.
+ * @returns {function(EncoderFrame): EncoderFrame} Layered capture.
+ */
+export function beginLayered(context) {
+  const encoder = context.bufferPool.encoder
+  const histories = encoder.state.layeredHistories
+  const work = encoder.frame.layeredWork
+  const jointHistory = encoder.state.jointStereoHistory
+  const jointWork = encoder.frame.jointStereoWork
+  return (frame) => {
+    for (let layer = 0; layer < 2; layer++) {
+      histories[layer].stageTo(work[layer])
+    }
+    jointHistory.stageTo(jointWork)
+    frame.layers = work
+    frame.jointStereo = jointWork
+    return frame
+  }
+}
+
+/**
+ * Publish layered histories after successful frame packing.
+ *
+ * @param {EncoderContext} context Pipeline ownership context.
+ * @returns {function(EncoderFrame): Uint8Array} Layered publication.
+ */
+export function commitLayered(context) {
+  const encoder = context.bufferPool.encoder
+  const histories = encoder.state.layeredHistories
+  const jointHistory = encoder.state.jointStereoHistory
+  return (frame) => {
+    for (let layer = 0; layer < 2; layer++) {
+      histories[layer].commitFrom(frame.layers[layer])
+    }
+    jointHistory.commitFrom(frame.jointStereo)
+    return frame.output.slice()
   }
 }
 
