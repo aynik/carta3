@@ -6,12 +6,12 @@ import { resolveProfile } from '../codec/core/profiles.js'
 import { PCM_SCALE, normalizePcm } from '../codec/io/pcm.js'
 import { encodeWavePcm } from '../codec/io/wave-encoder.js'
 import { parseWave } from '../codec/io/wave.js'
+import { dequantize } from '../codec/dequantization/stage.js'
 import { unpack } from '../codec/unpacking.js'
 import {
   beginTransaction,
   commitFrame,
   decode,
-  dequantize,
   synthesize,
   validateFrame,
 } from '../codec/pipeline/decoder.js'

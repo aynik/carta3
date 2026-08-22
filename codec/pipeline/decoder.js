@@ -19,7 +19,6 @@ import {
   RESIDUAL_DELAY_SAMPLES,
 } from '../core/constants.js'
 import { resolveProfile } from '../core/profiles.js'
-import { reconstructChannelSpectrum } from '../io/channel-decoder.js'
 import { normalizePcm } from '../io/pcm.js'
 import { applyInverseGainEnvelope } from '../transforms/gain-scale.js'
 import { applyInverseBlockTransform } from '../transforms/mdct.js'
@@ -41,6 +40,7 @@ import { unpack } from '../unpacking.js'
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(Uint8Array): DecoderFrame} Reusable validation stage.
  */
+import { dequantize } from '../dequantization/stage.js'
 export function validateFrame(context) {
   const bytes = context.profile.bytesPerFrame
   return (input) => {
@@ -79,14 +79,6 @@ export function beginTransaction(context) {
  *
  * @returns {function(DecoderFrame): DecoderFrame} Dequantization stage.
  */
-export function dequantize() {
-  return (frame) => {
-    for (const decoded of frame.decodedChannels) {
-      reconstructChannelSpectrum(decoded)
-    }
-    return frame
-  }
-}
 
 /**
  * Synthesize detached band histories from reconstructed spectra.
