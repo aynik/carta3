@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  initialResidualBandLimit,
-  measureResidualSource,
-} from '../codec/allocation/source.js'
+import { measureResidualSource } from '../codec/allocation/source.js'
 import { allocateLayeredResidual } from '../codec/allocation/layered.js'
 import {
   createResidualQualityProfile,
@@ -175,8 +172,6 @@ describe('ATRAC3 layered residual coding', () => {
     layer.spectrum.set(referenceSpectrum())
     const profile = measureResidualSource(layer, new ResidualSourceProfile())
     expect(sourceProfileHash(profile)).toBe('b720b245f658a5fe')
-    expect(initialResidualBandLimit(profile, 12, 357, true)).toBe(28)
-    expect(initialResidualBandLimit(profile, 12, 357, false)).toBe(12)
   })
 
   it('matches primary and joint-secondary allocation reference images', () => {

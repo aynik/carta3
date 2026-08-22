@@ -83,31 +83,3 @@ export function measureResidualSource(layer, profile) {
   profile.sumRunning = sumRunning
   return profile
 }
-
-/**
- * Select the initial active-band prefix that can fit the residual budget.
- *
- * @param {object} profile Measured residual source profile.
- * @param {number} scaleFactorBandLimit Profile-derived upper band limit.
- * @param {number} bitBudget Available layer bits.
- * @param {boolean} primary Whether this is a primary or independent layer.
- * @returns {number} Initial active band count.
- */
-export function initialResidualBandLimit(
-  profile,
-  scaleFactorBandLimit,
-  bitBudget,
-  primary
-) {
-  let bandLimit = scaleFactorBandLimit | 0
-  if (primary) {
-    for (let band = 0; band < 32; band++) {
-      const threshold = profile.primaryExpansionThresholds[band]
-      if (threshold >= 0 && bitBudget > threshold) {
-        const expansionLimit = band > 0x1a ? Math.min(band + 2, 0x20) : 0x1c
-        bandLimit = Math.max(bandLimit, expansionLimit)
-      }
-    }
-  }
-  return bandLimit
-}
