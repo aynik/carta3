@@ -21,7 +21,7 @@ import {
   residualCodebook,
   residualQuantGroupScale,
 } from '../codec/quantization/symbols/residual.js'
-import { quantizeLayeredResidual } from '../codec/quantization/symbols/layered.js'
+import { quantizeLayered } from '../codec/quantization/symbols/layered.js'
 import { BitCounter } from '../codec/syntax/bitstream.js'
 import { writeResidualBand } from '../codec/syntax/residual.js'
 import {
@@ -166,6 +166,30 @@ function wordImageHash(words) {
   return hash.toString(16).padStart(16, '0')
 }
 
+/**
+ * Materialize one test layer through the public layered quantization operation.
+ *
+ * @param {LayerWork} layer
+ * @param {Int32Array} work
+ * @returns {Int32Array}
+ */
+function materializeResidualSymbols(layer, work) {
+  const symbols = [new Int32Array(1024), new Int32Array(1024)]
+  const context = {
+    bufferPool: {
+      encoder: {
+        frame: { layeredSymbols: symbols },
+      },
+    },
+  }
+  const frame = {
+    layers: [layer, layer],
+    layeredAllocationWork: [work, work],
+  }
+  quantizeLayered(context)(frame)
+  return symbols[0]
+}
+
 describe('ATRAC3 layered residual coding', () => {
   it('matches the residual source-analysis reference image', () => {
     const layer = new LayerWork()
@@ -271,7 +295,7 @@ describe('ATRAC3 layered residual coding', () => {
         mode,
         work
       )
-      const symbols = quantizeLayeredResidual(layer, work, new Int32Array(1024))
+      const symbols = materializeResidualSymbols(layer, work)
       const output = new Uint8Array(bytes)
       const options = {
         previousOutput: 3,

@@ -11,7 +11,7 @@ import { quantizeResidualSymbols } from './residual.js'
  * @param {Int32Array} output Caller-owned retained symbol storage.
  * @returns {Int32Array} `output` after quantization.
  */
-export function quantizeLayeredResidual(layer, work, output) {
+function quantizeResidual(layer, work, output) {
   const allocation = new AllocationWorkView(work)
   output.fill(0)
   for (let band = 0; band < allocation.activeBandCount; band++) {
@@ -39,7 +39,7 @@ export function quantizeLayered(context) {
   const symbols = context.bufferPool.encoder.frame.layeredSymbols
   return (frame) => {
     for (let layer = 0; layer < 2; layer++) {
-      quantizeLayeredResidual(
+      quantizeResidual(
         frame.layers[layer],
         frame.layeredAllocationWork[layer],
         symbols[layer]
