@@ -6,7 +6,7 @@
  */
 
 import { AllocationWorkView } from '../state/allocation.js'
-import { measureResidualBand } from '../coding/residual.js'
+import { measureResidualBand } from './residual.js'
 import { QUANTIZATION_UNIT_OFFSETS } from '../core/tables.js'
 import { allocateLayeredResidual } from './layered.js'
 import { buildMaskFromBandMeasures } from '../allocation/distortion.js'

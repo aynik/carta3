@@ -18,15 +18,17 @@ import {
 } from '../codec/state/allocation.js'
 import { ALLOCATION_RESIDUAL_SPECTRUM_OFFSET } from '../codec/core/constants.js'
 import {
-  residualCodebook,
-  residualQuantGroupScale,
   measureResidualBand,
   measureResidualModeNeighbors,
   measureResidualScaleNeighbors,
+} from '../codec/allocation/residual.js'
+import {
   quantizeResidualCoefficient,
-  writeResidualBand,
-} from '../codec/coding/residual.js'
+  residualCodebook,
+  residualQuantGroupScale,
+} from '../codec/quantization/symbols/residual.js'
 import { BitCounter } from '../codec/syntax/bitstream.js'
+import { writeResidualBand } from '../codec/syntax/residual.js'
 import {
   countLayeredChannelBits,
   packLayeredChannel,

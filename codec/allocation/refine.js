@@ -5,7 +5,7 @@ import {
   measureResidualBand,
   measureResidualModeNeighbors,
   measureResidualScaleNeighbors,
-} from '../coding/residual.js'
+} from './residual.js'
 import { QUANTIZATION_UNIT_OFFSETS } from '../core/tables.js'
 import { buildMaskFromBandMeasures } from '../allocation/distortion.js'
 

@@ -3,7 +3,7 @@
 import {
   writeQuantizedResidualSymbols,
   writeResidualSymbols,
-} from '../../../coding/residual.js'
+} from '../../residual.js'
 import { AllocationWorkView } from '../../../state/allocation.js'
 import {
   PAIR_BLOCK_GAIN_COUNT_WORD,

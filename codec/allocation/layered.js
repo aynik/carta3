@@ -6,10 +6,8 @@
  * frame bytes are emitted from this module.
  */
 
-import {
-  measureResidualBand,
-  quantizeResidualSymbols,
-} from '../coding/residual.js'
+import { measureResidualBand } from './residual.js'
+import { quantizeResidualSymbols } from '../quantization/symbols/residual.js'
 import { AllocationWorkMut, AllocationWorkView } from '../state/allocation.js'
 import {
   BITS_PER_SPECTRUM_BY_MODE,
