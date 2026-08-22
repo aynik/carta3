@@ -12,10 +12,10 @@ import {
   beginTransaction,
   commitFrame,
   decode,
-  synthesize,
   validateFrame,
 } from '../codec/pipeline/decoder.js'
 import { DecoderFrameState, DecoderState } from '../codec/state/decoder.js'
+import { synthesize } from '../codec/synthesis.js'
 import { pipe } from '../codec/utils.js'
 
 const SAMPLE_COUNT = 10 * 1024
