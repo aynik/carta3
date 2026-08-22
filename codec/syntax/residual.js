@@ -27,7 +27,7 @@ import {
  * @param {object} sink
  * @returns {number}
  */
-function writeResidualSymbolsInRange(source, range, mode, scaleFactor, sink) {
+function writeSymbols(source, range, mode, scaleFactor, sink) {
   const codebook = residualCodebook(mode)
   const quantizerScale = residualQuantGroupScale(mode, scaleFactor)
   const start = sink.bitPosition
@@ -115,7 +115,7 @@ export function writeQuantizedResidualSymbols(
 export function writeResidualSymbols(source, band, mode, scaleFactor, sink) {
   const range = residualBandRange(source, band)
   validateResidualSyntax(mode, scaleFactor)
-  return writeResidualSymbolsInRange(source, range, mode, scaleFactor, sink)
+  return writeSymbols(source, range, mode, scaleFactor, sink)
 }
 
 /**
@@ -133,6 +133,6 @@ export function writeResidualBand(source, band, mode, scaleFactor, sink) {
   validateResidualSyntax(mode, scaleFactor)
   const start = sink.bitPosition
   sink.write(scaleFactor, 6)
-  writeResidualSymbolsInRange(source, range, mode, scaleFactor, sink)
+  writeSymbols(source, range, mode, scaleFactor, sink)
   return sink.bitPosition - start
 }
