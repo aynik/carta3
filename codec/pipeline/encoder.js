@@ -5,7 +5,6 @@
  * and packing in one linear recipe. Atomic commit publishes successful frames.
  */
 
-import { quantizeLayeredResidual } from '../coding/layered.js'
 import { BufferPool } from '../core/buffers.js'
 import {
   FRAME_SAMPLES,
@@ -33,6 +32,7 @@ import { analyze } from '../analysis/stage.js'
  * @returns {function(Float32Array[]): EncoderFrame} Reusable validation stage.
  */
 import { allocate } from '../allocation/stage.js'
+import { quantize } from '../quantization/stage.js'
 export function validateFrame() {
   return (channels) => {
     if (!Array.isArray(channels) || channels.length !== 2) {
@@ -271,47 +271,6 @@ export function beginTransaction(context) {
  *
  * @returns {function(EncoderFrame): EncoderFrame} Quantization operation.
  */
-function quantizeIndependent() {
-  return (frame) => {
-    for (let channel = 0; channel < 2; channel++) {
-      frame.soundUnits[channel].copyTo(frame.channelBlocks[channel])
-    }
-    return frame
-  }
-}
-
-/**
- * Materialize both layers' retained residual symbols.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Quantization operation.
- */
-function quantizeLayered(context) {
-  const symbols = context.bufferPool.encoder.frame.layeredSymbols
-  return (frame) => {
-    for (let layer = 0; layer < 2; layer++) {
-      quantizeLayeredResidual(
-        frame.layers[layer],
-        frame.layeredAllocationWork[layer],
-        symbols[layer]
-      )
-    }
-    frame.layeredSymbols = symbols
-    return frame
-  }
-}
-
-/**
- * Select final symbol materialization for the configured profile.
- *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Quantization stage.
- */
-export function quantize(context) {
-  return context.profile.bitrateKbps === 132
-    ? quantizeIndependent()
-    : quantizeLayered(context)
-}
 
 /**
  * Select byte packing for the configured profile.
