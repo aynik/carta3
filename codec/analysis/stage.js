@@ -5,7 +5,7 @@
  */
 
 import { selectJointStereoModes, selectJointStereoRatios } from './stereo.js'
-import { planGainControl } from './gain/independent.js'
+import { planGainRecords } from './gain/independent.js'
 import { analyzeLayeredGain } from './gain/layered.js'
 import {
   BAND_PART_FLOATS,
@@ -214,7 +214,7 @@ export function planGain(context) {
   const encoder = context.bufferPool.encoder
   return (frame) => {
     for (let channel = 0; channel < frame.channels.length; channel++) {
-      const planned = planGainControl(
+      const planned = planGainRecords(
         frame.analysisWork[channel],
         frame.previousGainRecords[channel],
         frame.channelBlocks[channel].gainRecords,

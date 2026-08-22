@@ -530,7 +530,7 @@ export function adjustGainContinuity(
  * @param {GainAnalysisScratch} gainAnalysisScratch Reusable gain-analysis scratch.
  * @returns {GainRecord[]|null} Complete plan, or `null` if any band fails.
  */
-export function planGainControl(
+export function planGainRecords(
   channelState,
   previousRecords,
   outputSeeds,
