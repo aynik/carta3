@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { BufferPool } from '../codec/core/buffers.js'
+import { BufferPool } from '../codec/state/storage.js'
 import { FRAME_SAMPLES } from '../codec/core/constants.js'
 import { resolveProfile } from '../codec/core/profiles.js'
 import { PCM_SCALE, normalizePcm } from '../codec/io/pcm.js'

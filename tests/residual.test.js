@@ -15,7 +15,7 @@ import {
   AllocationWorkMut,
   AllocationWorkView,
   createAllocationWork,
-} from '../codec/coding/work.js'
+} from '../codec/state/allocation.js'
 import { ALLOCATION_RESIDUAL_SPECTRUM_OFFSET } from '../codec/core/constants.js'
 import {
   residualCodebook,

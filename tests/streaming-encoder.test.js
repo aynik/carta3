@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
-import { BufferPool } from '../codec/core/buffers.js'
+import { BufferPool } from '../codec/state/storage.js'
 import { IndependentChannelHeader } from '../codec/syntax/records.js'
 import { createWave } from '../codec/io/wave.js'
 import { PCM_SCALE } from '../codec/io/pcm.js'

@@ -1,6 +1,6 @@
 /** Carta3 Audio Codec - Pareto-safe layered residual refinement. */
 
-import { AllocationWorkMut, AllocationWorkView } from '../coding/work.js'
+import { AllocationWorkMut, AllocationWorkView } from '../state/allocation.js'
 import {
   measureResidualBand,
   measureResidualModeNeighbors,

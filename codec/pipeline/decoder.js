@@ -6,7 +6,7 @@
  * that semantic recipe.
  */
 
-import { BufferPool } from '../core/buffers.js'
+import { BufferPool } from '../state/storage.js'
 import { FRAME_SAMPLES } from '../core/constants.js'
 import { resolveProfile } from '../core/profiles.js'
 import { dequantize } from '../dequantization/stage.js'

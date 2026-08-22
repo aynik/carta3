@@ -3,10 +3,7 @@ import {
   selectJointStereoModes,
   selectJointStereoRatios,
 } from '../codec/analysis/stereo.js'
-import {
-  JointStereoHistory,
-  JointStereoWork,
-} from '../codec/state/joint-stereo.js'
+import { JointStereoHistory, JointStereoWork } from '../codec/state/stereo.js'
 import { applyJointStereoConversion } from '../codec/signal/stereo.js'
 
 /**

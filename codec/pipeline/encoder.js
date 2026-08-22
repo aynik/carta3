@@ -5,7 +5,7 @@
  * and packing in one linear recipe. Atomic commit publishes successful frames.
  */
 
-import { BufferPool } from '../core/buffers.js'
+import { BufferPool } from '../state/storage.js'
 import {
   FRAME_SAMPLES,
   JOINT_STEREO_SLOT_ROUNDING,

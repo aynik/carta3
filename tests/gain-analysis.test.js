@@ -5,7 +5,7 @@ import {
   planGainContinuityEdit,
 } from '../codec/analysis/gain/independent.js'
 import { GainRecord } from '../codec/syntax/gain.js'
-import { BufferPool } from '../codec/core/buffers.js'
+import { BufferPool } from '../codec/state/storage.js'
 
 describe('ATRAC3 sound-unit gain analysis', () => {
   it('keeps flat low-level bands inactive while updating peak history', () => {

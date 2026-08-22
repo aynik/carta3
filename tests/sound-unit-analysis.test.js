@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BufferPool } from '../codec/core/buffers.js'
+import { BufferPool } from '../codec/state/storage.js'
 import {
   ANALYSIS_WORK_FLOATS,
   BAND_PART_FLOATS,

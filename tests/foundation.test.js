@@ -10,7 +10,7 @@ import {
   SUBBAND_COUNT,
 } from '../codec/core/constants.js'
 import { QUANTIZATION_UNIT_OFFSETS } from '../codec/core/tables.js'
-import { BufferPool } from '../codec/core/buffers.js'
+import { BufferPool } from '../codec/state/storage.js'
 import {
   EncoderFrameState,
   EncoderState,

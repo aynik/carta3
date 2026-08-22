@@ -27,7 +27,7 @@ import {
   TRANSFORM_CARRY_OFFSET_FLOATS,
   BITSTREAM_PADDING_BYTES,
 } from '../core/constants.js'
-import { JointStereoHistory, JointStereoWork } from './joint-stereo.js'
+import { JointStereoHistory, JointStereoWork } from './stereo.js'
 import { LayerHistory, LayerWork } from './layered.js'
 
 /**

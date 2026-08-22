@@ -8,20 +8,20 @@ import {
   IndependentQmfScratch,
   MdctScratch,
   SoundUnitAllocationScratch,
-} from '../state/encoder.js'
-import { DecoderFrameState } from '../state/decoder.js'
+} from './encoder.js'
+import { DecoderFrameState } from './decoder.js'
 import {
   LayeredAllocationScratch,
   LayeredGainScratch,
   LayeredMdctScratch,
-} from '../state/layered.js'
+} from './layered.js'
 import {
   BITSTREAM_PADDING_BYTES,
   FRAME_SAMPLES,
   LAYERED_QMF_HISTORY_FLOATS,
   MAX_CHANNELS,
   MAX_CODED_FRAME_BYTES,
-} from './constants.js'
+} from '../core/constants.js'
 
 /**
  * Own reusable codec storage according to the lifetime of its contents.

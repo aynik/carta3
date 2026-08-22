@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BufferPool } from '../codec/core/buffers.js'
+import { BufferPool } from '../codec/state/storage.js'
 import { FRAME_SAMPLES } from '../codec/core/constants.js'
 import { encode } from '../codec/pipeline/encoder.js'
 import { LayerHistory, LayerWork } from '../codec/state/layered.js'

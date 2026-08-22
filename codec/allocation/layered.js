@@ -10,7 +10,7 @@ import {
   measureResidualBand,
   quantizeResidualSymbols,
 } from '../coding/residual.js'
-import { AllocationWorkMut, AllocationWorkView } from '../coding/work.js'
+import { AllocationWorkMut, AllocationWorkView } from '../state/allocation.js'
 import {
   BITS_PER_SPECTRUM_BY_MODE,
   QUANTIZATION_UNIT_OFFSETS,

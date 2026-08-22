@@ -5,7 +5,7 @@
  * split frontier. Frame offsets and byte publication remain pipeline concerns.
  */
 
-import { AllocationWorkView } from '../coding/work.js'
+import { AllocationWorkView } from '../state/allocation.js'
 import { measureResidualBand } from '../coding/residual.js'
 import { QUANTIZATION_UNIT_OFFSETS } from '../core/tables.js'
 import { allocateLayeredResidual } from './layered.js'
