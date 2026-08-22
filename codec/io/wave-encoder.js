@@ -2,7 +2,7 @@
 
 import { FRAME_SAMPLES, WAVE_DELAY_SAMPLES } from '../core/constants.js'
 import { encode } from '../pipeline/encoder.js'
-import { createWave } from './wave.js'
+import { createWave } from '../boundary/container.js'
 
 /**
  * Validate one equally sized planar stereo PCM chunk.

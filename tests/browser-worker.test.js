@@ -11,7 +11,7 @@ beforeAll(async () => {
       responses.push(message)
     },
   }
-  await import('../codec/browser/worker.js')
+  await import('../codec/boundary/worker.js')
 })
 
 afterAll(() => {

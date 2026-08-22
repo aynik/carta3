@@ -2,7 +2,7 @@
 
 import { FRAME_SAMPLES, WAVE_DELAY_SAMPLES } from '../core/constants.js'
 import { decode } from '../pipeline/decoder.js'
-import { parseWave } from './wave.js'
+import { parseWave } from '../boundary/container.js'
 
 /**
  * Create the planar shape for a timeline interval with no visible samples.

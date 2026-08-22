@@ -1,6 +1,6 @@
 /** Carta3 Audio Codec - Iterable in-memory WAVE reader. */
 
-import { parseWave } from './wave.js'
+import { parseWave } from './container.js'
 
 /**
  * Normalize supported in-memory binary inputs without unnecessary copying.

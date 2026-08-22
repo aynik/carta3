@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createProgram, main } from '../bin/cli.js'
 import { createPcmWave } from '../codec/io/serialization.js'
 import { PCM_SCALE } from '../codec/io/pcm.js'
-import { parseWave } from '../codec/io/wave.js'
+import { parseWave } from '../codec/boundary/container.js'
 
 /**
  * Build a short normalized stereo PCM fixture.

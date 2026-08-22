@@ -3,10 +3,16 @@
 import { FRAME_SAMPLES } from '../core/constants.js'
 import { resolveProfile } from '../core/profiles.js'
 import { decode } from '../pipeline/decoder.js'
-import { createWaveStreamingDecoder, decodeWavePcm } from './wave-decoder.js'
-import { createWaveStreamingEncoder, encodeWavePcm } from './wave-encoder.js'
-import { createWaveHeader, parseWave } from './wave.js'
-import { createPcmWave } from './serialization.js'
+import {
+  createWaveStreamingDecoder,
+  decodeWavePcm,
+} from '../io/wave-decoder.js'
+import {
+  createWaveStreamingEncoder,
+  encodeWavePcm,
+} from '../io/wave-encoder.js'
+import { createWaveHeader, parseWave } from './container.js'
+import { createPcmWave } from '../io/serialization.js'
 
 /** High-level streaming audio processor facade. */
 export class AudioProcessor {

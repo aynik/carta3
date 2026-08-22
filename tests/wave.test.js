@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { WAVE_FORMAT_TAG, WAVE_HEADER_BYTES } from '../codec/core/constants.js'
-import { createWave, parseWave } from '../codec/io/wave.js'
+import { createWave, parseWave } from '../codec/boundary/container.js'
 
 describe('ATRAC3 RIFF/WAVE container', () => {
   it('writes the canonical ATRAC3 WAVE header layout', () => {
