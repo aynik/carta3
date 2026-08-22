@@ -5,12 +5,10 @@ import { resolveProfile } from '../core/profiles.js'
 import { decode } from '../pipeline/decoder.js'
 import {
   createWaveStreamingDecoder,
-  decodeWavePcm,
-} from '../io/wave-decoder.js'
-import {
   createWaveStreamingEncoder,
+  decodeWavePcm,
   encodeWavePcm,
-} from '../io/wave-encoder.js'
+} from './stream.js'
 import { createWaveHeader, parseWave } from './container.js'
 import { createPcmWave } from './pcm.js'
 

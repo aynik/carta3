@@ -5,7 +5,7 @@ import { IndependentChannelHeader } from '../codec/syntax/records.js'
 import { createWave } from '../codec/boundary/container.js'
 import { PCM_SCALE } from '../codec/boundary/pcm.js'
 import { encode } from '../codec/pipeline/encoder.js'
-import { createWaveStreamingEncoder } from '../codec/io/wave-encoder.js'
+import { createWaveStreamingEncoder } from '../codec/boundary/stream.js'
 
 /**
  * Test helper for stereoSignal.

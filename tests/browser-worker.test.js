@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createPcmWave } from '../codec/boundary/pcm.js'
-import { decodeWavePcm } from '../codec/io/wave-decoder.js'
-import { encodeWavePcm } from '../codec/io/wave-encoder.js'
+import { decodeWavePcm, encodeWavePcm } from '../codec/boundary/stream.js'
 
 const responses = []
 

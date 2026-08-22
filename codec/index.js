@@ -13,13 +13,11 @@ export { decode } from './pipeline/decoder.js'
 export { encode } from './pipeline/encoder.js'
 export {
   WaveStreamingDecoder,
-  createWaveStreamingDecoder,
-  decodeWavePcm,
-} from './io/wave-decoder.js'
-export {
   WaveStreamingEncoder,
+  createWaveStreamingDecoder,
   createWaveStreamingEncoder,
+  decodeWavePcm,
   encodeWavePcm,
-} from './io/wave-encoder.js'
+} from './boundary/stream.js'
 export { createWave, parseWave } from './boundary/container.js'
 export { AudioProcessor } from './boundary/processor.js'
