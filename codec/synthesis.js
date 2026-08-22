@@ -6,6 +6,7 @@ import {
   FRAME_SAMPLES,
   RESIDUAL_DELAY_SAMPLES,
 } from './core/constants.js'
+import { selectDecoderMode } from './core/profiles.js'
 import { applyInverseGainScale } from './signal/gain.js'
 import {
   applyDecoderJointStereoMix,
@@ -150,19 +151,42 @@ function synthesizePcm(context) {
 }
 
 /**
+ * Compose synthesis without joint-stereo reconstruction.
+ *
+ * @param {DecoderContext} context Pipeline ownership context.
+ * @returns {function(DecoderFrame): DecoderFrame} Synthesis recipe.
+ */
+function synthesizeNonJoint(context) {
+  return pipe(context, synthesizeSpectrum, synthesizeGain, synthesizePcm)
+}
+
+/**
+ * Compose synthesis with joint-stereo reconstruction.
+ *
+ * @param {DecoderContext} context Pipeline ownership context.
+ * @returns {function(DecoderFrame): DecoderFrame} Synthesis recipe.
+ */
+function synthesizeJoint(context) {
+  return pipe(
+    context,
+    synthesizeSpectrum,
+    synthesizeGain,
+    synthesizeStereo,
+    synthesizePcm
+  )
+}
+
+/**
  * Reconstruct PCM from the dequantized channel spectra.
  *
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): DecoderFrame} Synthesis stage.
  */
 export function synthesize(context) {
-  return context.profile.bitrateKbps === 66
-    ? pipe(
-        context,
-        synthesizeSpectrum,
-        synthesizeGain,
-        synthesizeStereo,
-        synthesizePcm
-      )
-    : pipe(context, synthesizeSpectrum, synthesizeGain, synthesizePcm)
+  const synthesizeMode = selectDecoderMode(
+    context.profile,
+    synthesizeNonJoint,
+    synthesizeJoint
+  )
+  return synthesizeMode(context)
 }

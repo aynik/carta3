@@ -1,5 +1,7 @@
 /** Carta3 directional stream-state publication. */
 
+import { selectDecoderMode, selectEncoderMode } from '../core/profiles.js'
+
 /**
  * Capture independent histories into detached frame work.
  *
@@ -87,15 +89,46 @@ function commitLayered(context) {
 }
 
 /**
+ * Publish non-joint decoder history after successful synthesis.
+ *
+ * @param {object} decoder Decoder storage.
+ * @returns {function(DecoderFrame): DecoderFrame} Decoder publication.
+ */
+function commitNonJointDecoder(decoder) {
+  return (frame) => {
+    decoder.state.commitFrom(decoder.frame)
+    return frame
+  }
+}
+
+/**
+ * Advance the joint header and publish decoder history.
+ *
+ * @param {object} decoder Decoder storage.
+ * @returns {function(DecoderFrame): DecoderFrame} Decoder publication.
+ */
+function commitJointDecoder(decoder) {
+  return (frame) => {
+    decoder.frame.header.advanceFrom(frame.pendingJointHeader)
+    decoder.state.commitFrom(decoder.frame)
+    return frame
+  }
+}
+
+/**
  * Select encoder capture once for the configured stream.
  *
  * @param {EncoderContext} context Pipeline ownership context.
  * @returns {function(EncoderFrame): EncoderFrame} Encoder capture.
  */
 export function beginEncoderFrame(context) {
-  return context.profile.bitrateKbps === 132
-    ? beginIndependent(context)
-    : beginLayered(context)
+  const beginMode = selectEncoderMode(
+    context.profile,
+    beginIndependent,
+    beginLayered,
+    beginLayered
+  )
+  return beginMode(context)
 }
 
 /**
@@ -105,9 +138,13 @@ export function beginEncoderFrame(context) {
  * @returns {function(EncoderFrame): Uint8Array} Encoder publication.
  */
 export function commitEncoderFrame(context) {
-  return context.profile.bitrateKbps === 132
-    ? commitIndependent(context)
-    : commitLayered(context)
+  const commitMode = selectEncoderMode(
+    context.profile,
+    commitIndependent,
+    commitLayered,
+    commitLayered
+  )
+  return commitMode(context)
 }
 
 /**
@@ -132,10 +169,10 @@ export function beginDecoderFrame(context) {
  */
 export function commitDecoderFrame(context) {
   const decoder = context.bufferPool.decoder
-  const joint = context.profile.bitrateKbps === 66
-  return (frame) => {
-    if (joint) decoder.frame.header.advanceFrom(frame.pendingJointHeader)
-    decoder.state.commitFrom(decoder.frame)
-    return frame
-  }
+  const commitMode = selectDecoderMode(
+    context.profile,
+    commitNonJointDecoder,
+    commitJointDecoder
+  )
+  return commitMode(decoder)
 }

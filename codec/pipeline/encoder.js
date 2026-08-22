@@ -14,7 +14,7 @@ import {
   SAMPLE_RATE,
   SPECTRUM_GROUPS,
 } from '../core/constants.js'
-import { resolveProfile } from '../core/profiles.js'
+import { resolveProfile, selectEncoderMode } from '../core/profiles.js'
 import {
   LAYER_BAND_OFFSETS,
   LAYER_PROFILE_CONFIGURATION,
@@ -123,8 +123,12 @@ function setupLayered(context) {
  * @param {EncoderContext} context Encoder ownership context.
  */
 function setupEncoder(context) {
-  const setup =
-    context.profile.bitrateKbps === 132 ? setupIndependent : setupLayered
+  const setup = selectEncoderMode(
+    context.profile,
+    setupIndependent,
+    setupLayered,
+    setupLayered
+  )
   setup(context)
 }
 

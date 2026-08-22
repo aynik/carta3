@@ -14,6 +14,7 @@ import {
   SUBBAND_COUNT,
   TRANSFORM_CARRY_OFFSET_FLOATS,
 } from '../core/constants.js'
+import { selectEncoderMode } from '../core/profiles.js'
 import {
   prepareGainAdjustedWindows,
   applyLayeredGainScale,
@@ -455,10 +456,11 @@ export function transformLayers(context) {
  * @returns {function(EncoderFrame): EncoderFrame} Analysis stage.
  */
 export function analyze(context) {
-  if (context.profile.bitrateKbps === 132) {
-    return analyzeIndependent(context)
-  }
-  return context.profile.bitrateKbps === 66
-    ? analyzeJoint(context)
-    : analyzeLayered(context)
+  const analyzeMode = selectEncoderMode(
+    context.profile,
+    analyzeIndependent,
+    analyzeLayered,
+    analyzeJoint
+  )
+  return analyzeMode(context)
 }

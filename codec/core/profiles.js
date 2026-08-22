@@ -80,3 +80,29 @@ export function resolveWaveProfile({
   }
   return materializeProfile(row)
 }
+
+/**
+ * Select one encoder operator for a resolved stream profile.
+ *
+ * @param {object} profile Resolved Carta3 profile.
+ * @param {Function} independent 132 kbps operator.
+ * @param {Function} layered 105 kbps operator.
+ * @param {Function} joint 66 kbps operator.
+ * @returns {Function} Selected operator.
+ */
+export function selectEncoderMode(profile, independent, layered, joint) {
+  if (profile.bitrateKbps === 132) return independent
+  return profile.bitrateKbps === 66 ? joint : layered
+}
+
+/**
+ * Select one decoder operator for a resolved stream profile.
+ *
+ * @param {object} profile Resolved Carta3 profile.
+ * @param {Function} nonJoint 132 or 105 kbps operator.
+ * @param {Function} joint 66 kbps operator.
+ * @returns {Function} Selected operator.
+ */
+export function selectDecoderMode(profile, nonJoint, joint) {
+  return profile.bitrateKbps === 66 ? joint : nonJoint
+}

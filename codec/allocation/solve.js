@@ -10,6 +10,7 @@ import {
 } from '../allocation/refine.js'
 import { allocateLayeredResidual } from '../allocation/layered.js'
 import { PAIR_BLOCK_GAIN_COUNT_WORD } from '../core/constants.js'
+import { selectEncoderMode } from '../core/profiles.js'
 import { countLayeredChannelBits } from '../syntax/unit/writer/layered.js'
 import { pipe } from '../utils.js'
 
@@ -181,10 +182,11 @@ export function finalizeLayered() {
  * @returns {function(EncoderFrame): EncoderFrame} Selected solver.
  */
 export function solve(context) {
-  if (context.profile.bitrateKbps === 132) {
-    return allocateIndependent(context)
-  }
-  return context.profile.bitrateKbps === 66
-    ? allocateJoint(context)
-    : allocateLayered(context)
+  const allocateMode = selectEncoderMode(
+    context.profile,
+    allocateIndependent,
+    allocateLayered,
+    allocateJoint
+  )
+  return allocateMode(context)
 }

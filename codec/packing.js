@@ -2,6 +2,7 @@
 
 import { packLayeredChannel } from './syntax/unit/writer/layered.js'
 import { packSoundUnit } from './syntax/unit/writer/independent.js'
+import { selectEncoderMode } from './core/profiles.js'
 
 /**
  * Pack an independent frame after all decisions are final.
@@ -82,7 +83,11 @@ export function packLayered(context) {
  * @returns {function(EncoderFrame): EncoderFrame} Packing stage.
  */
 export function pack(context) {
-  return context.profile.bitrateKbps === 132
-    ? packIndependent(context)
-    : packLayered(context)
+  const packMode = selectEncoderMode(
+    context.profile,
+    packIndependent,
+    packLayered,
+    packLayered
+  )
+  return packMode(context)
 }
