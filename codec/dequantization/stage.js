@@ -2,10 +2,18 @@
 
 import { dequantizeChannel } from './spectrum.js'
 
+/** @import { SyntaxFrame } from '../unpacking.js' */
+
+/**
+ * Continuous coded spectra reconstructed from parsed symbols.
+ *
+ * @typedef {SyntaxFrame} SpectrumFrame
+ */
+
 /**
  * Reconstruct spectra after both channels pass complete syntax checks.
  *
- * @returns {function(DecoderFrame): DecoderFrame} Dequantization stage.
+ * @returns {function(SyntaxFrame): SpectrumFrame} Dequantization stage.
  */
 export function dequantize() {
   return (frame) => {

@@ -18,6 +18,21 @@ import { beginEncoderFrame, commitEncoderFrame } from '../state/stream.js'
 import { pipe } from '../utils.js'
 
 /**
+ * Stable ownership shared by one persistent encoder pipeline.
+ *
+ * @typedef {object} EncoderContext
+ * @property {object} profile Resolved immutable stream profile.
+ * @property {BufferPool} bufferPool Persistent, frame, and scratch storage.
+ */
+
+/**
+ * Validated normalized or codec-domain PCM presented to signal analysis.
+ *
+ * @typedef {object} PcmFrame
+ * @property {Float32Array[]} channels Equal planar stereo channels.
+ */
+
+/**
  * Allocate stream state and stable construction context.
  *
  * @param {object} options Profile options for 66, 105, or 132 kbps.
@@ -34,7 +49,7 @@ function createEncoderContext(options, bufferPool) {
 /**
  * Validate a complete stereo frame before transactional scratch advances.
  *
- * @returns {function(Float32Array[]): EncoderFrame} Reusable validation stage.
+ * @returns {function(Float32Array[]): PcmFrame} Reusable validation stage.
  */
 export function validateFrame() {
   return (channels) => {

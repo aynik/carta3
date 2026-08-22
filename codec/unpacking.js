@@ -6,6 +6,17 @@ import {
   JointStereoHeader,
 } from './syntax/records.js'
 
+/** @import { DecoderContext, EncodedFrame } from './pipeline/decoder.js' */
+/** @import { DecodedChannelFrame, PendingJointHeader } from './state/decoder.js' */
+
+/**
+ * Parsed format-native syntax for both encoded channels.
+ *
+ * @typedef {EncodedFrame & object} SyntaxFrame
+ * @property {DecodedChannelFrame[]} decodedChannels Parsed channel syntax.
+ * @property {PendingJointHeader|null} pendingJointHeader Validated joint header.
+ */
+
 /**
  * Reverse the second shared-layout region into decoder-facing order.
  *
@@ -66,7 +77,7 @@ function readPendingJointHeader(header, pending) {
  * Parse both syntax regions and preflight shared selectors without mutation.
  *
  * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(DecoderFrame): DecoderFrame} Unpacking stage.
+ * @returns {function(EncodedFrame): SyntaxFrame} Unpacking stage.
  */
 export function unpack(context) {
   const decoder = context.bufferPool.decoder

@@ -19,6 +19,8 @@ import { reconstructGainPairSignal } from '../../signal/gain.js'
 import { bandGainOffset } from '../../signal/bands.js'
 import { absoluteMaximum } from '../../utils.js'
 
+/** @import { GainRecord } from '../../state/gain.js' */
+
 /**
  * Measure consecutive fixed-width absolute maxima into caller storage.
  *

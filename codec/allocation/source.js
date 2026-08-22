@@ -6,6 +6,8 @@ import {
 } from '../core/tables.js'
 import { float32ToBits } from '../utils.js'
 
+/** @import { ResidualSourceProfile } from '../state/layered.js' */
+
 /**
  * Approximate a layered scale-factor index from an ordered magnitude key.
  *

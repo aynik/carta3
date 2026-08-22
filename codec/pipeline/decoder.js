@@ -17,11 +17,28 @@ import { synthesize } from '../synthesis.js'
 import { unpack } from '../unpacking.js'
 import { pipe } from '../utils.js'
 
+/** @import { SynthesisFrame } from '../synthesis.js' */
+
+/**
+ * Stable ownership shared by one persistent decoder pipeline.
+ *
+ * @typedef {object} DecoderContext
+ * @property {object} profile Resolved immutable stream profile.
+ * @property {BufferPool} bufferPool Persistent, frame, and scratch storage.
+ */
+
+/**
+ * Validated encoded bytes presented to syntax unpacking.
+ *
+ * @typedef {object} EncodedFrame
+ * @property {Uint8Array} input One complete encoded frame.
+ */
+
 /**
  * Detach the synthesized PCM before it crosses the public normalization boundary.
  *
  * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(DecoderFrame): Float32Array[]} PCM detachment.
+ * @returns {function(SynthesisFrame): Float32Array[]} PCM detachment.
  */
 function detachPcm(context) {
   const channels = context.bufferPool.decoder.frame.channels
@@ -47,7 +64,7 @@ function createDecoderContext(options, bufferPool) {
  * Reject malformed frame storage before capturing persistent state.
  *
  * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(Uint8Array): DecoderFrame} Reusable validation stage.
+ * @returns {function(Uint8Array): EncodedFrame} Reusable validation stage.
  */
 export function validateFrame(context) {
   const bytes = context.profile.bytesPerFrame

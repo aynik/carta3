@@ -3,6 +3,10 @@
 import { AllocationWorkView } from '../../state/allocation.js'
 import { quantizeResidualSymbols } from './residual.js'
 
+/** @import { AllocationFrame } from '../../allocation/stage.js' */
+/** @import { EncoderContext } from '../../pipeline/encoder.js' */
+/** @import { SymbolFrame } from '../stage.js' */
+
 /**
  * Materialize one layer's retained residual symbols.
  *
@@ -33,7 +37,7 @@ function quantizeResidual(layer, work, output) {
  * Materialize both layers' retained residual symbols.
  *
  * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(EncoderFrame): EncoderFrame} Quantization operation.
+ * @returns {function(AllocationFrame): SymbolFrame} Quantization operation.
  */
 export function quantizeLayered(context) {
   const symbols = context.bufferPool.encoder.frame.layeredSymbols
