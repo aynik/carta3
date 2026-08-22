@@ -7,19 +7,28 @@ import { PCM_SCALE, normalizePcm } from '../codec/io/pcm.js'
 import { encodeWavePcm } from '../codec/io/wave-encoder.js'
 import { parseWave } from '../codec/io/wave.js'
 import { dequantize } from '../codec/dequantization/stage.js'
-import { unpack } from '../codec/unpacking.js'
-import {
-  beginTransaction,
-  commitFrame,
-  decode,
-  validateFrame,
-} from '../codec/pipeline/decoder.js'
+import { decode, validateFrame } from '../codec/pipeline/decoder.js'
 import { DecoderFrameState, DecoderState } from '../codec/state/decoder.js'
+import { beginDecoderFrame, commitDecoderFrame } from '../codec/state/stream.js'
 import { synthesize } from '../codec/synthesis.js'
+import { unpack } from '../codec/unpacking.js'
 import { pipe } from '../codec/utils.js'
 
 const SAMPLE_COUNT = 10 * 1024
 const waveCache = new Map()
+
+/**
+ * Detach signed codec PCM for the explicit semantic recipe.
+ *
+ * @param {object} context
+ * @returns {function(object): Float32Array[]}
+ */
+function detachPcm(context) {
+  return () =>
+    context.bufferPool.decoder.frame.channels.map((channel) =>
+      channel.synthesisBuffer.slice(0, FRAME_SAMPLES)
+    )
+}
 
 /**
  * Test helper for referenceWave.
@@ -189,11 +198,12 @@ describe('ATRAC3 staged streaming decoder', () => {
     const decodeFrame = pipe(
       context,
       validateFrame,
-      beginTransaction,
+      beginDecoderFrame,
       unpack,
       dequantize,
       synthesize,
-      commitFrame
+      commitDecoderFrame,
+      detachPcm
     )
     const result = normalizePcm(decodeFrame(input))
 
@@ -216,7 +226,7 @@ describe('ATRAC3 staged streaming decoder', () => {
     }
     const persistentBefore = headerSnapshot(bufferPool.decoder.state.header)
     let frame = validateFrame(context)(input)
-    frame = beginTransaction(context)(frame)
+    frame = beginDecoderFrame(context)(frame)
     const stagedBefore = headerSnapshot(bufferPool.decoder.frame.header)
 
     frame = unpack(context)(frame)
@@ -245,7 +255,7 @@ describe('ATRAC3 staged streaming decoder', () => {
       persistentBefore
     )
 
-    commitFrame(context)(frame)
+    commitDecoderFrame(context)(frame)
 
     const committed = headerSnapshot(bufferPool.decoder.state.header)
     expect(committed.previousGains).toEqual(stagedBefore.gains)

@@ -116,3 +116,26 @@ export function commitEncoderFrame(context) {
  * @param {DecoderContext} context Pipeline ownership context.
  * @returns {function(DecoderFrame): DecoderFrame} Decoder capture.
  */
+export function beginDecoderFrame(context) {
+  const decoder = context.bufferPool.decoder
+  return (frame) => {
+    decoder.state.stageTo(decoder.frame)
+    return frame
+  }
+}
+
+/**
+ * Publish decoder history after successful synthesis.
+ *
+ * @param {DecoderContext} context Pipeline ownership context.
+ * @returns {function(DecoderFrame): DecoderFrame} Decoder publication.
+ */
+export function commitDecoderFrame(context) {
+  const decoder = context.bufferPool.decoder
+  const joint = context.profile.bitrateKbps === 66
+  return (frame) => {
+    if (joint) decoder.frame.header.advanceFrom(frame.pendingJointHeader)
+    decoder.state.commitFrom(decoder.frame)
+    return frame
+  }
+}
