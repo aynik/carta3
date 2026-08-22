@@ -29,7 +29,7 @@ import {
  * @param {number} scaleFactor
  * @returns {object}
  */
-function residualBandCostInRange(source, range, mode, scaleFactor) {
+function measureBand(source, range, mode, scaleFactor) {
   validateResidualSyntax(mode, scaleFactor)
   const codebook = residualCodebook(mode)
   const quantizerScale = residualQuantGroupScale(mode, scaleFactor)
@@ -104,7 +104,7 @@ export function measureResidualBand(source, band, mode, scaleFactor) {
       error: energy,
       energy,
     }
-  const cost = residualBandCostInRange(source, range, mode, scaleFactor)
+  const cost = measureBand(source, range, mode, scaleFactor)
   return {
     ...cost,
     energy,
@@ -130,7 +130,7 @@ export function measureResidualModeNeighbors(source, band, mode, scaleFactor) {
   }
   return [mode - 1, mode + 1].map((candidate) => {
     if (candidate < 1 || candidate > 7) return null
-    return residualBandCostInRange(source, range, candidate, scaleFactor)
+    return measureBand(source, range, candidate, scaleFactor)
   })
 }
 
@@ -149,12 +149,7 @@ export function measureResidualScaleNeighbors(source, band, mode, scaleFactor) {
   validateResidualSyntax(mode, scaleFactor)
   return [scaleFactor - 1, scaleFactor + 1].map((candidate) => {
     if (candidate < 0 || candidate > 63) return null
-    const { bits, error } = residualBandCostInRange(
-      source,
-      range,
-      mode,
-      candidate
-    )
+    const { bits, error } = measureBand(source, range, mode, candidate)
     return {
       scaleFactor: candidate,
       bits,
