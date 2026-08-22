@@ -6,7 +6,7 @@ import {
   SPREAD_UP,
   WORD_LENGTH_QUANTIZER_LEVELS,
 } from '../core/tables.js'
-import { spectralScaleForIndex } from '../coding/quantization.js'
+import { spectralScaleForIndex } from '../quantization/spectrum.js'
 import { F64_MIN_POSITIVE } from '../core/constants.js'
 
 /**

@@ -33,7 +33,7 @@ import {
   spectralScaleForIndex,
   measureNontoneBits,
   quantizeNontoneSymbols,
-} from '../coding/quantization.js'
+} from '../quantization/spectrum.js'
 import {
   countSoundUnitBits,
   countSoundUnitFixedBits,

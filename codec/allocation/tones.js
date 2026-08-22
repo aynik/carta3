@@ -5,7 +5,7 @@ import {
   scaleFactorIndexForAbs,
   spectralScaleForIndex,
   quantizeSpectralValue,
-} from '../coding/quantization.js'
+} from '../quantization/spectrum.js'
 import {
   SPECTRAL_SCALE_FACTORS,
   TONE_SIDE_BITS_BY_MODE,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   quantizeNontoneSymbols,
   quantizeSpectralValue,
-} from '../codec/coding/quantization.js'
+} from '../codec/quantization/spectrum.js'
 
 describe('ATRAC3 sound-unit spectral quantization', () => {
   it('clamps every supported scalar lattice', () => {
