@@ -11,7 +11,7 @@ import { FRAME_SAMPLES } from '../core/constants.js'
 import { resolveProfile } from '../core/profiles.js'
 import { dequantize } from '../dequantization/stage.js'
 import { normalizePcm } from '../boundary/pcm.js'
-import { DecoderState } from '../state/decoder.js'
+import { initializeDecoderStream } from '../state/decoder.js'
 import { beginDecoderFrame, commitDecoderFrame } from '../state/stream.js'
 import { synthesize } from '../synthesis.js'
 import { unpack } from '../unpacking.js'
@@ -30,29 +30,17 @@ function detachPcm(context) {
 }
 
 /**
- * Compose the internal signed-amplitude decoder stage chain.
+ * Allocate stream state and stable construction context.
  *
- * @param {object} [options] Profile and decoder-state options.
- * @param {BufferPool} [bufferPool] Reusable persistent and scratch storage.
- * @returns {function(Uint8Array): Float32Array[]} One-frame stereo decoder.
+ * @param {object} options Profile options for 66, 105, or 132 kbps.
+ * @param {BufferPool} bufferPool Reusable persistent and scratch storage.
+ * @returns {DecoderContext} Pipeline ownership context.
  */
-function createCodecDecoder(options = {}, bufferPool = new BufferPool()) {
+function createDecoderContext(options, bufferPool) {
   const profile = resolveProfile(options)
   if (!profile) throw new RangeError('Unsupported ATRAC3 decoder profile')
-  bufferPool.decoder.state = new DecoderState(options)
-  bufferPool.decoder.frame.prepare(profile)
-  const context = { profile, bufferPool }
-
-  return pipe(
-    context,
-    validateFrame,
-    beginDecoderFrame,
-    unpack,
-    dequantize,
-    synthesize,
-    commitDecoderFrame,
-    detachPcm
-  )
+  initializeDecoderStream(profile, bufferPool.decoder)
+  return { profile, bufferPool }
 }
 
 /**
@@ -79,6 +67,16 @@ export function validateFrame(context) {
  * @returns {function(Uint8Array): Float32Array[]} One-frame stereo decoder.
  */
 export function decode(options = {}, bufferPool = new BufferPool()) {
-  const decodeFrame = createCodecDecoder(options, bufferPool)
+  const context = createDecoderContext(options, bufferPool)
+  const decodeFrame = pipe(
+    context,
+    validateFrame,
+    beginDecoderFrame,
+    unpack,
+    dequantize,
+    synthesize,
+    commitDecoderFrame,
+    detachPcm
+  )
   return (frame) => normalizePcm(decodeFrame(frame))
 }

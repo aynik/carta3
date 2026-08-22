@@ -300,3 +300,16 @@ export class DecoderFrameState {
     return this
   }
 }
+
+/**
+ * Allocate committed history and prepare detached work for one decoder stream.
+ *
+ * @param {object} profile Resolved stream profile.
+ * @param {object} decoder Decoder pool ownership root.
+ * @returns {object} Initialized decoder storage.
+ */
+export function initializeDecoderStream(profile, decoder) {
+  decoder.state = new DecoderState(profile)
+  decoder.frame.prepare(profile)
+  return decoder
+}
