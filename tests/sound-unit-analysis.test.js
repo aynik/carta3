@@ -21,11 +21,11 @@ import {
   transformSpectrum,
 } from '../codec/analysis/stage.js'
 import { allocate } from '../codec/allocation/stage.js'
+import { pack } from '../codec/packing.js'
 import { quantize } from '../codec/quantization/stage.js'
 import {
   beginTransaction,
   encode,
-  pack,
   validateFrame,
 } from '../codec/pipeline/encoder.js'
 import { IndependentChannelHistory } from '../codec/state/encoder.js'
