@@ -239,7 +239,7 @@ export function forwardMdct256(
  * @param {MdctScratch} mdctScratch Reusable MDCT work buffers.
  * @returns {Float32Array} `spectrum`.
  */
-export function transformPreparedSubbands(windows, spectrum, mdctScratch) {
+export function writeIndependentMdctOutputs(windows, spectrum, mdctScratch) {
   if (
     windows?.length < SUBBAND_COUNT * GAIN_SCALE_SAMPLES ||
     spectrum?.length < SUBBAND_COUNT * BAND_PART_FLOATS
@@ -479,7 +479,7 @@ function transformLayeredRows(words, transform, initialGainScales) {
  * @param {object} mdctScratch Reusable layered MDCT storage.
  * @returns {object} The transformed `layer`.
  */
-export function runLayeredMdct(layer, words, mdctScratch) {
+export function writeLayeredMdctOutputs(layer, words, mdctScratch) {
   if (
     !layer ||
     words?.length < LAYER_WORDS ||
@@ -521,12 +521,7 @@ function coefficient(index, field) {
  * @param {object} synthesis Transaction-staged decoder channel state.
  * @returns {void}
  */
-export function applyInverseBlockTransform(
-  spectrum,
-  blockIndex,
-  gainIndex,
-  synthesis
-) {
+export function inverseMdctBlock(spectrum, blockIndex, gainIndex, synthesis) {
   if (
     spectrum.length !== DECODER_SPECTRAL_LINES_PER_UNIT ||
     blockIndex < 0 ||

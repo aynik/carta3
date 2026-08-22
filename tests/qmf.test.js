@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { ANALYSIS_WORK_FLOATS, FRAME_SAMPLES } from '../codec/core/constants.js'
 import {
-  analyzeIndependentQmf,
+  analyzeIndependentQmfChannel,
   bandSplitOffset,
-} from '../codec/transforms/qmf.js'
+} from '../codec/signal/bands.js'
 import { IndependentQmfScratch } from '../codec/state/encoder.js'
 
 const bitsView = new DataView(new ArrayBuffer(4))
@@ -46,7 +46,7 @@ describe('ATRAC3 four-band QMF analysis', () => {
   it('keeps silence and all persistent state at zero', () => {
     const work = new Float32Array(ANALYSIS_WORK_FLOATS)
     expect(
-      analyzeIndependentQmf(
+      analyzeIndependentQmfChannel(
         new Float32Array(FRAME_SAMPLES),
         work,
         new IndependentQmfScratch()
@@ -58,9 +58,9 @@ describe('ATRAC3 four-band QMF analysis', () => {
   it('advances three-deep history instead of replacing work storage', () => {
     const work = new Float32Array(ANALYSIS_WORK_FLOATS)
     const scratch = new IndependentQmfScratch()
-    analyzeIndependentQmf(frame(0), work, scratch)
+    analyzeIndependentQmfChannel(frame(0), work, scratch)
     const firstSplit = work.slice(bandSplitOffset(0), bandSplitOffset(0) + 256)
-    analyzeIndependentQmf(frame(1), work, scratch)
+    analyzeIndependentQmfChannel(frame(1), work, scratch)
     expect(work.slice(bandSplitOffset(0) - 256, bandSplitOffset(0))).toEqual(
       firstSplit
     )
@@ -69,8 +69,8 @@ describe('ATRAC3 four-band QMF analysis', () => {
   it('matches the two-frame persistent-state reference checksum', () => {
     const work = new Float32Array(ANALYSIS_WORK_FLOATS)
     const scratch = new IndependentQmfScratch()
-    analyzeIndependentQmf(frame(0), work, scratch)
-    analyzeIndependentQmf(frame(1), work, scratch)
+    analyzeIndependentQmfChannel(frame(0), work, scratch)
+    analyzeIndependentQmfChannel(frame(1), work, scratch)
     expect(checksum(work)).toEqual([0x0425c3442c91n, 0x36c78d9dn])
   })
 })

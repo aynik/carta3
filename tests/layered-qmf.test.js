@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeLayeredQmf } from '../codec/transforms/qmf.js'
+import { analyzeLayeredQmfChannel } from '../codec/signal/bands.js'
 import {
   FRAME_SAMPLES,
   LAYERED_QMF_HISTORY_FLOATS,
@@ -18,7 +18,12 @@ describe('ATRAC3 layered QMF analysis', () => {
   it('keeps zero input and zero history silent', () => {
     const spectrum = new Float32Array(1024)
     const history = new Float32Array(138)
-    analyzeLayeredQmf(new Float32Array(1024), spectrum, history, qmfScratch())
+    analyzeLayeredQmfChannel(
+      new Float32Array(1024),
+      spectrum,
+      history,
+      qmfScratch()
+    )
     expect(spectrum.every((value) => value === 0)).toBe(true)
     expect(history.every((value) => value === 0)).toBe(true)
   })
@@ -34,10 +39,10 @@ describe('ATRAC3 layered QMF analysis', () => {
     const spectrum = new Float32Array(1024)
     const history = new Float32Array(138)
     const scratch = qmfScratch()
-    analyzeLayeredQmf(input, spectrum, history, scratch)
+    analyzeLayeredQmfChannel(input, spectrum, history, scratch)
     const firstSpectrum = spectrum.slice()
     const firstHistory = history.slice()
-    analyzeLayeredQmf(input, spectrum, history, scratch)
+    analyzeLayeredQmfChannel(input, spectrum, history, scratch)
     expect(firstSpectrum.some((value) => value !== 0)).toBe(true)
     expect(firstHistory.some((value) => value !== 0)).toBe(true)
     expect(spectrum.every(Number.isFinite)).toBe(true)

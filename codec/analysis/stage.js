@@ -19,18 +19,18 @@ import {
 } from '../core/constants.js'
 import {
   prepareGainAdjustedWindows,
-  prepareLayeredGain,
-} from '../transforms/gain-scale.js'
-import { applyJointStereoConversion } from '../transforms/joint-stereo.js'
+  applyLayeredGainScale,
+} from '../signal/gain.js'
+import { applyJointStereoConversion } from '../signal/stereo.js'
 import {
-  runLayeredMdct,
-  transformPreparedSubbands,
-} from '../transforms/mdct.js'
+  writeLayeredMdctOutputs,
+  writeIndependentMdctOutputs,
+} from '../signal/spectrum.js'
 import {
-  analyzeIndependentQmf,
-  analyzeLayeredQmf,
+  analyzeIndependentQmfChannel,
+  analyzeLayeredQmfChannel,
   bandMdctOffset,
-} from '../transforms/qmf.js'
+} from '../signal/bands.js'
 import { pipe } from '../utils.js'
 
 /** Identify a failed pre-transform sound-unit phase and channel. */
@@ -195,7 +195,7 @@ export function analyzeBands(context) {
   const encoder = context.bufferPool.encoder
   return (frame) => {
     for (let channel = 0; channel < frame.channels.length; channel++) {
-      analyzeIndependentQmf(
+      analyzeIndependentQmfChannel(
         frame.channels[channel],
         frame.analysisWork[channel],
         encoder.scratch.qmf
@@ -268,7 +268,7 @@ export function transformSpectrum(context) {
   const encoder = context.bufferPool.encoder
   return (frame) => {
     for (let channel = 0; channel < 2; channel++) {
-      transformPreparedSubbands(
+      writeIndependentMdctOutputs(
         frame.mdctWindows[channel],
         encoder.frame.analyzedSpectra[channel],
         encoder.scratch.mdct[channel]
@@ -333,7 +333,7 @@ export function transformReference(context) {
   return (frame) => {
     for (let channel = 0; channel < 2; channel++) {
       if (!frame.referenceTransformNeeded[channel]) continue
-      transformPreparedSubbands(
+      writeIndependentMdctOutputs(
         frame.referenceWindows[channel],
         frame.referenceSpectra[channel],
         encoder.scratch.mdct[channel]
@@ -354,7 +354,7 @@ export function analyzeLayeredBands(context) {
   return (frame) => {
     for (let layer = 0; layer < 2; layer++) {
       const state = frame.layers[layer]
-      analyzeLayeredQmf(
+      analyzeLayeredQmfChannel(
         frame.channels[layer],
         state.spectrum,
         state.qmfHistory,
@@ -425,7 +425,7 @@ export function planLayeredGain(context) {
 export function applyLayeredGain() {
   return (frame) => {
     for (let layer = 0; layer < 2; layer++) {
-      prepareLayeredGain(frame.layerWords[layer])
+      applyLayeredGainScale(frame.layerWords[layer])
     }
     return frame
   }
@@ -441,7 +441,11 @@ export function transformLayers(context) {
   const scratch = context.bufferPool.encoder.scratch.layeredMdct
   return (frame) => {
     for (let layer = 0; layer < 2; layer++) {
-      runLayeredMdct(frame.layers[layer], frame.layerWords[layer], scratch)
+      writeLayeredMdctOutputs(
+        frame.layers[layer],
+        frame.layerWords[layer],
+        scratch
+      )
     }
     return frame
   }

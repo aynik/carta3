@@ -78,7 +78,7 @@ export function bandSplitOffset(subband) {
  * @param {Float32Array} history
  * @param {Float64Array} convolutionWork
  */
-function analyzeBranch(
+function analyzeQmfPair(
   input,
   low,
   high,
@@ -124,7 +124,7 @@ function analyzeBranch(
  * @param {IndependentQmfScratch} independentQmfScratch Operation-local QMF buffers.
  * @returns {Float32Array} `analysisWork` with its newest split slots populated.
  */
-export function analyzeIndependentQmf(
+export function analyzeIndependentQmfChannel(
   pcm,
   analysisWork,
   independentQmfScratch
@@ -157,7 +157,7 @@ export function analyzeIndependentQmf(
     ROOT_HISTORY_OFFSET,
     ROOT_HISTORY_OFFSET + QMF_DELAY
   )
-  analyzeBranch(
+  analyzeQmfPair(
     pcm,
     independentQmfScratch.firstLow,
     independentQmfScratch.firstHigh,
@@ -166,7 +166,7 @@ export function analyzeIndependentQmf(
     independentQmfScratch.convolutionWork
   )
 
-  analyzeBranch(
+  analyzeQmfPair(
     independentQmfScratch.firstLow,
     analysisWork.subarray(
       bandSplitOffset(0),
@@ -181,7 +181,7 @@ export function analyzeIndependentQmf(
     independentQmfScratch.convolutionWork
   )
 
-  analyzeBranch(
+  analyzeQmfPair(
     independentQmfScratch.firstHigh,
     analysisWork.subarray(
       bandSplitOffset(3),
@@ -208,7 +208,12 @@ export function analyzeIndependentQmf(
  * @param {Float32Array} layeredQmfScratch Operation-local history+input workspace.
  * @returns {Float32Array} `spectrum` after analysis.
  */
-export function analyzeLayeredQmf(pcm, spectrum, history, layeredQmfScratch) {
+export function analyzeLayeredQmfChannel(
+  pcm,
+  spectrum,
+  history,
+  layeredQmfScratch
+) {
   if (
     pcm.length < FRAME_SAMPLES ||
     spectrum.length < FRAME_SAMPLES ||
@@ -372,7 +377,7 @@ export function analyzeLayeredQmf(pcm, spectrum, history, layeredQmfScratch) {
  * @param {object} channel Decoder channel state containing synthesis history.
  * @returns {Float32Array} One reconstructed PCM frame view.
  */
-export function synthesizeLayeredQmf(channel) {
+export function synthesizeQmfChannel(channel) {
   const work = channel.synthesisBuffer
   const twoPi = Number(TWO_PI)
   for (let frameOffset = 0; frameOffset < FRAME_SAMPLES; frameOffset += 4) {

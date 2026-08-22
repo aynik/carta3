@@ -6,13 +6,13 @@ import {
   FRAME_SAMPLES,
   RESIDUAL_DELAY_SAMPLES,
 } from './core/constants.js'
-import { applyInverseGainEnvelope } from './transforms/gain-scale.js'
+import { applyInverseGainScale } from './signal/gain.js'
 import {
   applyDecoderJointStereoMix,
   prepareDecoderJointStereoMix,
-} from './transforms/joint-stereo.js'
-import { applyInverseBlockTransform } from './transforms/mdct.js'
-import { synthesizeLayeredQmf } from './transforms/qmf.js'
+} from './signal/stereo.js'
+import { inverseMdctBlock } from './signal/spectrum.js'
+import { synthesizeQmfChannel } from './signal/bands.js'
 import { pipe } from './utils.js'
 
 /**
@@ -44,7 +44,7 @@ function synthesizeSpectrum(context) {
           spectrumOffset,
           spectrumOffset + DECODER_SPECTRAL_LINES_PER_UNIT
         )
-        applyInverseBlockTransform(
+        inverseMdctBlock(
           spectrum,
           unit,
           decoded.pairTables[unit].gains[0],
@@ -84,7 +84,7 @@ function synthesizeGain(context) {
       const channel = stagedState.channels[channelIndex]
       const decoded = frame.decodedChannels[channelIndex]
       for (let unit = 0; unit < frame.activeBlockCounts[channelIndex]; unit++) {
-        applyInverseGainEnvelope(channel, unit, channel.pairTables[unit])
+        applyInverseGainScale(channel, unit, channel.pairTables[unit])
       }
       for (let unit = 0; unit < DECODER_MAX_UNITS; unit++) {
         decoded.pairTables[unit].copyTo(channel.pairTables[unit])
@@ -143,7 +143,7 @@ function synthesizePcm(context) {
   const stagedState = context.bufferPool.decoder.frame
   return (frame) => {
     for (const channel of stagedState.channels) {
-      synthesizeLayeredQmf(channel)
+      synthesizeQmfChannel(channel)
     }
     return frame
   }

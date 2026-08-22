@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { forwardMdct256 } from '../codec/transforms/mdct.js'
+import { forwardMdct256 } from '../codec/signal/spectrum.js'
 import { MdctScratch } from '../codec/state/encoder.js'
 
 const bitsView = new DataView(new ArrayBuffer(4))

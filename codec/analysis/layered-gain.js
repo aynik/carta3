@@ -496,7 +496,7 @@ function analyzePairBlocks(
  * Analyze gain regions into a detached word image for one layer.
  *
  * This phase chooses and records gain regions but deliberately leaves the
- * transform matrix untouched. Call {@link prepareLayeredGain} before MDCT.
+ * transform matrix untouched. Call {@link applyLayeredGainScale} before MDCT.
  *
  * @param {object} layer Transaction-local layer state.
  * @param {Int32Array} absoluteModeHints Joint-stereo gain hints.

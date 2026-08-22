@@ -15,8 +15,8 @@ import {
   MAX_SELECTED_GAIN_CANDIDATES,
   SUBBAND_COUNT,
 } from '../core/constants.js'
-import { reconstructGainPairSignal } from '../transforms/gain-scale.js'
-import { bandGainOffset } from '../transforms/qmf.js'
+import { reconstructGainPairSignal } from '../signal/gain.js'
+import { bandGainOffset } from '../signal/bands.js'
 import { absoluteMaximum } from '../utils.js'
 
 /**

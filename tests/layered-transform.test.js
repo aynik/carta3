@@ -6,8 +6,8 @@ import {
   LayerWork,
 } from '../codec/state/layered.js'
 import { analyzeLayeredGain } from '../codec/analysis/layered-gain.js'
-import { prepareLayeredGain } from '../codec/transforms/gain-scale.js'
-import { runLayeredMdct } from '../codec/transforms/mdct.js'
+import { applyLayeredGainScale } from '../codec/signal/gain.js'
+import { writeLayeredMdctOutputs } from '../codec/signal/spectrum.js'
 
 const floatBits = new DataView(new ArrayBuffer(4))
 
@@ -87,8 +87,8 @@ describe('ATRAC3 layered transform', () => {
     )
     expect(layer.spectrum[0]).toBe(Math.fround(14 * 16.25))
     expect(words.subarray(0x400, 0x600)).toEqual(layer.windowMatrix)
-    prepareLayeredGain(words)
-    runLayeredMdct(layer, words, new LayeredMdctScratch())
+    applyLayeredGainScale(words)
+    writeLayeredMdctOutputs(layer, words, new LayeredMdctScratch())
 
     expect(stateImageHash(layer.storeTo(words))).toBe('fe93bf05724529c6')
     expect(layer.pairBlocks.map((block) => block[0x32])).toEqual([0, 0, 0, 0])

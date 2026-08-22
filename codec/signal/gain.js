@@ -116,7 +116,7 @@ function applyLayeredGainRegions(words, unit, pairBase, selector) {
  * @param {Uint32Array} words Layered transform image from gain analysis.
  * @returns {Uint32Array} The gain-prepared `words`.
  */
-export function prepareLayeredGain(words) {
+export function applyLayeredGainScale(words) {
   if (words?.length < LAYER_WORDS) {
     throw new RangeError('ATRAC3 layered gain preparation has invalid geometry')
   }
@@ -162,7 +162,7 @@ function applyRecordSteps(destination, record, endBias, add) {
  * @param {Int32Array} steps Reusable 64-step intermediate storage.
  * @returns {number|null} First changed sample, or null for invalid syntax.
  */
-export function reconstructGainScale(previous, current, output, steps) {
+export function reconstructForwardGainScale(previous, current, output, steps) {
   if (output.length < GAIN_SCALE_SAMPLES) {
     throw new RangeError('ATRAC3 gain scale requires 512 output samples')
   }
@@ -264,7 +264,7 @@ export function reconstructGainPairSignal(
   output.set(overlap.subarray(0, 256), 256)
   if (gainPairIsActive(previous, current)) {
     if (
-      reconstructGainScale(
+      reconstructForwardGainScale(
         previous,
         current,
         gainScaleScratch.scale,
@@ -350,7 +350,7 @@ export function prepareGainAdjustedWindows(
  * @param {object} pairTable Decoded gain locations and selectors.
  * @returns {void}
  */
-export function applyInverseGainEnvelope(synthesis, blockIndex, pairTable) {
+export function applyInverseGainScale(synthesis, blockIndex, pairTable) {
   const synthesisBase = RESIDUAL_DELAY_SAMPLES + blockIndex
   const scaleCursor = synthesisBase + FRAME_SAMPLES
   let lastGain = pairTable.gains[0] | 0

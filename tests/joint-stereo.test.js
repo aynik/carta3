@@ -7,7 +7,7 @@ import {
   JointStereoHistory,
   JointStereoWork,
 } from '../codec/state/joint-stereo.js'
-import { applyJointStereoConversion } from '../codec/transforms/joint-stereo.js'
+import { applyJointStereoConversion } from '../codec/signal/stereo.js'
 
 /**
  * Test helper for layers.
