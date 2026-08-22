@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   selectJointStereoModes,
   selectJointStereoRatios,
-} from '../codec/analysis/joint-stereo.js'
+} from '../codec/analysis/stereo.js'
 import {
   JointStereoHistory,
   JointStereoWork,

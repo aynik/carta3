@@ -1,6 +1,6 @@
 /** Carta3 Audio Codec - Low-rate gain-region analysis. */
 
-import { detectGainLogFlux } from './gain.js'
+import { detectGainLogFlux } from './independent.js'
 import {
   BREAKPOINT_MAGNITUDE_FLOOR_BITS,
   BREAKPOINT_SNAP_RATIO_BITS,
@@ -32,8 +32,8 @@ import {
   SQUARE_ROOT_TWO_BITS,
   SUBBAND_COUNT,
   TONE_HISTORY_WORD,
-} from '../core/constants.js'
-import { float32FromBits, float32Multiply, float32ToBits } from '../utils.js'
+} from '../../core/constants.js'
+import { float32FromBits, float32Multiply, float32ToBits } from '../../utils.js'
 
 /**
  * Reproduce the port's unordered-or-less floating comparison.

@@ -4,12 +4,9 @@
  * Stable profile selection chooses one short analysis recipe at construction.
  */
 
-import {
-  selectJointStereoModes,
-  selectJointStereoRatios,
-} from './joint-stereo.js'
-import { planGainControl } from './gain.js'
-import { analyzeLayeredGain } from './layered-gain.js'
+import { selectJointStereoModes, selectJointStereoRatios } from './stereo.js'
+import { planGainControl } from './gain/independent.js'
+import { analyzeLayeredGain } from './gain/layered.js'
 import {
   BAND_PART_FLOATS,
   FORWARD_TRANSFORM_CARRY_OFFSET,

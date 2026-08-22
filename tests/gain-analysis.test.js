@@ -3,7 +3,7 @@ import {
   adjustGainContinuity,
   planBandGainRecord,
   planGainContinuityEdit,
-} from '../codec/analysis/gain.js'
+} from '../codec/analysis/gain/independent.js'
 import { GainRecord } from '../codec/syntax/gain.js'
 import { BufferPool } from '../codec/core/buffers.js'
 

@@ -6,7 +6,7 @@
  * either channel's plan.
  */
 
-import { gainRecordBits } from '../syntax/gain.js'
+import { gainRecordBits } from '../../syntax/gain.js'
 import {
   ATTACK_CANDIDATE_COUNT,
   BAND_PART_FLOATS,
@@ -14,10 +14,10 @@ import {
   LOG2_E_F32,
   MAX_SELECTED_GAIN_CANDIDATES,
   SUBBAND_COUNT,
-} from '../core/constants.js'
-import { reconstructGainPairSignal } from '../signal/gain.js'
-import { bandGainOffset } from '../signal/bands.js'
-import { absoluteMaximum } from '../utils.js'
+} from '../../core/constants.js'
+import { reconstructGainPairSignal } from '../../signal/gain.js'
+import { bandGainOffset } from '../../signal/bands.js'
+import { absoluteMaximum } from '../../utils.js'
 
 /**
  * Measure consecutive fixed-width absolute maxima into caller storage.
