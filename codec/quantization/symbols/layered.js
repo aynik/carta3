@@ -1,6 +1,6 @@
 /** Carta3 layered retained-symbol materialization. */
 
-import { quantizeLayeredResidual } from '../../coding/layered.js'
+import { quantizeLayeredResidual } from '../../allocation/layered.js'
 
 /**
  * Materialize both layers' retained residual symbols.

@@ -33,12 +33,12 @@ import {
   spectralScaleForIndex,
   measureNontoneBits,
   quantizeNontoneSymbols,
-} from './quantization.js'
+} from '../coding/quantization.js'
 import {
   countSoundUnitBits,
   countSoundUnitFixedBits,
 } from '../syntax/unit/writer/independent.js'
-import { extractMultitone } from './tones.js'
+import { extractMultitone } from '../coding/tones.js'
 import {
   buildReconstructionMask,
   measureBandReconstructionNoise,

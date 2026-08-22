@@ -5,13 +5,13 @@
  * split frontier. Frame offsets and byte publication remain pipeline concerns.
  */
 
-import { AllocationWorkView } from './work.js'
-import { measureResidualBand } from './residual.js'
+import { AllocationWorkView } from '../coding/work.js'
+import { measureResidualBand } from '../coding/residual.js'
 import { QUANTIZATION_UNIT_OFFSETS } from '../core/tables.js'
 import { allocateLayeredResidual } from './layered.js'
 import { buildMaskFromBandMeasures } from '../analysis/perceptual.js'
-import { measureResidualBandMeasures } from './finalization.js'
-import { measureResidualSource } from '../analysis/residual.js'
+import { measureResidualBandMeasures } from '../coding/finalization.js'
+import { measureResidualSource } from '../allocation/source.js'
 import { MIN_SHIFT, SPLIT_EXPLORE_SPAN } from '../core/constants.js'
 import { BUDGET_SHIFT_DELTAS } from '../core/tables.js'
 

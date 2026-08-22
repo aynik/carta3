@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   initialResidualBandLimit,
   measureResidualSource,
-} from '../codec/analysis/residual.js'
+} from '../codec/allocation/source.js'
 import {
   allocateLayeredResidual,
   quantizeLayeredResidual,
-} from '../codec/coding/layered.js'
+} from '../codec/allocation/layered.js'
 import {
   createResidualQualityProfile,
   refineResidual,

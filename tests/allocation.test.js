@@ -3,7 +3,7 @@ import {
   SoundUnitCandidateError,
   allocateSoundUnitCandidate,
   allocateSoundUnitCandidates,
-} from '../codec/coding/allocation.js'
+} from '../codec/allocation/independent.js'
 import { TONE_POLICY_THRESHOLD } from '../codec/core/constants.js'
 import { BufferPool } from '../codec/core/buffers.js'
 import { packSoundUnit } from '../codec/syntax/unit/writer/independent.js'
