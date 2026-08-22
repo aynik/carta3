@@ -13,17 +13,19 @@ import {
 } from '../codec/core/constants.js'
 import { resolveProfile } from '../codec/core/profiles.js'
 import {
-  allocate,
   analyzeBands,
-  beginTransaction,
-  encode,
-  pack,
   planGain,
   prepareGainWindows,
   prepareReference,
-  quantize,
   transformReference,
   transformSpectrum,
+} from '../codec/analysis/stage.js'
+import {
+  allocate,
+  beginTransaction,
+  encode,
+  pack,
+  quantize,
   validateFrame,
 } from '../codec/pipeline/encoder.js'
 import { IndependentChannelHistory } from '../codec/state/encoder.js'
