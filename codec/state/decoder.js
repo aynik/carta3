@@ -245,11 +245,10 @@ export class DecoderState {
   }
 }
 
-/** Parsed channel syntax and reconstructed coefficients for one frame. */
+/** Parsed channel syntax for one frame. */
 export class DecodedChannelFrame {
-  /** Allocate empty syntax tables, coefficient storage, and run metadata. */
+  /** Allocate empty syntax tables and run metadata. */
   constructor() {
-    this.samples = new Float32Array(FRAME_SAMPLES)
     this.pairTables = Array.from(
       { length: SUBBAND_COUNT },
       () => new GainPairTable()
@@ -264,7 +263,6 @@ export class DecodedChannelFrame {
    * @returns {DecodedChannelFrame}
    */
   reset() {
-    this.samples.fill(0)
     this.coefficientBlocks = 0
     this.runs.length = 0
     return this
@@ -283,6 +281,10 @@ export class DecoderFrameState {
       () => new DecoderChannelWork()
     )
     this.activeBlockCounts = new Uint8Array(MAX_CHANNELS)
+    this.spectra = Array.from(
+      { length: MAX_CHANNELS },
+      () => new Float32Array(FRAME_SAMPLES)
+    )
     this.decodedChannels = Array.from(
       { length: MAX_CHANNELS },
       () => new DecodedChannelFrame()

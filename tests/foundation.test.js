@@ -144,9 +144,8 @@ describe('ATRAC3 profiles and state geometry', () => {
     expect(pool.decoder.state).toBeNull()
     expect(pool.decoder.frame).toBeInstanceOf(DecoderFrameState)
     expect(pool.decoder.frame.decodedChannels).toHaveLength(2)
-    expect(pool.decoder.frame.decodedChannels[0].samples).toHaveLength(
-      FRAME_SAMPLES
-    )
+    expect(pool.decoder.frame.spectra[0]).toHaveLength(FRAME_SAMPLES)
+    expect(pool.decoder.frame.decodedChannels[0]).not.toHaveProperty('samples')
     expect(pool.decoder.frame.channels[0]).toBeInstanceOf(DecoderChannelWork)
     expect(pool.decoder.frame.channels[0].synthesisBuffer).toHaveLength(
       DECODER_WORK_FLOATS

@@ -244,7 +244,8 @@ describe('ATRAC3 staged streaming decoder', () => {
       unit: frame.pendingJointHeader.unitMode,
     }
 
-    frame = dequantize()(frame)
+    frame = dequantize(context)(frame)
+    expect(frame.spectra).toBe(bufferPool.decoder.frame.spectra)
     frame = synthesize(context)(frame)
 
     expect(frame.jointStereoMix).toBe(bufferPool.decoder.frame.jointStereoMix)

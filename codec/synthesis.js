@@ -52,7 +52,7 @@ function synthesizeSpectrum(context) {
       activeBlockCounts[channelIndex] = activeBlocks
       for (let unit = 0; unit < activeBlocks; unit++) {
         const spectrumOffset = unit * DECODER_SPECTRAL_LINES_PER_UNIT
-        const spectrum = decoded.samples.subarray(
+        const spectrum = frame.spectra[channelIndex].subarray(
           spectrumOffset,
           spectrumOffset + DECODER_SPECTRAL_LINES_PER_UNIT
         )
