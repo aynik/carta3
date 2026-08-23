@@ -3,10 +3,14 @@
  *
  * This module provides low-level bitstream packing and unpacking operations
  * for reading and writing ATRAC bitstreams with bit-level precision.
- *
- * @param {number} bitCount
  */
 
+/**
+ * Reject field widths outside the shared bitstream primitive's safe range.
+ *
+ * @param {number} bitCount
+ * @returns {void}
+ */
 function assertBitCount(bitCount) {
   if (!Number.isInteger(bitCount) || bitCount < 0 || bitCount > 32) {
     throw new RangeError(
