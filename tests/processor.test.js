@@ -86,4 +86,19 @@ describe('AudioProcessor ATRAC3 boundaries', () => {
     expect(frames[1][0][0]).toBe(channels[0][1024])
     expect(frames[1][0][1]).toBe(0)
   })
+
+  it('rejects mismatched planar buffers and invalid frame sizes', () => {
+    expect(() => [
+      ...AudioProcessor.frameBufferToFrames([
+        new Float32Array(2),
+        new Float32Array(1),
+      ]),
+    ]).toThrow(/equally sized/)
+    expect(() => [
+      ...AudioProcessor.frameBufferToFrames(
+        [new Float32Array(2), new Float32Array(2)],
+        0
+      ),
+    ]).toThrow(/positive integer/)
+  })
 })

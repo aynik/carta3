@@ -97,11 +97,16 @@ export class AudioProcessor {
       !Array.isArray(buffers) ||
       buffers.length !== 2 ||
       !(buffers[0] instanceof Float32Array) ||
-      !(buffers[1] instanceof Float32Array)
+      !(buffers[1] instanceof Float32Array) ||
+      buffers[0].length !== buffers[1].length ||
+      !Number.isInteger(frameSize) ||
+      frameSize < 1
     ) {
-      throw new RangeError('ATRAC3 framing requires two Float32 channels')
+      throw new RangeError(
+        'ATRAC3 framing requires two equally sized Float32 channels and a positive integer frame size'
+      )
     }
-    const sampleCount = Math.max(buffers[0].length, buffers[1].length)
+    const sampleCount = buffers[0].length
     for (let offset = 0; offset < sampleCount; offset += frameSize) {
       const frame = [new Float32Array(frameSize), new Float32Array(frameSize)]
       for (let channel = 0; channel < 2; channel++) {
