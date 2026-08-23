@@ -46,7 +46,7 @@ function clamp(value, minimum, maximum) {
  *
  * @param {number} limit
  * @param {number} minimum
- * @param {function(number): boolean} isActive
+ * @param {Function} isActive
  * @returns {number}
  */
 function activeBandPrefixLength(limit, minimum, isActive) {

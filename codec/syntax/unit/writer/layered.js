@@ -88,7 +88,7 @@ function residualSpectrumView(words) {
  * @param {object} layer
  * @param {Int32Array} work
  * @param {object} sink
- * @param {function(number, number, number, object): number} writeSymbols
+ * @param {Function} writeSymbols
  * @param {object} [options]
  * @returns {number}
  */

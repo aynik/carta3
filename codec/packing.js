@@ -4,21 +4,11 @@ import { packLayeredChannel } from './syntax/unit/writer/layered.js'
 import { packSoundUnit } from './syntax/unit/writer/independent.js'
 import { selectEncoderMode } from './core/profiles.js'
 
-/** @import { EncoderContext } from './pipeline/encoder.js' */
-/** @import { SymbolFrame } from './quantization/stage.js' */
-
-/**
- * Packed frame transaction awaiting atomic stream publication.
- *
- * @typedef {SymbolFrame & object} PackedFrame
- * @property {Uint8Array} output Serialized encoded frame bytes.
- */
-
 /**
  * Pack an independent frame after all decisions are final.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(SymbolFrame): PackedFrame} Independent packing.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Independent packing.
  */
 function packIndependent(context) {
   const { profile } = context
@@ -43,8 +33,8 @@ function packIndependent(context) {
 /**
  * Pack completed layers into their final independent or shared spans.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(SymbolFrame): PackedFrame} Layer packing.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Layer packing.
  */
 export function packLayered(context) {
   const { profile } = context
@@ -89,8 +79,8 @@ export function packLayered(context) {
 /**
  * Select byte packing for the configured profile.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(SymbolFrame): PackedFrame} Packing stage.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Packing stage.
  */
 export function pack(context) {
   const packMode = selectEncoderMode(

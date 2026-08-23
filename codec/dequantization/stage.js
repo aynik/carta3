@@ -2,21 +2,11 @@
 
 import { dequantizeChannel } from './spectrum.js'
 
-/** @import { SyntaxFrame } from '../unpacking.js' */
-/** @import { DecoderContext } from '../pipeline/decoder.js' */
-
-/**
- * Continuous coded spectra reconstructed from parsed symbols.
- *
- * @typedef {SyntaxFrame & object} SpectrumFrame
- * @property {Float32Array[]} spectra Reconstructed channel spectra.
- */
-
 /**
  * Reconstruct spectra after both channels pass complete syntax checks.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SyntaxFrame): SpectrumFrame} Dequantization stage.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Dequantization stage.
  */
 export function dequantize(context) {
   const spectra = context.bufferPool.decoder.frame.spectra

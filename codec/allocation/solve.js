@@ -14,15 +14,11 @@ import { selectEncoderMode } from '../core/profiles.js'
 import { countLayeredChannelBits } from '../syntax/unit/writer/layered.js'
 import { pipe } from '../utils.js'
 
-/** @import { AnalysisFrame } from '../analysis/stage.js' */
-/** @import { AllocationFrame } from './stage.js' */
-/** @import { EncoderContext } from '../pipeline/encoder.js' */
-
 /**
  * Choose exact sound-unit syntax without publishing persistent state.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AllocationFrame): AllocationFrame} Independent solver.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Independent solver.
  */
 function allocateIndependent(context) {
   const { profile } = context
@@ -52,8 +48,8 @@ function allocateIndependent(context) {
 /**
  * Select a shared 66 kbps budget without writing the frame buffer.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AllocationFrame): AllocationFrame} Joint allocation operation.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Joint allocation operation.
  */
 function shareBudget(context) {
   const encoder = context.bufferPool.encoder
@@ -76,8 +72,8 @@ function shareBudget(context) {
 /**
  * Allocate the two independent 105 kbps residual layers.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AllocationFrame): AllocationFrame} Layer allocation operation.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Layer allocation operation.
  */
 function allocateResidual(context) {
   const encoder = context.bufferPool.encoder
@@ -120,8 +116,8 @@ function layeredHasGainPoints(states) {
 /**
  * Compose layered residual allocation and shared finalization.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AllocationFrame): AllocationFrame} Layered solver.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Layered solver.
  */
 function allocateLayered(context) {
   return pipe(context, allocateResidual, finalizeLayered)
@@ -130,8 +126,8 @@ function allocateLayered(context) {
 /**
  * Compose joint-stereo shared budgeting and finalization.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AllocationFrame): AllocationFrame} Joint solver.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Joint solver.
  */
 function allocateJoint(context) {
   return pipe(context, shareBudget, finalizeLayered)
@@ -140,7 +136,7 @@ function allocateJoint(context) {
 /**
  * Refine completed layers and publish only a jointly viable proposal pair.
  *
- * @returns {function(AllocationFrame): AllocationFrame} Residual finalization.
+ * @returns {Function} Residual finalization.
  */
 export function finalizeLayered() {
   return (frame) => {
@@ -182,8 +178,8 @@ export function finalizeLayered() {
 /**
  * Select the allocation solver for the configured stream profile.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AllocationFrame} Selected solver.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Selected solver.
  */
 export function solve(context) {
   const allocateMode = selectEncoderMode(

@@ -42,8 +42,6 @@ import {
   float32ToBits,
 } from '../utils.js'
 
-/** @import { MdctScratch } from '../state/encoder.js' */
-
 // Preserve the readable table shape without pair iteration in the hot loop.
 const bitReverseIndices = Uint8Array.from(MDCT_BIT_REVERSE_PAIRS.flat())
 
@@ -276,7 +274,7 @@ function coefficient(index, field) {
  * @param {Float32Array} source Prepared 512-sample gain-adjusted window.
  * @param {Float32Array} destination Destination 256-line spectrum.
  * @param {boolean} reverseOutput Whether to publish coefficients in reverse order.
- * @param {MdctScratch} mdctScratch Reusable forward-transform storage.
+ * @param {object} mdctScratch Reusable forward-transform storage.
  * @returns {Float32Array} `destination` after the transform.
  */
 export function forwardMdct256(
@@ -460,7 +458,7 @@ export function forwardMdct256(
  *
  * @param {Float32Array} windows Four contiguous 512-sample time windows.
  * @param {Float32Array} spectrum Destination for four 256-line spectra.
- * @param {MdctScratch} mdctScratch Reusable MDCT work buffers.
+ * @param {object} mdctScratch Reusable MDCT work buffers.
  * @returns {Float32Array} `spectrum`.
  */
 export function writeIndependentMdctOutputs(windows, spectrum, mdctScratch) {

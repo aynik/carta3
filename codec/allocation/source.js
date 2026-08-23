@@ -6,8 +6,6 @@ import {
 } from '../core/tables.js'
 import { float32ToBits } from '../utils.js'
 
-/** @import { ResidualSourceProfile } from '../state/layered.js' */
-
 /**
  * Approximate a layered scale-factor index from an ordered magnitude key.
  *
@@ -26,7 +24,7 @@ function scaleFactorEstimate(magnitudeKey) {
  * Measure stable activity, scale, and primary-expansion evidence for one layer.
  *
  * @param {object} layer Transformed transaction-local layer state.
- * @param {ResidualSourceProfile} profile Reusable destination measurement profile.
+ * @param {object} profile Reusable destination measurement profile.
  * @returns {object} The populated `profile`.
  */
 export function measureResidualSource(layer, profile) {

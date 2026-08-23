@@ -15,8 +15,8 @@ export class GainRecord {
   /**
    * Copy wire-visible fields while preserving destination-local detector state.
    *
-   * @param {GainRecord} source
-   * @returns {GainRecord}
+   * @param {object} source
+   * @returns {object}
    */
   copyCodedFieldsFrom(source) {
     this.entries = source.entries
@@ -29,8 +29,8 @@ export class GainRecord {
   /**
    * Copy coded fields and detector history into existing storage.
    *
-   * @param {GainRecord} destination
-   * @returns {GainRecord}
+   * @param {object} destination
+   * @returns {object}
    */
   copyTo(destination) {
     destination.entries = this.entries
@@ -40,7 +40,7 @@ export class GainRecord {
     return destination
   }
 
-  /** @returns {GainRecord} Independent record copy. */
+  /** @returns {object} Independent record copy. */
   clone() {
     return this.copyTo(new GainRecord())
   }
@@ -48,7 +48,7 @@ export class GainRecord {
   /**
    * Compare only fields that affect encoded gain syntax.
    *
-   * @param {GainRecord} other
+   * @param {object} other
    * @returns {boolean}
    */
   codedEquals(other) {

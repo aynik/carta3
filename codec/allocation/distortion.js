@@ -12,7 +12,7 @@ import { F64_MIN_POSITIVE } from '../core/constants.js'
 /**
  * Estimate tonality from spectral energy concentration within one band.
  *
- * @param {{energy: number, peak: number, width: number}} band
+ * @param {object} band
  * @returns {number}
  */
 function tonality(band) {

@@ -18,26 +18,11 @@ import { beginEncoderFrame, commitEncoderFrame } from '../state/stream.js'
 import { pipe } from '../utils.js'
 
 /**
- * Stable ownership shared by one persistent encoder pipeline.
- *
- * @typedef {object} EncoderContext
- * @property {object} profile Resolved immutable stream profile.
- * @property {BufferPool} bufferPool Persistent, frame, and scratch storage.
- */
-
-/**
- * Validated normalized or codec-domain PCM presented to signal analysis.
- *
- * @typedef {object} PcmFrame
- * @property {Float32Array[]} channels Equal planar stereo channels.
- */
-
-/**
  * Allocate stream state and stable construction context.
  *
  * @param {object} options Profile options for 66, 105, or 132 kbps.
  * @param {BufferPool} bufferPool Reusable persistent and scratch storage.
- * @returns {EncoderContext} Pipeline ownership context.
+ * @returns {object} Pipeline ownership context.
  */
 function createEncoderContext(options, bufferPool) {
   const profile = resolveProfile(options)
@@ -49,7 +34,7 @@ function createEncoderContext(options, bufferPool) {
 /**
  * Validate a complete stereo frame before transactional scratch advances.
  *
- * @returns {function(Float32Array[]): PcmFrame} Reusable validation stage.
+ * @returns {Function} Reusable validation stage.
  */
 export function validateFrame() {
   return (channels) => {
@@ -75,7 +60,7 @@ export function validateFrame() {
 /**
  * Detach pool-owned packed bytes only after successful state publication.
  *
- * @returns {function(import('../packing.js').PackedFrame): Uint8Array} Output detachment.
+ * @returns {Function} Output detachment.
  */
 export function detachOutput() {
   return (frame) => frame.output.slice()
@@ -88,7 +73,7 @@ export function detachOutput() {
  *
  * @param {object} [options] Profile options for 66, 105, or 132 kbps.
  * @param {BufferPool} [bufferPool] Reusable persistent and scratch storage.
- * @returns {function(Float32Array[]): Uint8Array} One-frame stereo encoder.
+ * @returns {Function} One-frame stereo encoder.
  */
 export function encode(options = {}, bufferPool = new BufferPool()) {
   const context = createEncoderContext(options, bufferPool)

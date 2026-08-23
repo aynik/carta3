@@ -1,10 +1,7 @@
-/** @import { AllocationFrame } from '../../allocation/stage.js' */
-/** @import { SymbolFrame } from '../stage.js' */
-
 /**
  * Publish selected sound-unit candidates as final syntax.
  *
- * @returns {function(AllocationFrame): SymbolFrame} Quantization operation.
+ * @returns {Function} Quantization operation.
  */
 export function promoteSymbols() {
   return (frame) => {

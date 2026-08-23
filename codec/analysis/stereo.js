@@ -26,7 +26,7 @@ const ratioMappingScale = float32FromBits(RATIO_MAPPING_SCALE_BITS)
 /**
  * Create four detached zeroed left/right energy records.
  *
- * @returns {{left: number, right: number}[]}
+ * @returns {object[]}
  */
 function zeroEnergies() {
   return Array.from({ length: 4 }, () => ({ left: 0, right: 0 }))
@@ -37,7 +37,7 @@ function zeroEnergies() {
  *
  * @param {object} state Detached joint-stereo transaction.
  * @param {object[]} layers Two analyzed layer spectra.
- * @returns {{left: number, right: number}[]} Current per-slot energy evidence.
+ * @returns {object[]} Current per-slot energy evidence.
  */
 export function selectJointStereoModes(state, layers) {
   if (
@@ -127,7 +127,7 @@ export function selectJointStereoModes(state, layers) {
  * Select and rate-limit ratios for modes chosen by the current frame.
  *
  * @param {object} state Mode-selected joint-stereo transaction.
- * @param {{left: number, right: number}[]} energies Current energy evidence.
+ * @param {object[]} energies Current energy evidence.
  * @returns {object} The fully selected transform plan.
  */
 export function selectJointStereoRatios(state, energies) {

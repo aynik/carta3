@@ -59,7 +59,7 @@ const secondaryHuffmanFamily = buildFamily(HUFFMAN_PAIRS_B)
  * @param {object} table
  * @param {ArrayLike<number>} values
  * @param {number} count
- * @param {function(number): void} visitor
+ * @param {Function} visitor
  */
 function visitSymbols(table, values, count, visitor) {
   if (!table || count > values.length) {
@@ -164,7 +164,7 @@ export function measureHuffmanBits(table, values, count = values.length) {
  *
  * @param {object} table One word-length Huffman table.
  * @param {ArrayLike<number>} values Signed symbols in encoder representation.
- * @param {{bitPosition: number, write: Function}} sink Bit writer or counter.
+ * @param {object} sink Bit writer or counter.
  * @param {number} [count] Number of values to write.
  * @returns {number} Number of bits written.
  */
@@ -182,7 +182,7 @@ export function writeHuffman(table, values, sink, count = values.length) {
 /**
  * Decode one complete sound-unit Huffman run to reconstruction values.
  *
- * @param {{read: Function}} reader Bit reader positioned at the first codeword.
+ * @param {object} reader Bit reader positioned at the first codeword.
  * @param {number} tableSelector A/B table selector; only its low bit is used.
  * @param {number} codeIndex Zero-based coded word-length index.
  * @param {number} sampleCount Number of spectral values to decode.

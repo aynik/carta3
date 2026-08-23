@@ -16,22 +16,11 @@ import { inverseMdctBlock } from './signal/spectrum.js'
 import { synthesizeQmfChannel } from './signal/bands.js'
 import { pipe } from './utils.js'
 
-/** @import { SpectrumFrame } from './dequantization/stage.js' */
-/** @import { DecoderContext } from './pipeline/decoder.js' */
-
-/**
- * Synthesized transaction with PCM ready for detachment.
- *
- * @typedef {SpectrumFrame & object} SynthesisFrame
- * @property {Uint8Array} activeBlockCounts Active inverse-transform blocks.
- * @property {object} jointStereoMix Prepared joint-stereo decision.
- */
-
 /**
  * Synthesize detached band histories from reconstructed spectra.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SynthesisFrame): SynthesisFrame} Spectrum synthesis.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Spectrum synthesis.
  */
 function synthesizeSpectrum(context) {
   const decoderFrame = context.bufferPool.decoder.frame
@@ -86,8 +75,8 @@ function synthesizeSpectrum(context) {
 /**
  * Apply prior-frame gain envelopes after inverse transforms are complete.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SynthesisFrame): SynthesisFrame} Gain synthesis.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Gain synthesis.
  */
 function synthesizeGain(context) {
   const stagedState = context.bufferPool.decoder.frame
@@ -109,8 +98,8 @@ function synthesizeGain(context) {
 /**
  * Prepare the current signal decision from staged header history.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SynthesisFrame): SynthesisFrame} Stereo preparation.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Stereo preparation.
  */
 function prepareStereo(context) {
   const stagedState = context.bufferPool.decoder.frame
@@ -124,8 +113,8 @@ function prepareStereo(context) {
 /**
  * Apply the current-frame stereo decision to signal work only.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SynthesisFrame): SynthesisFrame} Stereo mixing.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Stereo mixing.
  */
 function mixStereo(context) {
   const channels = context.bufferPool.decoder.frame.channels
@@ -138,8 +127,8 @@ function mixStereo(context) {
 /**
  * Reconstruct shared-layout stereo from completed inverse transforms.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SynthesisFrame): SynthesisFrame} Stereo synthesis.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Stereo synthesis.
  */
 function synthesizeStereo(context) {
   return pipe(context, prepareStereo, mixStereo)
@@ -148,8 +137,8 @@ function synthesizeStereo(context) {
 /**
  * Run fixed four-band synthesis independently for each frame channel.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SynthesisFrame): SynthesisFrame} PCM synthesis.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} PCM synthesis.
  */
 function synthesizePcm(context) {
   const stagedState = context.bufferPool.decoder.frame
@@ -164,8 +153,8 @@ function synthesizePcm(context) {
 /**
  * Compose synthesis without joint-stereo reconstruction.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SynthesisFrame): SynthesisFrame} Synthesis recipe.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Synthesis recipe.
  */
 function synthesizeNonJoint(context) {
   return pipe(context, synthesizeSpectrum, synthesizeGain, synthesizePcm)
@@ -174,8 +163,8 @@ function synthesizeNonJoint(context) {
 /**
  * Compose synthesis with joint-stereo reconstruction.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SynthesisFrame): SynthesisFrame} Synthesis recipe.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Synthesis recipe.
  */
 function synthesizeJoint(context) {
   return pipe(
@@ -190,8 +179,8 @@ function synthesizeJoint(context) {
 /**
  * Reconstruct PCM from the dequantized channel spectra.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SpectrumFrame): SynthesisFrame} Synthesis stage.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Synthesis stage.
  */
 export function synthesize(context) {
   const synthesizeMode = selectDecoderMode(

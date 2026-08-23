@@ -26,9 +26,6 @@ import {
   INVERSE_TRANSFORM_SCALES,
 } from '../core/tables.js'
 
-/** @import { GainScaleScratch } from '../state/encoder.js' */
-/** @import { GainRecord } from '../state/gain.js' */
-
 const LAYER_GAIN_ROW_OFFSETS = Object.freeze([0, 4, 8, 12, 16, 20, 24, 28])
 
 /**
@@ -117,7 +114,7 @@ function applyLayeredGainRegions(words, unit, pairBase, selector) {
  * Expand one coded gain record into the 64-step intermediate envelope.
  *
  * @param {Int32Array} destination
- * @param {GainRecord} record
+ * @param {object} record
  * @param {number} endBias
  * @param {boolean} add
  * @returns {boolean}
@@ -159,8 +156,8 @@ export function applyLayeredGainScale(words) {
 /**
  * Expand adjacent coded gain records into a 512-sample envelope.
  *
- * @param {GainRecord} previous Prior-frame record for the same subband.
- * @param {GainRecord} current Current-frame record.
+ * @param {object} previous Prior-frame record for the same subband.
+ * @param {object} current Current-frame record.
  * @param {Float32Array} output Destination gain envelope.
  * @param {Int32Array} steps Reusable 64-step intermediate storage.
  * @returns {number|null} First changed sample, or null for invalid syntax.
@@ -227,8 +224,8 @@ function divideByGainScale(samples, scale) {
 /**
  * Test whether either half of an adjacent gain-record pair is active.
  *
- * @param {GainRecord} previous Prior-frame record.
- * @param {GainRecord} current Current-frame record.
+ * @param {object} previous Prior-frame record.
+ * @param {object} current Current-frame record.
  * @returns {boolean} Whether reconstruction requires gain scaling.
  */
 function gainPairIsActive(previous, current) {
@@ -240,10 +237,10 @@ function gainPairIsActive(previous, current) {
  *
  * @param {Float32Array} input Current 256-sample half-window.
  * @param {Float32Array} overlap Prior 256-sample overlap half.
- * @param {GainRecord} previous Prior-frame gain record.
- * @param {GainRecord} current Current-frame gain record.
+ * @param {object} previous Prior-frame gain record.
+ * @param {object} current Current-frame gain record.
  * @param {Float32Array} output Destination 512-sample window.
- * @param {GainScaleScratch} gainScaleScratch Reusable gain-scale buffers.
+ * @param {object} gainScaleScratch Reusable gain-scale buffers.
  * @returns {Float32Array|null} Reconstructed signal, or null for invalid syntax.
  */
 export function reconstructGainPairSignal(
@@ -289,7 +286,7 @@ export function reconstructGainPairSignal(
  * @param {object[]} currentRecords Gain records selected for this frame.
  * @param {Float32Array} carry Previous 256-sample halves, updated in place.
  * @param {Float32Array} windows Destination containing four 512-sample windows.
- * @param {GainScaleScratch} gainScaleScratch Reusable gain-scale reconstruction buffers.
+ * @param {object} gainScaleScratch Reusable gain-scale reconstruction buffers.
  * @returns {Float32Array} `windows` after all four bands are prepared.
  */
 export function prepareGainAdjustedWindows(

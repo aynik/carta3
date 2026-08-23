@@ -169,7 +169,7 @@ export function jointPrimaryBitBudget(
  * @param {object[]} input.residualSourceProfiles Reusable analysis profiles.
  * @param {object} input.jointStereo Selected joint-stereo history and hints.
  * @param {number} input.bytesPerFrame Complete shared frame size.
- * @param {function(object, Int32Array, object): number} input.measureLayerBits
+ * @param {Function} input.measureLayerBits
  * Exact syntax counter supplied by the pipeline's I/O boundary.
  * @returns {number} Selected byte split between the two allocation images.
  */

@@ -242,7 +242,7 @@ export class IndependentChannelHistory {
    * Commit native analysis and gain history after successful packing.
    *
    * @param {Float32Array} work Completed frame-local analysis image.
-   * @param {GainRecord[]} gainRecords Current frame gain records.
+   * @param {object[]} gainRecords Current frame gain records.
    * @returns {IndependentChannelHistory} This committed history.
    */
   commitFrom(work, gainRecords) {

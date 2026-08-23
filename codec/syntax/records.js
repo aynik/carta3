@@ -51,7 +51,7 @@ export class IndependentChannelHeader {
   /**
    * Write the header to a bit sink.
    *
-   * @param {{write: Function}} sink Bit writer or exact counter.
+   * @param {object} sink Bit writer or exact counter.
    * @returns {void}
    */
   pack(sink) {
@@ -159,7 +159,7 @@ export class SpectrumAllocation {
   /**
    * Read a complete spectrum allocation from a bit reader.
    *
-   * @param {{read: Function}} reader Reader positioned at allocation metadata.
+   * @param {object} reader Reader positioned at allocation metadata.
    * @returns {SpectrumAllocation} Decoded allocation.
    */
   static read(reader) {
@@ -184,7 +184,7 @@ export class SpectrumAllocation {
   /**
    * Write allocation metadata to a bit sink.
    *
-   * @param {{write: Function}} sink Bit writer or exact counter.
+   * @param {object} sink Bit writer or exact counter.
    * @returns {void}
    */
   pack(sink) {
@@ -226,7 +226,7 @@ export class ToneSectionHeader {
   /**
    * Read a tone-section header.
    *
-   * @param {{read: Function}} reader Reader positioned at tone metadata.
+   * @param {object} reader Reader positioned at tone metadata.
    * @returns {ToneSectionHeader} Decoded header.
    */
   static read(reader) {
@@ -240,7 +240,7 @@ export class ToneSectionHeader {
   /**
    * Write a tone-section header.
    *
-   * @param {{write: Function}} sink Bit writer or exact counter.
+   * @param {object} sink Bit writer or exact counter.
    * @returns {void}
    */
   pack(sink) {
@@ -270,7 +270,7 @@ export class ToneRegionHeader {
    * Read one tone-region descriptor.
    *
    * @param {number} channelCount Active transform-unit count.
-   * @param {{read: Function}} reader Reader positioned at the descriptor.
+   * @param {object} reader Reader positioned at the descriptor.
    * @returns {ToneRegionHeader} Decoded region header.
    */
   static read(channelCount, reader) {
@@ -285,7 +285,7 @@ export class ToneRegionHeader {
   /**
    * Write one tone-region descriptor.
    *
-   * @param {{write: Function}} sink Bit writer or exact counter.
+   * @param {object} sink Bit writer or exact counter.
    * @returns {void}
    */
   pack(sink) {
@@ -319,7 +319,7 @@ export class ToneListCount {
   /**
    * Read a tone list count.
    *
-   * @param {{read: Function}} reader Reader positioned at the list count.
+   * @param {object} reader Reader positioned at the list count.
    * @returns {ToneListCount} Decoded list count.
    */
   static read(reader) {
@@ -329,7 +329,7 @@ export class ToneListCount {
   /**
    * Write a tone list count.
    *
-   * @param {{write: Function}} sink Bit writer or exact counter.
+   * @param {object} sink Bit writer or exact counter.
    * @returns {void}
    */
   pack(sink) {
@@ -353,7 +353,7 @@ export class ToneItemHeader {
   /**
    * Read one tone item header.
    *
-   * @param {{read: Function}} reader Reader positioned at the item header.
+   * @param {object} reader Reader positioned at the item header.
    * @returns {ToneItemHeader} Decoded item header.
    */
   static read(reader) {
@@ -363,7 +363,7 @@ export class ToneItemHeader {
   /**
    * Write one tone item header.
    *
-   * @param {{write: Function}} sink Bit writer or exact counter.
+   * @param {object} sink Bit writer or exact counter.
    * @returns {void}
    */
   pack(sink) {

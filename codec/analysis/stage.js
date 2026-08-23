@@ -31,18 +31,6 @@ import {
 } from '../signal/bands.js'
 import { pipe } from '../utils.js'
 
-/** @import { EncoderContext, PcmFrame } from '../pipeline/encoder.js' */
-/** @import { GainRecord } from '../state/gain.js' */
-
-/**
- * Continuous codec-domain representation and signal decisions.
- *
- * @typedef {PcmFrame & object} AnalysisFrame
- * @property {Float32Array[]} spectra Retained channel spectra.
- * @property {object[]} channelBlocks Independent-channel signal decisions.
- * @property {object[]} layers Layered signal work when selected.
- */
-
 /** Identify a failed pre-transform sound-unit phase and channel. */
 class SoundUnitAnalysisError extends Error {
   /**
@@ -62,7 +50,7 @@ class SoundUnitAnalysisError extends Error {
 /**
  * Return whether any record changes the unity gain window.
  *
- * @param {GainRecord[]} records
+ * @param {object[]} records
  * @returns {boolean}
  */
 function gainRecordsAreActive(records) {
@@ -111,8 +99,8 @@ function referenceTransformCarry(analysisWork) {
 /**
  * Build the gain-adjusted independent spectrum.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Spectrum application.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Spectrum application.
  */
 function analyzeSpectrum(context) {
   return pipe(context, prepareGainWindows, transformSpectrum)
@@ -121,8 +109,8 @@ function analyzeSpectrum(context) {
 /**
  * Build the independent zero-gain comparison spectrum.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Reference application.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Reference application.
  */
 function analyzeReference(context) {
   return pipe(context, prepareReference, transformReference)
@@ -131,8 +119,8 @@ function analyzeReference(context) {
 /**
  * Select and apply the configured joint-stereo representation.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Joint-stereo application.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Joint-stereo application.
  */
 function analyzeStereo(context) {
   return pipe(context, selectStereo, applyStereo)
@@ -141,8 +129,8 @@ function analyzeStereo(context) {
 /**
  * Build both gain-adjusted layered spectra.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Layered spectrum application.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Layered spectrum application.
  */
 function analyzeLayeredSpectrum(context) {
   return pipe(context, applyLayeredGain, transformLayers)
@@ -151,8 +139,8 @@ function analyzeLayeredSpectrum(context) {
 /**
  * Compose independent-channel signal analysis.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Analysis application.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Analysis application.
  */
 function analyzeIndependent(context) {
   return pipe(
@@ -167,8 +155,8 @@ function analyzeIndependent(context) {
 /**
  * Compose layered signal analysis.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Analysis application.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Analysis application.
  */
 function analyzeLayered(context) {
   return pipe(
@@ -182,8 +170,8 @@ function analyzeLayered(context) {
 /**
  * Compose joint-stereo signal analysis.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Analysis application.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Analysis application.
  */
 function analyzeJoint(context) {
   return pipe(
@@ -198,8 +186,8 @@ function analyzeJoint(context) {
 /**
  * Advance the four-band QMF histories for both frame-transaction channels.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Independent band analysis.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Independent band analysis.
  */
 export function analyzeBands(context) {
   const encoder = context.bufferPool.encoder
@@ -219,8 +207,8 @@ export function analyzeBands(context) {
 /**
  * Plan both channels' gain records before either plan can be published.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Independent gain analysis.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Independent gain analysis.
  */
 export function planGain(context) {
   const encoder = context.bufferPool.encoder
@@ -244,8 +232,8 @@ export function planGain(context) {
 /**
  * Apply selected gain windows and advance carry without transforming.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Gain-window application.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Gain-window application.
  */
 export function prepareGainWindows(context) {
   const encoder = context.bufferPool.encoder
@@ -271,8 +259,8 @@ export function prepareGainWindows(context) {
 /**
  * Transform prepared four-band windows without applying or selecting gain.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Coded-spectrum operation.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Coded-spectrum operation.
  */
 export function transformSpectrum(context) {
   const encoder = context.bufferPool.encoder
@@ -292,8 +280,8 @@ export function transformSpectrum(context) {
 /**
  * Prepare the independent zero-gain comparison used by allocation.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Reference-window application.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Reference-window application.
  */
 export function prepareReference(context) {
   const encoder = context.bufferPool.encoder
@@ -335,8 +323,8 @@ export function prepareReference(context) {
 /**
  * Transform only zero-gain windows that require a second MDCT.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Reference MDCT operation.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Reference MDCT operation.
  */
 export function transformReference(context) {
   const encoder = context.bufferPool.encoder
@@ -356,8 +344,8 @@ export function transformReference(context) {
 /**
  * Run the stateful low-rate QMF over the complete stereo transaction.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Layered band analysis.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Layered band analysis.
  */
 export function analyzeLayeredBands(context) {
   const encoder = context.bufferPool.encoder
@@ -378,7 +366,7 @@ export function analyzeLayeredBands(context) {
 /**
  * Select 66 kbps modes and ratios without modifying either spectrum.
  *
- * @returns {function(AnalysisFrame): AnalysisFrame} Stereo selection operation.
+ * @returns {Function} Stereo selection operation.
  */
 export function selectStereo() {
   return (frame) => {
@@ -391,7 +379,7 @@ export function selectStereo() {
 /**
  * Apply the fully selected 66 kbps conversion to both spectra.
  *
- * @returns {function(AnalysisFrame): AnalysisFrame} Stereo mapping operation.
+ * @returns {Function} Stereo mapping operation.
  */
 export function applyStereo() {
   return (frame) => {
@@ -403,8 +391,8 @@ export function applyStereo() {
 /**
  * Select layered gain regions without modifying transform samples.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Layered gain analysis.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Layered gain analysis.
  */
 export function planLayeredGain(context) {
   const encoder = context.bufferPool.encoder
@@ -430,7 +418,7 @@ export function planLayeredGain(context) {
 /**
  * Apply each layered gain plan to its detached transform input.
  *
- * @returns {function(AnalysisFrame): AnalysisFrame} Layered-window application.
+ * @returns {Function} Layered-window application.
  */
 export function applyLayeredGain() {
   return (frame) => {
@@ -444,8 +432,8 @@ export function applyLayeredGain() {
 /**
  * Run each prepared low-rate layer through only its forward MDCT.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Layered MDCT operation.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Layered MDCT operation.
  */
 export function transformLayers(context) {
   const scratch = context.bufferPool.encoder.scratch.layeredMdct
@@ -464,8 +452,8 @@ export function transformLayers(context) {
 /**
  * Select signal analysis for the configured profile.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AnalysisFrame): AnalysisFrame} Analysis stage.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Analysis stage.
  */
 export function analyze(context) {
   const analyzeMode = selectEncoderMode(

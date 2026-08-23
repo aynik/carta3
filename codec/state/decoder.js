@@ -54,7 +54,7 @@ class DecoderHeaderState {
   /**
    * Advance shared-layout chronology from one successfully decoded header.
    *
-   * @param {PendingJointHeader} pending Validated current-frame header.
+   * @param {object} pending Validated current-frame header.
    * @returns {DecoderHeaderState} This advanced header history.
    */
   advanceFrom(pending) {
@@ -260,7 +260,7 @@ export class DecodedChannelFrame {
   /**
    * Clear variable syntax before parsing another channel frame.
    *
-   * @returns {DecodedChannelFrame}
+   * @returns {object}
    */
   reset() {
     this.coefficientBlocks = 0

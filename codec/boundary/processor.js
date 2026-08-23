@@ -76,9 +76,8 @@ export class AudioProcessor {
   /**
    * Collect all frames from a synchronous or asynchronous stream.
    *
-   * @template T
-   * @param {AsyncIterable<T>|Iterable<T>} frameStream Frames in source order.
-   * @returns {Promise<T[]>} Materialized frames in source order.
+   * @param {AsyncIterable|Iterable} frameStream Frames in source order.
+   * @returns {Promise<Array>} Materialized frames in source order.
    */
   static async collectFrames(frameStream) {
     const frames = []

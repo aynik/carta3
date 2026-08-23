@@ -10,8 +10,8 @@ import { GainRecord } from '../state/gain.js'
 /**
  * Validate one wire-visible gain record.
  *
- * @param {GainRecord} record
- * @returns {GainRecord}
+ * @param {object} record
+ * @returns {object}
  */
 export function validateGainRecord(record) {
   if (
@@ -45,7 +45,7 @@ export function validateGainRecord(record) {
 /**
  * Return the exact encoded length of one gain record.
  *
- * @param {GainRecord} record
+ * @param {object} record
  * @returns {number}
  */
 export function gainRecordBits(record) {
@@ -58,8 +58,8 @@ export function gainRecordBits(record) {
 /**
  * Pack ordered transform-unit gain records.
  *
- * @param {GainRecord[]} records
- * @param {{write: Function}} sink
+ * @param {object[]} records
+ * @param {object} sink
  * @returns {void}
  */
 export function packGainRecords(records, sink) {
@@ -78,8 +78,8 @@ export function packGainRecords(records, sink) {
 /**
  * Read one gain record.
  *
- * @param {{read: Function}} reader
- * @returns {GainRecord}
+ * @param {object} reader
+ * @returns {object}
  */
 export function readGainRecord(reader) {
   const record = new GainRecord()

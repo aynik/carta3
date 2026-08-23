@@ -38,8 +38,6 @@ import {
 } from '../core/tables.js'
 import { float32Add, float32Multiply } from '../utils.js'
 
-/** @import { IndependentQmfScratch } from '../state/encoder.js' */
-
 /**
  * Convolve one QMF branch and publish its updated delay line.
  *
@@ -123,7 +121,7 @@ export function bandSplitOffset(subband) {
  *
  * @param {Float32Array} pcm One complete 1024-sample channel frame.
  * @param {Float32Array} analysisWork Frame-local 132 kbps analysis image.
- * @param {IndependentQmfScratch} independentQmfScratch Operation-local QMF buffers.
+ * @param {object} independentQmfScratch Operation-local QMF buffers.
  * @returns {Float32Array} `analysisWork` with its newest split slots populated.
  */
 export function analyzeIndependentQmfChannel(

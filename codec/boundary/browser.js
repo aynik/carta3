@@ -54,7 +54,7 @@ export class Carta3Worker {
    *
    * @param {Float32Array[]} pcmData Normalized planar stereo PCM.
    * @param {object} [options] Encoder profile options.
-   * @returns {Promise<{waveBlob: Blob, info: object}>} Encoded blob and metadata.
+   * @returns {Promise<object>} Encoded blob and metadata.
    */
   encode(pcmData, options = {}) {
     return this.request('encode', { pcmData, options })
@@ -64,7 +64,7 @@ export class Carta3Worker {
    * Decode an ATRAC3 WAVE image into a PCM WAVE blob.
    *
    * @param {ArrayBuffer|ArrayBufferView|Blob} wave Encoded WAVE input.
-   * @returns {Promise<{wavBlob: Blob, info: object}>} Decoded blob and metadata.
+   * @returns {Promise<object>} Decoded blob and metadata.
    */
   decode(wave) {
     return this.request('decode', { wave })

@@ -19,9 +19,6 @@ import { reconstructGainPairSignal } from '../../signal/gain.js'
 import { bandGainOffset } from '../../signal/bands.js'
 import { absoluteMaximum } from '../../utils.js'
 
-/** @import { GainAnalysisScratch, GainScaleScratch } from '../../state/encoder.js' */
-/** @import { GainRecord } from '../../state/gain.js' */
-
 /**
  * Measure consecutive fixed-width absolute maxima into caller storage.
  *
@@ -108,8 +105,8 @@ function selectCandidates(entries, detectedCount, ranked) {
  *
  * @param {Float32Array} spectrum
  * @param {number} sampleCount
- * @param {GainRecord} previousRecord
- * @param {GainAnalysisScratch} gainAnalysisScratch
+ * @param {object} previousRecord
+ * @param {object} gainAnalysisScratch
  * @returns {object|null}
  */
 function detectGainCandidates(
@@ -213,7 +210,7 @@ function boundedGainStep(step, used, limit) {
  * Lower detector events into the seven-point coded representation.
  *
  * @param {object} detection
- * @param {GainRecord} previousRecord
+ * @param {object} previousRecord
  * @returns {object}
  */
 function lowerGainCandidates(detection, previousRecord) {
@@ -291,10 +288,10 @@ function gainLevelEnvelope(lowered, levels) {
 /**
  * Materialize a record in caller-owned storage while preserving unused slots.
  *
- * @param {GainRecord} seed
+ * @param {object} seed
  * @param {number} peakHistory
  * @param {Int32Array} levels
- * @returns {GainRecord|null}
+ * @returns {object|null}
  */
 function buildGainRecord(seed, peakHistory, levels) {
   const events = []
@@ -328,7 +325,7 @@ function buildGainRecord(seed, peakHistory, levels) {
 /**
  * Measure the strongest prefix excursion around the minimum coded level.
  *
- * @param {GainRecord} record
+ * @param {object} record
  * @param {number} minimumSeed
  * @param {number} maximumSeed
  * @returns {number}
@@ -375,7 +372,7 @@ function compareSignals(candidate, reference) {
  *
  * @param {number} value Candidate peak magnitude.
  * @param {number} ceiling Previous running peak.
- * @param {{smoothedRise: number}} state Mutable detector history.
+ * @param {object} state Mutable detector history.
  * @returns {boolean} Whether the current rise triggers an event.
  */
 export function detectGainLogFlux(value, ceiling, state) {
@@ -392,10 +389,10 @@ export function detectGainLogFlux(value, ceiling, state) {
  * Plan one band's coded gain record without publishing persistent state.
  *
  * @param {Float32Array} spectrum Complete 768-float rolling band slot.
- * @param {GainRecord} previousRecord Prior committed gain record.
- * @param {GainRecord} outputSeed Detached destination seed.
- * @param {GainAnalysisScratch} gainAnalysisScratch
- * @returns {GainRecord|null} Planned record, or `null` when unrepresentable.
+ * @param {object} previousRecord Prior committed gain record.
+ * @param {object} outputSeed Detached destination seed.
+ * @param {object} gainAnalysisScratch
+ * @returns {object|null} Planned record, or `null` when unrepresentable.
  */
 export function planBandGainRecord(
   spectrum,
@@ -432,9 +429,9 @@ export function planBandGainRecord(
  * Select the optional band-1-to-band-0 continuity insertion.
  *
  * @param {Float32Array} targetSpectrum First band's rolling sample slot.
- * @param {GainRecord[]} previousRecords Prior committed channel records.
- * @param {GainRecord[]} plannedRecords Candidate current records.
- * @returns {{location: number, level: number}|null} Detached edit, if viable.
+ * @param {object[]} previousRecords Prior committed channel records.
+ * @param {object[]} plannedRecords Candidate current records.
+ * @returns {object|null} Detached edit, if viable.
  */
 export function planGainContinuityEdit(
   targetSpectrum,
@@ -463,10 +460,10 @@ export function planGainContinuityEdit(
  * Evaluate and apply the optional continuity edit in reconstructed sample space.
  *
  * @param {Float32Array} targetSpectrum First band's rolling sample slot.
- * @param {GainRecord[]} previousRecords Prior committed records.
- * @param {GainRecord[]} plannedRecords Detached current records.
- * @param {GainScaleScratch} gainScaleScratch Reusable gain reconstruction scratch.
- * @returns {GainRecord[]|null} Selected detached records, or `null` on failure.
+ * @param {object[]} previousRecords Prior committed records.
+ * @param {object[]} plannedRecords Detached current records.
+ * @param {object} gainScaleScratch Reusable gain reconstruction scratch.
+ * @returns {object[]|null} Selected detached records, or `null` on failure.
  */
 export function adjustGainContinuity(
   targetSpectrum,
@@ -527,11 +524,11 @@ export function adjustGainContinuity(
  * Plan all four channel gain records atomically.
  *
  * @param {Float32Array} channelState Persistent rolling subband state.
- * @param {GainRecord[]} previousRecords Prior committed records.
- * @param {GainRecord[]} outputSeeds Detached destination records.
- * @param {GainScaleScratch} gainScaleScratch Reusable gain reconstruction scratch.
- * @param {GainAnalysisScratch} gainAnalysisScratch Reusable gain-analysis scratch.
- * @returns {GainRecord[]|null} Complete plan, or `null` if any band fails.
+ * @param {object[]} previousRecords Prior committed records.
+ * @param {object[]} outputSeeds Detached destination records.
+ * @param {object} gainScaleScratch Reusable gain reconstruction scratch.
+ * @param {object} gainAnalysisScratch Reusable gain-analysis scratch.
+ * @returns {object[]|null} Complete plan, or `null` if any band fails.
  */
 export function planGainRecords(
   channelState,

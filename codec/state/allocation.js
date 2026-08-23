@@ -119,7 +119,7 @@ export class AllocationWorkView {
    * Decode the bounded header of a variable tone subrecord.
    *
    * @param {number} offset Subrecord word offset.
-   * @returns {{symbolCount: number, tableIndex: number}|null} Header or null.
+   * @returns {object|null} Header or null.
    */
   toneSubrecordHeader(offset) {
     if (offset < 0 || offset + 6 > this.words.length) return null

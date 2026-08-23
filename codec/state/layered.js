@@ -257,7 +257,7 @@ export class ResidualSourceProfile {
   /**
    * Clear measurements that are rebuilt for every source spectrum.
    *
-   * @returns {ResidualSourceProfile}
+   * @returns {object}
    */
   reset() {
     this.groupScaleFactors.fill(0)

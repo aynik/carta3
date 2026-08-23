@@ -2,17 +2,11 @@
 
 import { selectDecoderMode, selectEncoderMode } from '../core/profiles.js'
 
-/** @import { AnalysisFrame } from '../analysis/stage.js' */
-/** @import { PackedFrame } from '../packing.js' */
-/** @import { DecoderContext, EncodedFrame } from '../pipeline/decoder.js' */
-/** @import { EncoderContext, PcmFrame } from '../pipeline/encoder.js' */
-/** @import { SynthesisFrame } from '../synthesis.js' */
-
 /**
  * Capture independent histories into detached frame work.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(PcmFrame): AnalysisFrame} Independent capture.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Independent capture.
  */
 function beginIndependent(context) {
   const encoder = context.bufferPool.encoder
@@ -35,8 +29,8 @@ function beginIndependent(context) {
 /**
  * Publish independent histories after successful frame packing.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(PackedFrame): PackedFrame} Independent publication.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Independent publication.
  */
 function commitIndependent(context) {
   const encoder = context.bufferPool.encoder
@@ -56,7 +50,7 @@ function commitIndependent(context) {
  * Publish non-joint decoder history after successful synthesis.
  *
  * @param {object} decoder Decoder storage.
- * @returns {function(SynthesisFrame): SynthesisFrame} Decoder publication.
+ * @returns {Function} Decoder publication.
  */
 function commitNonJointDecoder(decoder) {
   return (frame) => {
@@ -69,7 +63,7 @@ function commitNonJointDecoder(decoder) {
  * Advance the joint header and publish decoder history.
  *
  * @param {object} decoder Decoder storage.
- * @returns {function(SynthesisFrame): SynthesisFrame} Decoder publication.
+ * @returns {Function} Decoder publication.
  */
 function commitJointDecoder(decoder) {
   return (frame) => {
@@ -82,8 +76,8 @@ function commitJointDecoder(decoder) {
 /**
  * Capture layered histories into detached frame work.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(PcmFrame): AnalysisFrame} Layered capture.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Layered capture.
  */
 export function beginLayered(context) {
   const encoder = context.bufferPool.encoder
@@ -105,8 +99,8 @@ export function beginLayered(context) {
 /**
  * Publish layered histories after successful frame packing.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(PackedFrame): PackedFrame} Layered publication.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Layered publication.
  */
 export function commitLayered(context) {
   const encoder = context.bufferPool.encoder
@@ -124,8 +118,8 @@ export function commitLayered(context) {
 /**
  * Select encoder capture once for the configured stream.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(PcmFrame): AnalysisFrame} Encoder capture.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Encoder capture.
  */
 export function beginEncoderFrame(context) {
   const beginMode = selectEncoderMode(
@@ -140,8 +134,8 @@ export function beginEncoderFrame(context) {
 /**
  * Select encoder publication once for the configured stream.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(PackedFrame): PackedFrame} Encoder publication.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Encoder publication.
  */
 export function commitEncoderFrame(context) {
   const commitMode = selectEncoderMode(
@@ -156,8 +150,8 @@ export function commitEncoderFrame(context) {
 /**
  * Capture decoder history into detached frame work.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(EncodedFrame): EncodedFrame} Decoder capture.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Decoder capture.
  */
 export function beginDecoderFrame(context) {
   const decoder = context.bufferPool.decoder
@@ -170,8 +164,8 @@ export function beginDecoderFrame(context) {
 /**
  * Publish decoder history after successful synthesis.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SynthesisFrame): SynthesisFrame} Decoder publication.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Decoder publication.
  */
 export function commitDecoderFrame(context) {
   const decoder = context.bufferPool.decoder

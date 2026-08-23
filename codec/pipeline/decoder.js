@@ -17,28 +17,11 @@ import { synthesize } from '../synthesis.js'
 import { unpack } from '../unpacking.js'
 import { pipe } from '../utils.js'
 
-/** @import { SynthesisFrame } from '../synthesis.js' */
-
-/**
- * Stable ownership shared by one persistent decoder pipeline.
- *
- * @typedef {object} DecoderContext
- * @property {object} profile Resolved immutable stream profile.
- * @property {BufferPool} bufferPool Persistent, frame, and scratch storage.
- */
-
-/**
- * Validated encoded bytes presented to syntax unpacking.
- *
- * @typedef {object} EncodedFrame
- * @property {Uint8Array} input One complete encoded frame.
- */
-
 /**
  * Detach the synthesized PCM before it crosses the public normalization boundary.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(SynthesisFrame): Float32Array[]} PCM detachment.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} PCM detachment.
  */
 function detachPcm(context) {
   const channels = context.bufferPool.decoder.frame.channels
@@ -51,7 +34,7 @@ function detachPcm(context) {
  *
  * @param {object} options Profile options for 66, 105, or 132 kbps.
  * @param {BufferPool} bufferPool Reusable persistent and scratch storage.
- * @returns {DecoderContext} Pipeline ownership context.
+ * @returns {object} Pipeline ownership context.
  */
 function createDecoderContext(options, bufferPool) {
   const profile = resolveProfile(options)
@@ -63,8 +46,8 @@ function createDecoderContext(options, bufferPool) {
 /**
  * Reject malformed frame storage before capturing persistent state.
  *
- * @param {DecoderContext} context Pipeline ownership context.
- * @returns {function(Uint8Array): EncodedFrame} Reusable validation stage.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Reusable validation stage.
  */
 export function validateFrame(context) {
   const bytes = context.profile.bytesPerFrame
@@ -81,7 +64,7 @@ export function validateFrame(context) {
  *
  * @param {object} [options] Profile and decoder-state options.
  * @param {BufferPool} [bufferPool] Reusable persistent and scratch storage.
- * @returns {function(Uint8Array): Float32Array[]} One-frame stereo decoder.
+ * @returns {Function} One-frame stereo decoder.
  */
 export function decode(options = {}, bufferPool = new BufferPool()) {
   const context = createDecoderContext(options, bufferPool)
