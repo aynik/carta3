@@ -210,20 +210,16 @@ export function reconstructForwardGainScale(previous, current, output, steps) {
 }
 
 /**
- * Multiply or divide samples by a reconstructed gain envelope in place.
+ * Divide samples by a reconstructed gain envelope in place.
  *
  * @param {Float32Array} samples Samples to update.
  * @param {Float32Array} scale Reconstructed envelope.
- * @param {'divide'|'multiply'} [operation] Direction of gain application.
  * @returns {number} Number of samples updated.
  */
-export function applyGainScale(samples, scale, operation = 'divide') {
+function divideByGainScale(samples, scale) {
   const count = Math.min(samples.length, scale.length, GAIN_SCALE_SAMPLES)
   for (let index = 0; index < count; index++) {
-    samples[index] =
-      operation === 'multiply'
-        ? samples[index] * scale[index]
-        : samples[index] / scale[index]
+    samples[index] = samples[index] / scale[index]
   }
   return count
 }
@@ -235,7 +231,7 @@ export function applyGainScale(samples, scale, operation = 'divide') {
  * @param {GainRecord} current Current-frame record.
  * @returns {boolean} Whether reconstruction requires gain scaling.
  */
-export function gainPairIsActive(previous, current) {
+function gainPairIsActive(previous, current) {
   return previous.entries !== 0 || current.entries !== 0
 }
 
@@ -276,7 +272,7 @@ export function reconstructGainPairSignal(
     ) {
       return null
     }
-    applyGainScale(output, gainScaleScratch.scale, 'divide')
+    divideByGainScale(output, gainScaleScratch.scale)
   }
   return output
 }
