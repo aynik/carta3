@@ -564,14 +564,14 @@ export function inverseMdctBlock(spectrum, blockIndex, gainIndex, synthesis) {
 
   let step = DECODER_SPECTRUM_FLOATS_PER_UNIT / 2
   let spectrumOffset = 0
-  for (;;) {
+  while (step > 2) {
     const half = step >> 1
     let twiddlePosition = DECODER_SPECTRUM_FLOATS_PER_UNIT - 1 - half
-    for (;;) {
+    while (twiddlePosition >= 0) {
       const span = step * 2
       let end = spectrumOffset
       let remaining = span
-      for (;;) {
+      while (remaining > 0) {
         spectrum[end] = float32Subtract(
           spectrum[end],
           spectrum[end + remaining - 1]
@@ -590,11 +590,10 @@ export function inverseMdctBlock(spectrum, blockIndex, gainIndex, synthesis) {
         )
         end += 4
         remaining -= 8
-        if (remaining <= 0) break
       }
       const endOffset = end
       const twiddle = INVERSE_TRANSFORM_TWIDDLES[twiddlePosition]
-      for (;;) {
+      while (spectrumOffset !== endOffset) {
         const first = spectrumOffset
         const second = spectrumOffset + step
         const firstRotated = float32Multiply(twiddle, spectrum[second])
@@ -607,15 +606,12 @@ export function inverseMdctBlock(spectrum, blockIndex, gainIndex, synthesis) {
         spectrum[first] = float32Add(spectrum[first], firstRotated)
         spectrum[first + 1] = float32Add(spectrum[first + 1], secondRotated)
         spectrumOffset += 2
-        if (spectrumOffset === endOffset) break
       }
       twiddlePosition -= step
       spectrumOffset += step
-      if (twiddlePosition < 0) break
     }
     spectrumOffset -= DECODER_SPECTRAL_LINES_PER_UNIT
     step = half
-    if (step === 2) break
   }
 
   for (let group = 0; group < DECODER_SPECTRUM_FLOATS_PER_UNIT / 2; group++) {
