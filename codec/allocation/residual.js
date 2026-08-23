@@ -1,24 +1,15 @@
 /** Carta3 residual allocation measurement. */
 
-/** Carta3 Audio Codec - Residual codebooks, quantization, and pricing. */
-
 import {
   RESIDUAL_SYMBOL_MASKS,
   SPECTRAL_SCALE_FACTORS,
 } from '../core/tables.js'
+import { residualBandRange } from '../core/geometry.js'
 import {
   quantizeResidualCoefficient,
-  residualBandRange,
-  residualCodebook,
   residualQuantGroupScale,
-  validateResidualSyntax,
-} from '../quantization/symbols/residual.js'
-/**
- * Expand one compact residual mode into encoder and decoder tables.
- *
- * @param {number} mode
- * @returns {object}
- */
+} from '../quantization/residual.js'
+import { residualCodebook, validateResidualSyntax } from '../syntax/residual.js'
 
 /**
  * Quantize and measure reconstruction cost over a coefficient range.
@@ -89,7 +80,7 @@ function measureBand(source, range, mode, scaleFactor) {
  * @param {number} band Quantization-unit index.
  * @param {number} mode Residual mode, or zero for an omitted band.
  * @param {number} scaleFactor Six-bit scale-factor index.
- * @returns {{bits: number, error: number, energy: number}} Rate/distortion cost.
+ * @returns {object} Rate/distortion cost.
  */
 export function measureResidualBand(source, band, mode, scaleFactor) {
   const range = residualBandRange(source, band)
@@ -157,14 +148,3 @@ export function measureResidualScaleNeighbors(source, band, mode, scaleFactor) {
     }
   })
 }
-
-/**
- * Quantize and write residual symbols over a validated coefficient range.
- *
- * @param {Float32Array} source
- * @param {object} range
- * @param {number} mode
- * @param {number} scaleFactor
- * @param {object} sink
- * @returns {number}
- */

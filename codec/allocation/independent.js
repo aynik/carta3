@@ -31,9 +31,9 @@ import {
   quantZeroThreshold,
   scaleFactorIndexForAbs,
   spectralScaleForIndex,
-  measureNontoneBits,
   quantizeNontoneSymbols,
 } from '../quantization/spectrum.js'
+import { HUFFMAN_FAMILIES, measureHuffmanBits } from '../syntax/entropy.js'
 import {
   countSoundUnitBits,
   countSoundUnitFixedBits,
@@ -46,12 +46,24 @@ import {
 } from './distortion.js'
 import { absoluteMaximum, float32Add, float32Multiply } from '../utils.js'
 
-/** @import { SoundUnitAllocationScratch } from '../state/encoder.js' */
-/** @import { GainRecord } from '../state/gain.js' */
-
 const maximumWordLengthThresholds = new Float32Array(
   ALLOCATION_BAND_COUNT
 ).fill(WORD_LENGTH_LIMIT)
+
+/**
+ * Measure selector and Huffman bits for one quantized non-tone run.
+ *
+ * @param {number} tableGroup Huffman family selector.
+ * @param {number} wordLength Coded word length.
+ * @param {ArrayLike<number>} symbols Quantized symbols.
+ * @returns {number} Exact syntax cost in bits.
+ */
+function measureNontoneBits(tableGroup, wordLength, symbols) {
+  if (wordLength === 0) return 0
+  const table = HUFFMAN_FAMILIES[tableGroup]?.[wordLength]
+  if (!table) throw new RangeError('ATRAC3 non-tone codebook is unavailable')
+  return 6 + measureHuffmanBits(table, symbols)
+}
 
 /**
  * Measure four-line scale-factor evidence across the active spectrum prefix.
@@ -99,7 +111,7 @@ function selectBandScales(profile, bandCount, output) {
 /**
  * Return whether one gain record encodes a strong level excursion.
  *
- * @param {GainRecord} record
+ * @param {object} record
  * @returns {boolean}
  */
 function isAttackRecord(record) {
@@ -115,8 +127,8 @@ function isAttackRecord(record) {
 /**
  * Inspect current and prior component records for an active attack.
  *
- * @param {GainRecord[]} current
- * @param {GainRecord[]} previous
+ * @param {object[]} current
+ * @param {object[]} previous
  * @param {number} componentCount
  * @returns {boolean}
  */
@@ -379,7 +391,7 @@ function retuneCandidate(
  * @param {number} budget
  * @param {Float32Array} spectrum
  * @param {number} bandCount
- * @param {SoundUnitAllocationScratch} allocationScratch
+ * @param {object} allocationScratch
  * @returns {object}
  */
 function tuneToBudget(
@@ -1000,7 +1012,7 @@ function publishCandidate(block, state, componentCount, bandCount) {
  *
  * @param {object} block Detached candidate syntax and trial symbols.
  * @param {Float32Array} source Gain-adjusted source spectrum.
- * @param {SoundUnitAllocationScratch} allocationScratch Reusable measurement scratch.
+ * @param {object} allocationScratch Reusable measurement scratch.
  * @returns {number} Mask-normalized reconstruction error.
  */
 function measureCandidateError(block, source, allocationScratch) {
@@ -1069,9 +1081,9 @@ export class SoundUnitCandidateError extends RangeError {}
  * @param {Float32Array} sourceSpectrum Gain-adjusted source spectrum.
  * @param {Float32Array} transformedSpectrum Zero-gain reference spectrum.
  * @param {object} block Detached destination sound-unit state.
- * @param {GainRecord[]} previousGainRecords Prior committed gain records.
+ * @param {object[]} previousGainRecords Prior committed gain records.
  * @param {number} unitBits Exact sound-unit bit budget.
- * @param {SoundUnitAllocationScratch} allocationScratch Reusable allocation scratch.
+ * @param {object} allocationScratch Reusable allocation scratch.
  * @param {string} [tonePolicy] Tone candidate policy identifier.
  * @returns {number} Exact candidate syntax bit count.
  */
@@ -1236,9 +1248,9 @@ export function allocateSoundUnitCandidate(
  * @param {Float32Array} transformedSpectrum Zero-gain reference spectrum.
  * @param {object} selectedBlock Detached destination sound-unit state.
  * @param {object} candidateBlock Reusable alternative candidate state.
- * @param {GainRecord[]} previousGainRecords Prior committed gain records.
+ * @param {object[]} previousGainRecords Prior committed gain records.
  * @param {number} unitBits Exact sound-unit bit budget.
- * @param {SoundUnitAllocationScratch} allocationScratch Reusable allocation scratch.
+ * @param {object} allocationScratch Reusable allocation scratch.
  * @returns {number} Exact bit count of the published candidate.
  */
 export function allocateSoundUnitCandidates(

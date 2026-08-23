@@ -11,7 +11,6 @@ import {
   QUANTIZATION_BIAS_SCALE,
   QUANTIZATION_LIMIT_BIAS,
 } from '../core/constants.js'
-import { HUFFMAN_FAMILIES, measureHuffmanBits } from '../syntax/entropy.js'
 
 /**
  * Truncate a finite f64 to the codec's saturated signed integer domain.
@@ -124,19 +123,4 @@ export function quantizeNontoneSymbols(
     }
   }
   return spectrum.length
-}
-
-/**
- * Measure selector and Huffman bits for a quantized non-tone run.
- *
- * @param {number} tableGroup Huffman family selector.
- * @param {number} wordLength Coded word length.
- * @param {ArrayLike<number>} symbols Quantized symbols.
- * @returns {number} Exact syntax cost in bits.
- */
-export function measureNontoneBits(tableGroup, wordLength, symbols) {
-  if (wordLength === 0) return 0
-  const table = HUFFMAN_FAMILIES[tableGroup]?.[wordLength]
-  if (!table) throw new RangeError('ATRAC3 non-tone codebook is unavailable')
-  return 6 + measureHuffmanBits(table, symbols)
 }

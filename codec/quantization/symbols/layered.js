@@ -1,11 +1,7 @@
 /** Carta3 layered retained-symbol materialization. */
 
 import { AllocationWorkView } from '../../state/allocation.js'
-import { quantizeResidualSymbols } from './residual.js'
-
-/** @import { AllocationFrame } from '../../allocation/stage.js' */
-/** @import { EncoderContext } from '../../pipeline/encoder.js' */
-/** @import { SymbolFrame } from '../stage.js' */
+import { quantizeResidualSymbols } from '../residual.js'
 
 /**
  * Materialize one layer's retained residual symbols.
@@ -15,7 +11,7 @@ import { quantizeResidualSymbols } from './residual.js'
  * @param {Int32Array} output Caller-owned retained symbol storage.
  * @returns {Int32Array} `output` after quantization.
  */
-function quantizeResidual(layer, work, output) {
+function quantizeLayer(layer, work, output) {
   const allocation = new AllocationWorkView(work)
   output.fill(0)
   for (let band = 0; band < allocation.activeBandCount; band++) {
@@ -36,14 +32,14 @@ function quantizeResidual(layer, work, output) {
 /**
  * Materialize both layers' retained residual symbols.
  *
- * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(AllocationFrame): SymbolFrame} Quantization operation.
+ * @param {object} context Pipeline ownership context.
+ * @returns {Function} Quantization operation.
  */
 export function quantizeLayered(context) {
   const symbols = context.bufferPool.encoder.frame.layeredSymbols
   return (frame) => {
     for (let layer = 0; layer < 2; layer++) {
-      quantizeResidual(
+      quantizeLayer(
         frame.layers[layer],
         frame.layeredAllocationWork[layer],
         symbols[layer]

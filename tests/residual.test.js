@@ -18,12 +18,14 @@ import {
 } from '../codec/allocation/residual.js'
 import {
   quantizeResidualCoefficient,
-  residualCodebook,
   residualQuantGroupScale,
-} from '../codec/quantization/symbols/residual.js'
+} from '../codec/quantization/residual.js'
 import { quantizeLayered } from '../codec/quantization/symbols/layered.js'
 import { BitCounter } from '../codec/syntax/bitstream.js'
-import { writeResidualBand } from '../codec/syntax/residual.js'
+import {
+  residualCodebook,
+  writeResidualBand,
+} from '../codec/syntax/residual.js'
 import {
   countLayeredChannelBits,
   packLayeredChannel,
