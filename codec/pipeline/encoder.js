@@ -73,6 +73,15 @@ export function validateFrame() {
 }
 
 /**
+ * Detach pool-owned packed bytes only after successful state publication.
+ *
+ * @returns {function(import('../packing.js').PackedFrame): Uint8Array} Output detachment.
+ */
+export function detachOutput() {
+  return (frame) => frame.output.slice()
+}
+
+/**
  * Compose one persistent encoder accepting normalized Web Audio PCM.
  *
  * The adapter reuses one codec-domain frame for the lifetime of the closure.
@@ -91,7 +100,8 @@ export function encode(options = {}, bufferPool = new BufferPool()) {
     allocate,
     quantize,
     pack,
-    commitEncoderFrame
+    commitEncoderFrame,
+    detachOutput
   )
   const codecFrame = [
     new Float32Array(FRAME_SAMPLES),

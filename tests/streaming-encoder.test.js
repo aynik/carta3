@@ -4,7 +4,7 @@ import { BufferPool } from '../codec/state/storage.js'
 import { IndependentChannelHeader } from '../codec/syntax/records.js'
 import { createWave } from '../codec/boundary/container.js'
 import { PCM_SCALE } from '../codec/boundary/pcm.js'
-import { encode } from '../codec/pipeline/encoder.js'
+import { detachOutput, encode } from '../codec/pipeline/encoder.js'
 import { createWaveStreamingEncoder } from '../codec/boundary/stream.js'
 
 /**
@@ -57,6 +57,13 @@ describe('ATRAC3 encoder stream setup', () => {
 })
 
 describe('ATRAC3 132 kbps staged encoder transaction', () => {
+  it('detaches packed bytes independently from state publication', () => {
+    const output = Uint8Array.of(1, 2, 3)
+    const detached = detachOutput()({ output })
+    expect(detached).toEqual(output)
+    expect(detached).not.toBe(output)
+  })
+
   it('packs both independent channels into one 384-byte frame', () => {
     const buffers = new BufferPool()
     const encoder = encode({}, buffers)

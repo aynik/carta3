@@ -36,7 +36,7 @@ function beginIndependent(context) {
  * Publish independent histories after successful frame packing.
  *
  * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(PackedFrame): Uint8Array} Independent publication.
+ * @returns {function(PackedFrame): PackedFrame} Independent publication.
  */
 function commitIndependent(context) {
   const encoder = context.bufferPool.encoder
@@ -48,7 +48,7 @@ function commitIndependent(context) {
         frame.channelBlocks[channel].gainRecords
       )
     }
-    return frame.output.slice()
+    return frame
   }
 }
 
@@ -106,7 +106,7 @@ export function beginLayered(context) {
  * Publish layered histories after successful frame packing.
  *
  * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(PackedFrame): Uint8Array} Layered publication.
+ * @returns {function(PackedFrame): PackedFrame} Layered publication.
  */
 export function commitLayered(context) {
   const encoder = context.bufferPool.encoder
@@ -117,7 +117,7 @@ export function commitLayered(context) {
       histories[layer].commitFrom(frame.layers[layer])
     }
     jointHistory.commitFrom(frame.jointStereo)
-    return frame.output.slice()
+    return frame
   }
 }
 
@@ -141,7 +141,7 @@ export function beginEncoderFrame(context) {
  * Select encoder publication once for the configured stream.
  *
  * @param {EncoderContext} context Pipeline ownership context.
- * @returns {function(PackedFrame): Uint8Array} Encoder publication.
+ * @returns {function(PackedFrame): PackedFrame} Encoder publication.
  */
 export function commitEncoderFrame(context) {
   const commitMode = selectEncoderMode(
