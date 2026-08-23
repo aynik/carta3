@@ -72,7 +72,7 @@ describe('AudioProcessor ATRAC3 boundaries', () => {
     const parsed = await AudioProcessor.parseWaveBlob(new Blob([wave]))
     const blob = await AudioProcessor.createWaveBlob(parsed.frames, {
       bitrateKbps: 105,
-      alignmentSampleCount: parsed.fact.alignmentSampleCount,
+      primingSampleCount: parsed.fact.primingSampleCount,
       sampleCount: parsed.fact.sampleCount,
     })
     expect(new Uint8Array(await blob.arrayBuffer())).toEqual(wave)

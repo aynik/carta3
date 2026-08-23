@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { WAVE_FORMAT_TAG, WAVE_HEADER_BYTES } from '../codec/core/constants.js'
+import {
+  STREAM_PRIMING_SAMPLES,
+  WAVE_FORMAT_TAG,
+  WAVE_HEADER_BYTES,
+} from '../codec/core/constants.js'
+import { decodeWavePcm, encodeWavePcm } from '../codec/boundary/stream.js'
 import { createWave, parseWave } from '../codec/boundary/container.js'
 
 describe('ATRAC3 RIFF/WAVE container', () => {
@@ -17,7 +22,7 @@ describe('ATRAC3 RIFF/WAVE container', () => {
     expect(view.getUint16(36, true)).toBe(14)
     expect(view.getUint32(56, true)).toBe(12)
     expect(view.getUint32(60, true)).toBe(2048)
-    expect(view.getUint32(68, true)).toBe(1024)
+    expect(view.getUint32(68, true)).toBe(STREAM_PRIMING_SAMPLES)
     expect(view.getUint32(76, true)).toBe(768)
   })
 
@@ -25,7 +30,7 @@ describe('ATRAC3 RIFF/WAVE container', () => {
     const frames = [new Uint8Array(384).fill(3), new Uint8Array(384).fill(7)]
     const parsed = parseWave(createWave(frames))
     expect(parsed.profile.bitrateKbps).toBe(132)
-    expect(parsed.fact.alignmentSampleCount).toBe(1024)
+    expect(parsed.fact.primingSampleCount).toBe(STREAM_PRIMING_SAMPLES)
     expect(parsed.frameCount).toBe(2)
     expect([...parsed.frames()].map((frame) => frame[0])).toEqual([3, 7])
     const iterator = parsed.frames()
@@ -37,5 +42,28 @@ describe('ATRAC3 RIFF/WAVE container', () => {
 
   it('rejects a frame with incorrect block alignment', () => {
     expect(() => createWave([new Uint8Array(192)])).toThrow(/alignment/)
+  })
+
+  it('aligns decoded PCM with the original source timeline', () => {
+    const sampleCount = 8192
+    const impulseSample = 3145
+    const channels = [
+      new Float32Array(sampleCount),
+      new Float32Array(sampleCount),
+    ]
+    channels[0][impulseSample] = 0.8
+    channels[1][impulseSample] = -0.6
+
+    const decoded = decodeWavePcm(encodeWavePcm(channels, { bitrateKbps: 132 }))
+    for (const channel of decoded) {
+      let peakSample = 0
+      for (let sample = 1; sample < channel.length; sample++) {
+        if (Math.abs(channel[sample]) > Math.abs(channel[peakSample])) {
+          peakSample = sample
+        }
+      }
+      expect(channel).toHaveLength(sampleCount)
+      expect(peakSample).toBe(impulseSample)
+    }
   })
 })

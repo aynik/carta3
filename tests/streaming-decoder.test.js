@@ -67,7 +67,7 @@ function decodeTimelineFloatBits(bitrateKbps) {
   const decodeFrame = decode({ bitrateKbps })
   const decodedFrames = Array.from(parsed.frames(), decodeFrame)
   const sampleCount = parsed.fact.sampleCount
-  const skipSamples = parsed.fact.alignmentSampleCount + 69
+  const skipSamples = parsed.fact.primingSampleCount
   const bytes = new Uint8Array(sampleCount * 2 * Float32Array.BYTES_PER_ELEMENT)
   const view = new DataView(bytes.buffer)
   for (let sample = 0; sample < sampleCount; sample++) {
@@ -268,9 +268,9 @@ describe('ATRAC3 staged streaming decoder', () => {
   })
 
   it.each([
-    [132, '933e74b0945791083552759cd827b6ccf152c735c4e12cb0610c0855ea84fb26'],
-    [105, 'c00acd8146cb89710268452acec414bf87ca128e6dfa5c10efd68aa4ee0519c5'],
-    [66, '422b26c27b7d0641abd4ff7a987cafff1bf85f3caddcac2d80f25dcb4e254bc9'],
+    [132, 'b832c96572a36bbba1fc6955067c4cb7b06e6df6559e0cc956e752d8d16ae349'],
+    [105, '3bdda7f5908935e01957417b1d67e9a7bdadf6e18724422149309d8710b5d101'],
+    [66, 'bb3aa18f6b139f21a77ac6d6c6f65a6c9042b0339a623b1eaeb1dd09e1f55d6e'],
   ])(
     'matches the %i kbps decoded WAVE timeline reference',
     (bitrateKbps, expectedHash) => {

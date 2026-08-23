@@ -2,7 +2,7 @@
 
 import {
   FRAME_SAMPLES,
-  WAVE_DELAY_SAMPLES,
+  STREAM_PRIMING_SAMPLES,
   WAVE_HEADER_BYTES,
 } from '../core/constants.js'
 import { resolveProfile } from '../core/profiles.js'
@@ -67,7 +67,7 @@ self.onmessage = async ({ data }) => {
           createWaveHeader(
             profile,
             encodedFrames.length * profile.bytesPerFrame,
-            profile.frameSamples,
+            STREAM_PRIMING_SAMPLES,
             encoder.sampleCount
           ),
           ...encodedFrames,
@@ -90,16 +90,13 @@ self.onmessage = async ({ data }) => {
       const parsed = parseWave(wave)
       const sampleCount =
         parsed.fact?.sampleCount ??
-        Math.max(
-          0,
-          parsed.frameCount * FRAME_SAMPLES - FRAME_SAMPLES - WAVE_DELAY_SAMPLES
-        )
+        Math.max(0, parsed.frameCount * FRAME_SAMPLES - STREAM_PRIMING_SAMPLES)
       const pcmParts = [createPcmWaveHeader({ sampleCount })]
       const decoder = createWaveStreamingDecoder({
         bitrateKbps: parsed.profile.bitrateKbps,
         sampleCount,
-        alignmentSampleCount:
-          parsed.fact?.alignmentSampleCount ?? FRAME_SAMPLES,
+        primingSampleCount:
+          parsed.fact?.primingSampleCount ?? STREAM_PRIMING_SAMPLES,
       })
       for (const frame of parsed.frames()) {
         const chunk = decoder.write(frame)

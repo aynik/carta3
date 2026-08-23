@@ -1,6 +1,6 @@
 /** Carta3 Audio Codec - High-level streaming audio processing. */
 
-import { FRAME_SAMPLES } from '../core/constants.js'
+import { FRAME_SAMPLES, STREAM_PRIMING_SAMPLES } from '../core/constants.js'
 import { resolveProfile } from '../core/profiles.js'
 import { decode } from '../pipeline/decoder.js'
 import {
@@ -164,9 +164,12 @@ export class AudioProcessor {
     const header = createWaveHeader(
       profile,
       frames.length * profile.bytesPerFrame,
-      options.alignmentSampleCount ?? profile.frameSamples,
+      options.primingSampleCount ?? STREAM_PRIMING_SAMPLES,
       options.sampleCount ??
-        Math.max(0, (frames.length - 3) * profile.frameSamples)
+        Math.max(
+          0,
+          frames.length * profile.frameSamples - STREAM_PRIMING_SAMPLES
+        )
     )
     return new Blob([header, ...frames], { type: 'audio/wav' })
   }

@@ -1,6 +1,10 @@
 /** Carta3 Audio Codec - Streaming WAVE timeline adapters. */
 
-import { FRAME_SAMPLES, WAVE_DELAY_SAMPLES } from '../core/constants.js'
+import {
+  ENCODER_LEAD_SAMPLES,
+  FRAME_SAMPLES,
+  STREAM_PRIMING_SAMPLES,
+} from '../core/constants.js'
 import { decode } from '../pipeline/decoder.js'
 import { encode } from '../pipeline/encoder.js'
 import { createWave, parseWave } from './container.js'
@@ -54,12 +58,12 @@ export class WaveStreamingEncoder {
    */
   constructor(options = {}) {
     this.encodeFrame = encode(options)
-    this.alignmentFrame = createStereoFrame()
+    this.primingFrame = createStereoFrame()
     this.pcmFrame = createStereoFrame()
-    this.alignmentFill = 0
+    this.primingFill = 0
     this.pcmFill = 0
     this.sampleCount = 0
-    this.alignmentPublished = false
+    this.primingPublished = false
     this.dropNextPcmFrame = true
     this.finalized = false
   }
@@ -87,25 +91,25 @@ export class WaveStreamingEncoder {
     const inputLength = channels[0].length
     let inputOffset = 0
 
-    if (!this.alignmentPublished) {
+    if (!this.primingPublished) {
       const count = Math.min(
         inputLength,
-        WAVE_DELAY_SAMPLES - this.alignmentFill
+        ENCODER_LEAD_SAMPLES - this.primingFill
       )
       const destination =
-        FRAME_SAMPLES - WAVE_DELAY_SAMPLES + this.alignmentFill
+        FRAME_SAMPLES - ENCODER_LEAD_SAMPLES + this.primingFill
       for (let channel = 0; channel < 2; channel++) {
-        this.alignmentFrame[channel].set(
+        this.primingFrame[channel].set(
           channels[channel].subarray(0, count),
           destination
         )
       }
-      this.alignmentFill += count
+      this.primingFill += count
       inputOffset += count
       this.sampleCount += count
-      if (this.alignmentFill === WAVE_DELAY_SAMPLES) {
-        yield this.encodeFrame(this.alignmentFrame)
-        this.alignmentPublished = true
+      if (this.primingFill === ENCODER_LEAD_SAMPLES) {
+        yield this.encodeFrame(this.primingFrame)
+        this.primingPublished = true
       }
     }
 
@@ -145,9 +149,9 @@ export class WaveStreamingEncoder {
       this.finalized = true
       return output
     }
-    if (!this.alignmentPublished) {
-      output.push(this.encodeFrame(this.alignmentFrame))
-      this.alignmentPublished = true
+    if (!this.primingPublished) {
+      output.push(this.encodeFrame(this.primingFrame))
+      this.primingPublished = true
     }
     if (this.pcmFill !== 0) {
       const frame = this.encodeFrame(this.pcmFrame)
@@ -176,8 +180,7 @@ export class WaveStreamingDecoder {
    */
   constructor(options = {}) {
     this.decodeFrame = decode(options)
-    this.skipSamples =
-      (options.alignmentSampleCount ?? FRAME_SAMPLES) + WAVE_DELAY_SAMPLES
+    this.skipSamples = options.primingSampleCount ?? STREAM_PRIMING_SAMPLES
     this.sampleCount = options.sampleCount ?? Number.POSITIVE_INFINITY
     this.timelinePosition = 0
     this.emittedSamples = 0
@@ -258,6 +261,7 @@ export function encodeWavePcm(channels, options = {}) {
   return createWave(frames, {
     ...options,
     sampleCount: encoder.sampleCount,
+    primingSampleCount: STREAM_PRIMING_SAMPLES,
   })
 }
 
@@ -271,16 +275,13 @@ export function decodeWavePcm(input) {
   const parsed = parseWave(input)
   const sampleCount =
     parsed.fact?.sampleCount ??
-    Math.max(
-      0,
-      parsed.frameCount * FRAME_SAMPLES - FRAME_SAMPLES - WAVE_DELAY_SAMPLES
-    )
-  const alignmentSampleCount =
-    parsed.fact?.alignmentSampleCount ?? FRAME_SAMPLES
+    Math.max(0, parsed.frameCount * FRAME_SAMPLES - STREAM_PRIMING_SAMPLES)
+  const primingSampleCount =
+    parsed.fact?.primingSampleCount ?? STREAM_PRIMING_SAMPLES
   const decoder = new WaveStreamingDecoder({
     bitrateKbps: parsed.profile.bitrateKbps,
     sampleCount,
-    alignmentSampleCount,
+    primingSampleCount,
   })
   const output = [new Float32Array(sampleCount), new Float32Array(sampleCount)]
   let outputOffset = 0

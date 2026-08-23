@@ -17,6 +17,11 @@ export const CHANNELS = 2
 export const MAX_CHANNELS = 2
 /** Residual delay samples. */
 export const RESIDUAL_DELAY_SAMPLES = 138
+/** Source samples advanced into the encoder's priming frame. */
+export const ENCODER_LEAD_SAMPLES = 69
+/** Complete-stream priming before source sample zero. */
+export const STREAM_PRIMING_SAMPLES =
+  FRAME_SAMPLES * 2 + RESIDUAL_DELAY_SAMPLES - ENCODER_LEAD_SAMPLES
 /** Decoder max units. */
 export const DECODER_MAX_UNITS = 4
 /** Decoder spectral lines per unit. */
@@ -219,8 +224,6 @@ export const PCM_WAVE_BITS_PER_SAMPLE = 16
 export const WAVE_FORMAT_TAG = 0x0270
 /** Wave header bytes. */
 export const WAVE_HEADER_BYTES = 80
-/** Wave delay samples. */
-export const WAVE_DELAY_SAMPLES = 69
 /** Channel sync. */
 export const CHANNEL_SYNC = 0x28
 

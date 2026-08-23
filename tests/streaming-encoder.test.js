@@ -193,7 +193,7 @@ describe('ATRAC3 132 kbps staged encoder transaction', () => {
     })
     expect(frames).toHaveLength(13)
     expect(createHash('sha256').update(wave).digest('hex')).toBe(
-      '0433559f95f98c6d481b7180511c8182986379ff92faa4981376f703707199c9'
+      '6f0bbd073a30cffd053ecc3ead86e429e84372bd3cc4bb8d4c06f8d784411870'
     )
   })
 
@@ -259,7 +259,7 @@ describe('ATRAC3 105 kbps staged encoder transaction', () => {
     expect(frames).toHaveLength(13)
     expect(wave).toHaveLength(4032)
     expect(createHash('sha256').update(wave).digest('hex')).toBe(
-      'b047f98fe56f97d6d1e3c214c0f1a6e36c82a9a9d58b2b82bd6a3582e9079f17'
+      '3c7a7594796eaedbd1815833129a175219b2aa6a2143c8eb4653d85166d8345c'
     )
   })
 })
@@ -306,7 +306,7 @@ describe('ATRAC3 66 kbps staged joint-stereo transaction', () => {
     expect(frames).toHaveLength(13)
     expect(wave).toHaveLength(2576)
     expect(createHash('sha256').update(wave).digest('hex')).toBe(
-      '66acca7764c5b6f36378b1da1f2bd27f6e7185f5e8338573d3feb3bd7bc2eed3'
+      '6ead33ef4a520457768744fc00af083474e3cec64ced1aca17e1234ad4f3883e'
     )
   })
 })

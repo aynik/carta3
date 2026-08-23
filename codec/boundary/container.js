@@ -1,6 +1,10 @@
 /** Carta3 Audio Codec - RIFF/WAVE container handling. */
 
-import { WAVE_FORMAT_TAG, WAVE_HEADER_BYTES } from '../core/constants.js'
+import {
+  STREAM_PRIMING_SAMPLES,
+  WAVE_FORMAT_TAG,
+  WAVE_HEADER_BYTES,
+} from '../core/constants.js'
 import { resolveProfile, resolveWaveProfile } from '../core/profiles.js'
 
 const textDecoder = new TextDecoder('ascii')
@@ -33,14 +37,14 @@ function readFourCc(input, offset) {
  *
  * @param {object} profile Resolved ATRAC3 profile.
  * @param {number} dataBytes Encoded data-chunk byte length.
- * @param {number} [alignmentSampleCount=1024] Fact alignment sample count.
+ * @param {number} [primingSampleCount=STREAM_PRIMING_SAMPLES] Samples before source sample zero.
  * @param {number} [sampleCount=0] Visible PCM samples per channel.
  * @returns {Uint8Array} Complete fixed-size RIFF header.
  */
 export function createWaveHeader(
   profile,
   dataBytes,
-  alignmentSampleCount = 1024,
+  primingSampleCount = STREAM_PRIMING_SAMPLES,
   sampleCount = 0
 ) {
   if (!profile || profile.channels !== 2 || dataBytes < 0) {
@@ -76,8 +80,8 @@ export function createWaveHeader(
   writeFourCc(output, 52, 'fact')
   view.setUint32(56, 12, true)
   view.setUint32(60, sampleCount >>> 0, true)
-  view.setUint32(64, alignmentSampleCount >>> 0, true)
-  view.setUint32(68, alignmentSampleCount >>> 0, true)
+  view.setUint32(64, primingSampleCount >>> 0, true)
+  view.setUint32(68, primingSampleCount >>> 0, true)
   writeFourCc(output, 72, 'data')
   view.setUint32(76, dataBytes, true)
   return output
@@ -99,9 +103,12 @@ export function createWave(frames, options = {}) {
     createWaveHeader(
       profile,
       dataBytes,
-      options.alignmentSampleCount ?? profile.frameSamples,
+      options.primingSampleCount ?? STREAM_PRIMING_SAMPLES,
       options.sampleCount ??
-        Math.max(0, (frames.length - 3) * profile.frameSamples)
+        Math.max(
+          0,
+          frames.length * profile.frameSamples - STREAM_PRIMING_SAMPLES
+        )
     )
   )
   let offset = WAVE_HEADER_BYTES
@@ -167,7 +174,7 @@ export function parseWave(input) {
         fact = {
           sampleCount: view.getUint32(payload, true),
           reservedSampleCount: view.getUint32(payload + 4, true),
-          alignmentSampleCount: view.getUint32(payload + 8, true),
+          primingSampleCount: view.getUint32(payload + 8, true),
         }
       }
     } else if (id === 'data') {
