@@ -356,7 +356,7 @@ export function analyzeLayeredBands(context) {
         frame.channels[layer],
         state.spectrum,
         state.qmfHistory,
-        encoder.scratch.layeredQmf
+        encoder.scratch.qmf
       )
     }
     return frame

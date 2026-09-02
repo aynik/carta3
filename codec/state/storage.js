@@ -5,8 +5,8 @@ import {
   EncoderState,
   GainAnalysisScratch,
   GainScaleScratch,
-  IndependentQmfScratch,
   MdctScratch,
+  QmfAnalysisScratch,
   SoundUnitAllocationScratch,
 } from './encoder.js'
 import { DecoderFrameState } from './decoder.js'
@@ -17,8 +17,6 @@ import {
 } from './layered.js'
 import {
   BITSTREAM_PADDING_BYTES,
-  FRAME_SAMPLES,
-  LAYERED_QMF_HISTORY_FLOATS,
   MAX_CHANNELS,
   MAX_CODED_FRAME_BYTES,
 } from '../core/constants.js'
@@ -40,10 +38,7 @@ export class BufferPool {
       state: new EncoderState(),
       frame: new EncoderFrameState(),
       scratch: {
-        layeredQmf: new Float32Array(
-          FRAME_SAMPLES + LAYERED_QMF_HISTORY_FLOATS
-        ),
-        qmf: new IndependentQmfScratch(),
+        qmf: new QmfAnalysisScratch(),
         mdct: Array.from({ length: MAX_CHANNELS }, () => new MdctScratch()),
         gainScale: new GainScaleScratch(),
         gainAnalysis: new GainAnalysisScratch(),

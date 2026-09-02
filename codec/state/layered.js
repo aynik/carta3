@@ -13,7 +13,6 @@ import {
   LAYER_TRANSFORM_HISTORY_OFFSET,
   LAYER_WINDOW_MATRIX_OFFSET,
   LAYER_WORDS,
-  LAYERED_QMF_HISTORY_FLOATS,
   MAX_CHANNELS,
   PAIR_BLOCK_BASE_WORD,
   PAIR_BLOCK_GAIN_COUNT_WORD,
@@ -25,6 +24,7 @@ import {
   SPECTRUM_GROUPS,
   SUBBAND_COUNT,
   TONE_HISTORY_WORD,
+  QMF_ANALYSIS_HISTORY_FLOATS,
 } from '../core/constants.js'
 import { float32FromBits, float32ToBits } from '../utils.js'
 
@@ -46,7 +46,7 @@ export class LayerHistory {
     this.windowMatrix = new Uint32Array(LAYER_MATRIX_WORDS)
     this.gainHistory = new Uint32Array(LAYER_MATRIX_WORDS)
     this.transformHistory = new Uint32Array(LAYER_MATRIX_WORDS)
-    this.qmfHistory = new Float32Array(LAYERED_QMF_HISTORY_FLOATS)
+    this.qmfHistory = new Float32Array(QMF_ANALYSIS_HISTORY_FLOATS)
     this.pairGains = Array.from(
       { length: SUBBAND_COUNT },
       () => new PairGainHistory()
@@ -131,7 +131,7 @@ export class LayerWork {
     this.windowMatrix = new Uint32Array(LAYER_MATRIX_WORDS)
     this.gainHistory = new Uint32Array(LAYER_MATRIX_WORDS)
     this.transformHistory = new Uint32Array(LAYER_MATRIX_WORDS)
-    this.qmfHistory = new Float32Array(LAYERED_QMF_HISTORY_FLOATS)
+    this.qmfHistory = new Float32Array(QMF_ANALYSIS_HISTORY_FLOATS)
     this.pairBlocks = Array.from(
       { length: SUBBAND_COUNT },
       () => new Uint32Array(PAIR_BLOCK_WORDS)
@@ -158,7 +158,7 @@ export class LayerWork {
     words.set(this.windowMatrix, LAYER_WINDOW_MATRIX_OFFSET)
     words.set(this.gainHistory, LAYER_GAIN_HISTORY_OFFSET)
     words.set(this.transformHistory, LAYER_TRANSFORM_HISTORY_OFFSET)
-    for (let index = 0; index < LAYERED_QMF_HISTORY_FLOATS; index++) {
+    for (let index = 0; index < QMF_ANALYSIS_HISTORY_FLOATS; index++) {
       words[LAYER_QMF_HISTORY_OFFSET + index] = float32ToBits(
         this.qmfHistory[index]
       )
@@ -207,7 +207,7 @@ export class LayerWork {
         LAYER_TRANSFORM_HISTORY_OFFSET + LAYER_MATRIX_WORDS
       )
     )
-    for (let index = 0; index < LAYERED_QMF_HISTORY_FLOATS; index++) {
+    for (let index = 0; index < QMF_ANALYSIS_HISTORY_FLOATS; index++) {
       this.qmfHistory[index] = float32FromBits(
         words[LAYER_QMF_HISTORY_OFFSET + index]
       )

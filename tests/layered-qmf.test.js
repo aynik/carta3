@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { analyzeLayeredQmfChannel } from '../codec/signal/bands.js'
-import {
-  FRAME_SAMPLES,
-  LAYERED_QMF_HISTORY_FLOATS,
-} from '../codec/core/constants.js'
+import { QMF_ANALYSIS_HISTORY_FLOATS } from '../codec/core/constants.js'
+import { QmfAnalysisScratch } from '../codec/state/encoder.js'
 
 /**
  * Test helper for qmfScratch.
@@ -11,13 +9,13 @@ import {
  * @returns {object}
  */
 function qmfScratch() {
-  return new Float32Array(FRAME_SAMPLES + LAYERED_QMF_HISTORY_FLOATS)
+  return new QmfAnalysisScratch()
 }
 
 describe('ATRAC3 layered QMF analysis', () => {
   it('keeps zero input and zero history silent', () => {
     const spectrum = new Float32Array(1024)
-    const history = new Float32Array(138)
+    const history = new Float32Array(QMF_ANALYSIS_HISTORY_FLOATS)
     analyzeLayeredQmfChannel(
       new Float32Array(1024),
       spectrum,
@@ -37,7 +35,7 @@ describe('ATRAC3 layered QMF analysis', () => {
       )
     )
     const spectrum = new Float32Array(1024)
-    const history = new Float32Array(138)
+    const history = new Float32Array(QMF_ANALYSIS_HISTORY_FLOATS)
     const scratch = qmfScratch()
     analyzeLayeredQmfChannel(input, spectrum, history, scratch)
     const firstSpectrum = spectrum.slice()

@@ -132,22 +132,27 @@ export const QMF_ANALYSIS_WINDOW_SAMPLES = QMF_TAPS
 export const QMF_ANALYSIS_MODULATION_SCALE = 1
 /** Persistent samples preceding one configurable QMF analysis input. */
 export const QMF_ANALYSIS_DELAY_SAMPLES = QMF_TAPS - QMF_BANDS
+/** Delay lines maintained by the four-band QMF analysis cascade. */
+export const QMF_ANALYSIS_DELAY_LINES = 3
+/** Complete persistent state of the four-band QMF analysis cascade. */
+export const QMF_ANALYSIS_HISTORY_FLOATS =
+  QMF_ANALYSIS_DELAY_LINES * QMF_ANALYSIS_DELAY_SAMPLES
+/** Root delay offset in four-band QMF analysis state. */
+export const QMF_ROOT_DELAY_OFFSET = 0
+/** Low-branch delay offset in four-band QMF analysis state. */
+export const QMF_LOW_DELAY_OFFSET = QMF_ANALYSIS_DELAY_SAMPLES
+/** High-branch delay offset in four-band QMF analysis state. */
+export const QMF_HIGH_DELAY_OFFSET = 2 * QMF_ANALYSIS_DELAY_SAMPLES
+/** Pinned inverse-square first-tap normalization for layered analysis. */
+export const LAYERED_QMF_ANALYSIS_SCALE = 4679080448
 /** Root history offset. */
 export const ROOT_HISTORY_OFFSET = 0x5000 / 4
 /** Low history offset. */
 export const LOW_HISTORY_OFFSET = 0x50b8 / 4
 /** High history offset. */
 export const HIGH_HISTORY_OFFSET = 0x5170 / 4
-/** Layered qmf history floats. */
-export const LAYERED_QMF_HISTORY_FLOATS = 138
-/** Low-rate QMF first-stage interleaved delay offset. */
-export const LAYERED_QMF_STAGE_OFFSET = 0x5c
-/** Low-rate QMF second-stage convolution cursor offset. */
-export const LAYERED_QMF_CONVOLUTION_CURSOR_OFFSET = 0x58
-/** Last direct-analysis QMF curve index. */
-export const LAYERED_QMF_ANALYSIS_TAIL_INDEX = 0x16
-/** Direct-analysis QMF mirror origin. */
-export const LAYERED_QMF_ANALYSIS_MIRROR_INDEX = 0x17
+/** Persistent samples preceding layered QMF synthesis input. */
+export const QMF_SYNTHESIS_HISTORY_FLOATS = 138
 /** Low-rate synthesis QMF history cursor offset. */
 export const LAYERED_QMF_SYNTHESIS_CURSOR_OFFSET = 0x54
 /** Last low-rate synthesis QMF tap. */

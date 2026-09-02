@@ -412,12 +412,17 @@ export class GainScaleScratch {
   }
 }
 
-/** Stage-private buffers for cascaded independent-channel QMF analysis. */
-export class IndependentQmfScratch {
+/** Stage-private buffers for cascaded four-band QMF analysis. */
+export class QmfAnalysisScratch {
   /** Allocate the cascaded stage outputs and configurable QMF kernel storage. */
   constructor() {
     this.firstLow = new Float32Array(FRAME_SAMPLES / 2)
     this.firstHigh = new Float32Array(FRAME_SAMPLES / 2)
+    this.layeredBands = Array.from(
+      { length: SUBBAND_COUNT },
+      () => new Float32Array(BAND_PART_FLOATS)
+    )
+    this.cascadeOutputs = new Array(SUBBAND_COUNT)
     this.analysisWindows = {
       [FRAME_SAMPLES / 2]: new Float32Array(
         QMF_ANALYSIS_DELAY_SAMPLES + FRAME_SAMPLES / 2

@@ -269,8 +269,8 @@ describe('ATRAC3 staged streaming decoder', () => {
 
   it.each([
     [132, 'bbe1715cf4fc0b106ee98be961dd6731d68ffd76e4ccbede001864e87be118a4'],
-    [105, '3bdda7f5908935e01957417b1d67e9a7bdadf6e18724422149309d8710b5d101'],
-    [66, 'bb3aa18f6b139f21a77ac6d6c6f65a6c9042b0339a623b1eaeb1dd09e1f55d6e'],
+    [105, '4ff1d4dae9603c21c8bf04121f7577f1cebd583ab2ac3ae0bed52cad022a0bec'],
+    [66, 'dfd5927dfbfa04670c03cabc43bcaa564fe5b98ab3d2ff2ab191c4dfbb95f105'],
   ])(
     'matches the %i kbps decoded WAVE timeline reference',
     (bitrateKbps, expectedHash) => {

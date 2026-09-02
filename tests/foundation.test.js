@@ -18,7 +18,7 @@ import {
   GainAnalysisScratch,
   GainScaleScratch,
   IndependentChannelHistory,
-  IndependentQmfScratch,
+  QmfAnalysisScratch,
   MdctScratch,
   SoundUnitAllocationScratch,
 } from '../codec/state/encoder.js'
@@ -109,7 +109,7 @@ describe('ATRAC3 profiles and state geometry', () => {
     expect(pool.encoder.scratch.mdct[0].folded).toHaveLength(256)
     expect(pool.encoder.scratch.mdct[0]).toBeInstanceOf(MdctScratch)
     expect(pool.encoder.scratch.mdct[0].real).toHaveLength(128)
-    expect(pool.encoder.scratch.qmf).toBeInstanceOf(IndependentQmfScratch)
+    expect(pool.encoder.scratch.qmf).toBeInstanceOf(QmfAnalysisScratch)
     expect(pool.encoder.scratch.qmf.firstLow).toHaveLength(512)
     expect(pool.encoder.scratch.qmf.analysisWindows[1024]).toHaveLength(
       QMF_ANALYSIS_DELAY_SAMPLES + FRAME_SAMPLES

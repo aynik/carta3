@@ -1,11 +1,9 @@
 /**
  * Carta3 Audio Codec - Quadrature-mirror filter kernels.
  *
- * The 132 kbps encoder uses a cascaded 48-tap analysis filter with three
- * independent delay lines. The 66/105 kbps encoder and decoder instead use a
- * fused four-lane polyphase form with explicit f32 rounding and one interleaved
- * 138-sample history. They share the QMF responsibility, but not a numerically
- * interchangeable convolution kernel.
+ * Every encoder profile uses the same cascaded 48-tap analysis transform with
+ * three independent delay lines. The low-rate decoder retains its native
+ * synthesis realization until that transform is independently decomposed.
  */
 
 import {
@@ -14,11 +12,7 @@ import {
   BAND_STRIDE_FLOATS,
   FRAME_SAMPLES,
   HIGH_HISTORY_OFFSET,
-  LAYERED_QMF_ANALYSIS_MIRROR_INDEX,
-  LAYERED_QMF_ANALYSIS_TAIL_INDEX,
-  LAYERED_QMF_CONVOLUTION_CURSOR_OFFSET,
-  LAYERED_QMF_HISTORY_FLOATS,
-  LAYERED_QMF_STAGE_OFFSET,
+  LAYERED_QMF_ANALYSIS_SCALE,
   LAYERED_QMF_SYNTHESIS_CARRY_OFFSET,
   LAYERED_QMF_SYNTHESIS_CURSOR_OFFSET,
   LAYERED_QMF_SYNTHESIS_HISTORY_OFFSET,
@@ -26,15 +20,15 @@ import {
   LAYERED_QMF_SYNTHESIS_MIRROR_INDEX,
   LOW_HISTORY_OFFSET,
   QMF_ANALYSIS_DELAY_SAMPLES,
+  QMF_ANALYSIS_HISTORY_FLOATS,
+  QMF_HIGH_DELAY_OFFSET,
+  QMF_LOW_DELAY_OFFSET,
+  QMF_ROOT_DELAY_OFFSET,
+  QMF_SYNTHESIS_HISTORY_FLOATS,
   ROOT_HISTORY_OFFSET,
   SUBBAND_COUNT,
 } from '../core/constants.js'
-import {
-  ANALYSIS_QMF_CURVE,
-  SYNTHESIS_QMF_CURVE,
-  TWO_PI,
-} from '../core/tables.js'
-import { float32Add, float32Multiply } from '../utils.js'
+import { SYNTHESIS_QMF_CURVE, TWO_PI } from '../core/tables.js'
 import { analyzeQmf } from './qmf.js'
 
 /**
@@ -45,6 +39,7 @@ import { analyzeQmf } from './qmf.js'
  * @param {Float32Array} high
  * @param {Float32Array} history
  * @param {object} scratch
+ * @returns {void}
  */
 function analyzeQmfPair(input, low, high, history, scratch) {
   const window = scratch.analysisWindows[input.length]
@@ -61,6 +56,30 @@ function analyzeQmfPair(input, low, high, history, scratch) {
   history.set(
     window.subarray(input.length, input.length + QMF_ANALYSIS_DELAY_SAMPLES)
   )
+}
+
+/**
+ * Split one PCM frame through the common two-level four-band QMF cascade.
+ *
+ * @param {Float32Array} pcm One complete 1024-sample channel frame.
+ * @param {Float32Array[]} bands Four caller-owned 256-sample band rows.
+ * @param {Float32Array} rootHistory Root-stage delay line.
+ * @param {Float32Array} lowHistory Low-branch delay line.
+ * @param {Float32Array} highHistory High-branch delay line.
+ * @param {object} scratch Operation-local QMF buffers.
+ * @returns {void}
+ */
+function analyzeQmfCascade(
+  pcm,
+  bands,
+  rootHistory,
+  lowHistory,
+  highHistory,
+  scratch
+) {
+  analyzeQmfPair(pcm, scratch.firstLow, scratch.firstHigh, rootHistory, scratch)
+  analyzeQmfPair(scratch.firstLow, bands[0], bands[1], lowHistory, scratch)
+  analyzeQmfPair(scratch.firstHigh, bands[3], bands[2], highHistory, scratch)
 }
 
 /**
@@ -137,40 +156,30 @@ export function analyzeIndependentQmfChannel(
     ROOT_HISTORY_OFFSET,
     ROOT_HISTORY_OFFSET + QMF_ANALYSIS_DELAY_SAMPLES
   )
-  analyzeQmfPair(
-    pcm,
-    independentQmfScratch.firstLow,
-    independentQmfScratch.firstHigh,
-    rootHistory,
-    independentQmfScratch
+  const bands = independentQmfScratch.cascadeOutputs
+  bands[0] = analysisWork.subarray(
+    bandSplitOffset(0),
+    bandSplitOffset(0) + BAND_PART_FLOATS
   )
-
-  analyzeQmfPair(
-    independentQmfScratch.firstLow,
-    analysisWork.subarray(
-      bandSplitOffset(0),
-      bandSplitOffset(0) + BAND_PART_FLOATS
-    ),
-    analysisWork.subarray(
-      bandSplitOffset(1),
-      bandSplitOffset(1) + BAND_PART_FLOATS
-    ),
+  bands[1] = analysisWork.subarray(
+    bandSplitOffset(1),
+    bandSplitOffset(1) + BAND_PART_FLOATS
+  )
+  bands[2] = analysisWork.subarray(
+    bandSplitOffset(2),
+    bandSplitOffset(2) + BAND_PART_FLOATS
+  )
+  bands[3] = analysisWork.subarray(
+    bandSplitOffset(3),
+    bandSplitOffset(3) + BAND_PART_FLOATS
+  )
+  analyzeQmfCascade(
+    pcm,
+    bands,
+    rootHistory,
     analysisWork.subarray(
       LOW_HISTORY_OFFSET,
       LOW_HISTORY_OFFSET + QMF_ANALYSIS_DELAY_SAMPLES
-    ),
-    independentQmfScratch
-  )
-
-  analyzeQmfPair(
-    independentQmfScratch.firstHigh,
-    analysisWork.subarray(
-      bandSplitOffset(3),
-      bandSplitOffset(3) + BAND_PART_FLOATS
-    ),
-    analysisWork.subarray(
-      bandSplitOffset(2),
-      bandSplitOffset(2) + BAND_PART_FLOATS
     ),
     analysisWork.subarray(
       HIGH_HISTORY_OFFSET,
@@ -183,174 +192,49 @@ export function analyzeIndependentQmfChannel(
 }
 
 /**
- * Analyze one low-rate channel through the fused polyphase QMF.
+ * Analyze one low-rate channel through the common four-band QMF cascade.
  *
  * @param {Float32Array} pcm One complete PCM frame.
  * @param {Float32Array} spectrum Destination for four interleaved bands.
- * @param {Float32Array} history Persistent 138-float interleaved delay state.
- * @param {Float32Array} layeredQmfScratch Operation-local history+input workspace.
+ * @param {Float32Array} history Three consecutive 46-sample delay lines.
+ * @param {object} qmfScratch Operation-local QMF buffers.
  * @returns {Float32Array} `spectrum` after analysis.
  */
-export function analyzeLayeredQmfChannel(
-  pcm,
-  spectrum,
-  history,
-  layeredQmfScratch
-) {
+export function analyzeLayeredQmfChannel(pcm, spectrum, history, qmfScratch) {
   if (
     pcm.length < FRAME_SAMPLES ||
     spectrum.length < FRAME_SAMPLES ||
-    history.length < LAYERED_QMF_HISTORY_FLOATS ||
-    layeredQmfScratch.length < FRAME_SAMPLES + LAYERED_QMF_HISTORY_FLOATS
+    history.length < QMF_ANALYSIS_HISTORY_FLOATS ||
+    !qmfScratch ||
+    qmfScratch.layeredBands?.length < SUBBAND_COUNT
   ) {
     throw new RangeError('ATRAC3 layered QMF has invalid buffer geometry')
   }
-  layeredQmfScratch.set(history.subarray(0, LAYERED_QMF_HISTORY_FLOATS), 0)
-
-  for (let window = 0; window < FRAME_SAMPLES; window += 4) {
-    const sample0 = pcm[window]
-    const sample1 = pcm[window + 1]
-    const sample2 = pcm[window + 2]
-    const sample3 = pcm[window + 3]
-    layeredQmfScratch[window + LAYERED_QMF_HISTORY_FLOATS] = sample0
-    layeredQmfScratch[window + LAYERED_QMF_HISTORY_FLOATS + 1] = sample1
-    layeredQmfScratch[window + LAYERED_QMF_HISTORY_FLOATS + 2] = sample2
-    layeredQmfScratch[window + LAYERED_QMF_HISTORY_FLOATS + 3] = sample3
-
-    let oddLow = float32Add(
-      sample1,
-      float32Multiply(
-        layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 1],
-        ANALYSIS_QMF_CURVE[0]
-      )
-    )
-    let oddHigh = float32Add(
-      sample3,
-      float32Multiply(
-        layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 3],
-        ANALYSIS_QMF_CURVE[0]
-      )
-    )
-    let evenLow = float32Add(
-      float32Multiply(sample0, ANALYSIS_QMF_CURVE[0]),
-      layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET]
-    )
-    let evenHigh = float32Add(
-      float32Multiply(sample2, ANALYSIS_QMF_CURVE[0]),
-      layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 2]
-    )
-    for (
-      let curveIndex = LAYERED_QMF_ANALYSIS_TAIL_INDEX;
-      curveIndex >= 1;
-      curveIndex--
-    ) {
-      const mirrored = LAYERED_QMF_ANALYSIS_MIRROR_INDEX - curveIndex
-      oddHigh = float32Add(
-        oddHigh,
-        float32Multiply(
-          ANALYSIS_QMF_CURVE[curveIndex],
-          layeredQmfScratch[
-            window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET + 3
-          ]
-        )
-      )
-      oddLow = float32Add(
-        oddLow,
-        float32Multiply(
-          ANALYSIS_QMF_CURVE[curveIndex],
-          layeredQmfScratch[
-            window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET + 1
-          ]
-        )
-      )
-      evenLow = float32Add(
-        evenLow,
-        float32Multiply(
-          ANALYSIS_QMF_CURVE[mirrored],
-          layeredQmfScratch[window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET]
-        )
-      )
-      evenHigh = float32Add(
-        evenHigh,
-        float32Multiply(
-          ANALYSIS_QMF_CURVE[mirrored],
-          layeredQmfScratch[
-            window + curveIndex * 2 + LAYERED_QMF_STAGE_OFFSET + 2
-          ]
-        )
-      )
-    }
-    const lowSum = float32Add(oddLow, evenLow)
-    const lowDifference = float32Add(oddLow, -evenLow)
-    const highSum = float32Add(oddHigh, evenHigh)
-    const highDifference = float32Add(oddHigh, -evenHigh)
-    layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET] = lowSum
-    layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 1] = lowDifference
-    layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 2] = highSum
-    layeredQmfScratch[window + LAYERED_QMF_STAGE_OFFSET + 3] = highDifference
-
-    let lane0 = float32Add(
-      float32Multiply(layeredQmfScratch[window + 2], ANALYSIS_QMF_CURVE[0]),
-      highSum
-    )
-    let lane1 = float32Add(
-      float32Multiply(layeredQmfScratch[window + 3], ANALYSIS_QMF_CURVE[0]),
-      highDifference
-    )
-    let lane2 = float32Add(
-      float32Multiply(lowDifference, ANALYSIS_QMF_CURVE[0]),
-      layeredQmfScratch[window + 1]
-    )
-    let lane3 = float32Add(
-      float32Multiply(lowSum, ANALYSIS_QMF_CURVE[0]),
-      layeredQmfScratch[window]
-    )
-    const cursor = window + LAYERED_QMF_CONVOLUTION_CURSOR_OFFSET
-    for (
-      let curveIndex = LAYERED_QMF_ANALYSIS_TAIL_INDEX;
-      curveIndex >= 1;
-      curveIndex--
-    ) {
-      const mirrored = LAYERED_QMF_ANALYSIS_MIRROR_INDEX - curveIndex
-      const offset = cursor - (LAYERED_QMF_ANALYSIS_TAIL_INDEX - curveIndex) * 4
-      lane1 = float32Add(
-        lane1,
-        float32Multiply(
-          ANALYSIS_QMF_CURVE[curveIndex],
-          layeredQmfScratch[offset + 3]
-        )
-      )
-      lane0 = float32Add(
-        lane0,
-        float32Multiply(
-          ANALYSIS_QMF_CURVE[curveIndex],
-          layeredQmfScratch[offset + 2]
-        )
-      )
-      lane3 = float32Add(
-        lane3,
-        float32Multiply(ANALYSIS_QMF_CURVE[mirrored], layeredQmfScratch[offset])
-      )
-      lane2 = float32Add(
-        lane2,
-        float32Multiply(
-          ANALYSIS_QMF_CURVE[mirrored],
-          layeredQmfScratch[offset + 1]
-        )
-      )
-    }
-    spectrum[window] = float32Add(lane0, lane3)
-    spectrum[window + 1] = float32Add(lane0, -lane3)
-    spectrum[window + 2] = float32Add(lane1, -lane2)
-    spectrum[window + 3] = float32Add(lane1, lane2)
-  }
-
-  history.set(
-    layeredQmfScratch.subarray(
-      FRAME_SAMPLES,
-      FRAME_SAMPLES + LAYERED_QMF_HISTORY_FLOATS
-    )
+  const bands = qmfScratch.layeredBands
+  analyzeQmfCascade(
+    pcm,
+    bands,
+    history.subarray(
+      QMF_ROOT_DELAY_OFFSET,
+      QMF_ROOT_DELAY_OFFSET + QMF_ANALYSIS_DELAY_SAMPLES
+    ),
+    history.subarray(
+      QMF_LOW_DELAY_OFFSET,
+      QMF_LOW_DELAY_OFFSET + QMF_ANALYSIS_DELAY_SAMPLES
+    ),
+    history.subarray(
+      QMF_HIGH_DELAY_OFFSET,
+      QMF_HIGH_DELAY_OFFSET + QMF_ANALYSIS_DELAY_SAMPLES
+    ),
+    qmfScratch
   )
+  for (let sample = 0; sample < BAND_PART_FLOATS; sample++) {
+    const destination = sample * SUBBAND_COUNT
+    for (let band = 0; band < SUBBAND_COUNT; band++) {
+      spectrum[destination + band] =
+        bands[band][sample] * LAYERED_QMF_ANALYSIS_SCALE
+    }
+  }
   return spectrum
 }
 
@@ -365,29 +249,30 @@ export function synthesizeQmfChannel(channel) {
   const twoPi = Number(TWO_PI)
   for (let frameOffset = 0; frameOffset < FRAME_SAMPLES; frameOffset += 4) {
     let evenDifference =
-      Number(work[frameOffset + LAYERED_QMF_HISTORY_FLOATS]) -
-      Number(work[frameOffset + LAYERED_QMF_HISTORY_FLOATS + 1])
+      Number(work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS]) -
+      Number(work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS + 1])
     let evenSum =
-      Number(work[frameOffset + LAYERED_QMF_HISTORY_FLOATS]) +
-      Number(work[frameOffset + LAYERED_QMF_HISTORY_FLOATS + 1])
+      Number(work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS]) +
+      Number(work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS + 1])
     let oddSum =
-      Number(work[frameOffset + LAYERED_QMF_HISTORY_FLOATS + 3]) +
-      Number(work[frameOffset + LAYERED_QMF_HISTORY_FLOATS + 2])
-    work[frameOffset + LAYERED_QMF_HISTORY_FLOATS] = Math.fround(evenDifference)
+      Number(work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS + 3]) +
+      Number(work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS + 2])
+    work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS] =
+      Math.fround(evenDifference)
     evenDifference +=
       Number(work[frameOffset + LAYERED_QMF_SYNTHESIS_CARRY_OFFSET]) * twoPi
     let oddDifference =
-      Number(work[frameOffset + LAYERED_QMF_HISTORY_FLOATS + 3]) -
-      Number(work[frameOffset + LAYERED_QMF_HISTORY_FLOATS + 2])
-    work[frameOffset + LAYERED_QMF_HISTORY_FLOATS + 3] = Math.fround(oddSum)
-    work[frameOffset + LAYERED_QMF_HISTORY_FLOATS + 1] = Math.fround(evenSum)
+      Number(work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS + 3]) -
+      Number(work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS + 2])
+    work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS + 3] = Math.fround(oddSum)
+    work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS + 1] = Math.fround(evenSum)
     evenSum =
       evenSum * twoPi +
       Number(work[frameOffset + LAYERED_QMF_SYNTHESIS_CARRY_OFFSET + 1])
     oddSum =
       oddSum * twoPi +
       Number(work[frameOffset + LAYERED_QMF_SYNTHESIS_CARRY_OFFSET + 3])
-    work[frameOffset + LAYERED_QMF_HISTORY_FLOATS + 2] =
+    work[frameOffset + QMF_SYNTHESIS_HISTORY_FLOATS + 2] =
       Math.fround(oddDifference)
     oddDifference +=
       Number(work[frameOffset + LAYERED_QMF_SYNTHESIS_CARRY_OFFSET + 2]) * twoPi
