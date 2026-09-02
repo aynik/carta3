@@ -2,21 +2,29 @@ import { describe, expect, it } from 'vitest'
 import { FFT } from '../codec/signal/fft.js'
 
 describe('ATRAC3 complex FFT', () => {
-  it('transforms an impulse without changing its exact amplitude', () => {
-    const real = new Float32Array(128)
-    const imaginary = new Float32Array(128)
-    real[0] = 1
+  it.each([16, 64, 128])(
+    'transforms a %i-point impulse without changing its exact amplitude',
+    (size) => {
+      const real = new Float32Array(size)
+      const imaginary = new Float32Array(size)
+      real[0] = 1
+
+      FFT.transform(real, imaginary)
+
+      expect([...real]).toEqual(Array(size).fill(1))
+      expect([...imaginary]).toEqual(Array(size).fill(0))
+    }
+  )
+
+  it.each([16, 64, 128])('resolves DC for a %i-point transform', (size) => {
+    const real = new Float32Array(size).fill(1)
+    const imaginary = new Float32Array(size)
 
     FFT.transform(real, imaginary)
 
-    expect([...real]).toEqual(Array(128).fill(1))
-    expect([...imaginary]).toEqual(Array(128).fill(0))
-  })
-
-  it('requires the pinned transform geometry', () => {
-    expect(() =>
-      FFT.transform(new Float32Array(64), new Float32Array(64))
-    ).toThrow(/128-value/)
-    expect(() => FFT.transform([], [])).toThrow(/128-value/)
+    expect(real[0]).toBe(size)
+    expect(imaginary[0]).toBe(0)
+    expect([...real.subarray(1)]).toEqual(Array(size - 1).fill(0))
+    expect([...imaginary.subarray(1)]).toEqual(Array(size - 1).fill(0))
   })
 })

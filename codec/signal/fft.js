@@ -1,9 +1,5 @@
-/** Carta3 single-precision complex fast Fourier transform. */
+/** Complex radix-2 Fast Fourier Transform. */
 
-import { MDCT_BIT_REVERSE_INDICES, transformTables } from '../core/tables.js'
-import { float32Add, float32Multiply, float32Subtract } from '../utils.js'
-
-/** Complex radix-2 FFT with Carta3's pinned Float32 evaluation order. */
 export class FFT {
   /**
    * Transform split complex data in place.
@@ -12,72 +8,61 @@ export class FFT {
    * @param {Float32Array} imaginary Imaginary input and output components.
    */
   static transform(real, imaginary) {
-    if (
-      !(real instanceof Float32Array) ||
-      !(imaginary instanceof Float32Array) ||
-      real.length !== 128 ||
-      imaginary.length !== real.length
-    ) {
-      throw new RangeError('Carta3 FFT requires two 128-value Float32 arrays')
-    }
+    const size = real.length
+    if (size === 1) return
 
-    for (let pair = 0; pair < MDCT_BIT_REVERSE_INDICES.length; pair += 2) {
-      const sourceIndex = MDCT_BIT_REVERSE_INDICES[pair]
-      const destinationIndex = MDCT_BIT_REVERSE_INDICES[pair + 1]
-      const realValue = real[sourceIndex]
-      real[sourceIndex] = real[destinationIndex]
-      real[destinationIndex] = realValue
-      const imaginaryValue = imaginary[sourceIndex]
-      imaginary[sourceIndex] = imaginary[destinationIndex]
-      imaginary[destinationIndex] = imaginaryValue
-    }
-
-    const tables = transformTables()
-    let step = 64
-    let butterflyLength = 2
-    for (let stage = 0; stage <= 6; stage++) {
-      const half = butterflyLength >> 1
-      let base = 0
-      let secondLaneBase = half
-      let groups = step
-      while (groups !== 0) {
-        let twiddleIndex = 0
-        let butterflyCount = half
-        let firstLane = base
-        let secondLane = secondLaneBase
-        while (butterflyCount !== 0) {
-          const twiddleCosine = tables.mdctTwiddleCosines[twiddleIndex]
-          const twiddleSine = tables.mdctTwiddleSines[twiddleIndex]
-          const firstReal = real[firstLane]
-          const firstImaginary = imaginary[firstLane]
-          const secondReal = real[secondLane]
-          const secondImaginary = imaginary[secondLane]
-          const rotatedReal = float32Subtract(
-            float32Multiply(secondReal, twiddleCosine),
-            float32Multiply(secondImaginary, twiddleSine)
-          )
-          const rotatedImaginary = float32Add(
-            float32Multiply(secondImaginary, twiddleCosine),
-            float32Multiply(secondReal, twiddleSine)
-          )
-          real[secondLane] = float32Subtract(firstReal, rotatedReal)
-          imaginary[secondLane] = float32Subtract(
-            firstImaginary,
-            rotatedImaginary
-          )
-          real[firstLane] = float32Add(firstReal, rotatedReal)
-          imaginary[firstLane] = float32Add(firstImaginary, rotatedImaginary)
-          twiddleIndex += step
-          firstLane++
-          secondLane++
-          butterflyCount--
-        }
-        base += butterflyLength
-        secondLaneBase += butterflyLength
-        groups--
+    const bits = Math.log2(size)
+    for (let index = 0; index < size; index++) {
+      let reversed = 0
+      let remaining = index
+      for (let bit = 0; bit < bits; bit++) {
+        reversed = (reversed << 1) | (remaining & 1)
+        remaining >>= 1
       }
-      step >>= 1
-      butterflyLength <<= 1
+      if (reversed > index) {
+        const realValue = real[index]
+        real[index] = real[reversed]
+        real[reversed] = realValue
+        const imaginaryValue = imaginary[index]
+        imaginary[index] = imaginary[reversed]
+        imaginary[reversed] = imaginaryValue
+      }
+    }
+
+    for (let stride = 2; stride <= size; stride <<= 1) {
+      const halfStride = stride >> 1
+      const angle = (-2 * Math.PI) / stride
+      const stepReal = Math.cos(angle)
+      const stepImaginary = Math.sin(angle)
+
+      for (let start = 0; start < size; start += stride) {
+        let twiddleReal = 1
+        let twiddleImaginary = 0
+
+        for (let offset = 0; offset < halfStride; offset++) {
+          const evenIndex = start + offset
+          const oddIndex = evenIndex + halfStride
+          const evenReal = real[evenIndex]
+          const evenImaginary = imaginary[evenIndex]
+          const oddReal = real[oddIndex]
+          const oddImaginary = imaginary[oddIndex]
+          const rotatedReal =
+            oddReal * twiddleReal - oddImaginary * twiddleImaginary
+          const rotatedImaginary =
+            oddReal * twiddleImaginary + oddImaginary * twiddleReal
+
+          real[evenIndex] = evenReal + rotatedReal
+          imaginary[evenIndex] = evenImaginary + rotatedImaginary
+          real[oddIndex] = evenReal - rotatedReal
+          imaginary[oddIndex] = evenImaginary - rotatedImaginary
+
+          const nextReal =
+            twiddleReal * stepReal - twiddleImaginary * stepImaginary
+          twiddleImaginary =
+            twiddleReal * stepImaginary + twiddleImaginary * stepReal
+          twiddleReal = nextReal
+        }
+      }
     }
   }
 }

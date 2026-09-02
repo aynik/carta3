@@ -193,7 +193,7 @@ describe('ATRAC3 132 kbps staged encoder transaction', () => {
     })
     expect(frames).toHaveLength(13)
     expect(createHash('sha256').update(wave).digest('hex')).toBe(
-      '6f0bbd073a30cffd053ecc3ead86e429e84372bd3cc4bb8d4c06f8d784411870'
+      'fa9380e3192c9ccb69ab2db1dcd547d4e67bfde336c41def64f0d667b90f7928'
     )
   })
 

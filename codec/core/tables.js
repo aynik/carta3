@@ -131,24 +131,6 @@ export const SPREAD_DOWN = Float64Array.from([
   float64FromBits(0x3ee4f8b588e368f1n),
 ])
 
-/** Swap pairs for the seven-bit MDCT bit-reversal permutation. */
-export const MDCT_BIT_REVERSE_PAIRS = Object.freeze(
-  Array.from({ length: 128 }, (_, source) => {
-    let value = source
-    let destination = 0
-    for (let bit = 0; bit < 7; bit++) {
-      destination = (destination << 1) | (value & 1)
-      value >>= 1
-    }
-    return destination > source ? Object.freeze([source, destination]) : null
-  }).filter(Boolean)
-)
-
-/** Interleaved source/destination swaps for the 128-point MDCT FFT. */
-export const MDCT_BIT_REVERSE_INDICES = Uint8Array.from(
-  MDCT_BIT_REVERSE_PAIRS.flat()
-)
-
 /** Canonical supported stream-profile rows. */
 export const PROFILE_ROWS = Object.freeze([
   Object.freeze({ bitrateKbps: 66, bytesPerFrame: 192, syntaxMode: 2 }),
@@ -324,8 +306,6 @@ function buildTransformTables() {
     mdctBaseCosinePlusFifthSine: new Float32Array(128),
     mdctFifthCosinePlusBaseSine: new Float32Array(128),
     mdctFifthCosineMinusBaseSine: new Float32Array(128),
-    mdctTwiddleCosines: new Float32Array(64),
-    mdctTwiddleSines: new Float32Array(64),
     mdctWindow: new Float32Array(512),
     fftStagedCosines: new Int16Array(127),
     fftStagedSines: new Int16Array(127),
@@ -340,15 +320,8 @@ function buildTransformTables() {
     tables.mdctPreRotationSines[index] = -Math.sin(angle)
   }
 
-  for (let index = 0; index < 64; index++) {
-    const angle = (index * PI) / 64
-    tables.mdctTwiddleCosines[index] = Math.cos(angle)
-    tables.mdctTwiddleSines[index] = -Math.sin(angle)
-  }
-
   const halfPiCosine = float32FromBits(0x248d3000)
   tables.mdctPreRotationCosines[64] = halfPiCosine
-  tables.mdctTwiddleCosines[32] = halfPiCosine
 
   for (let index = 0; index < 512; index++) {
     const sine = Math.sin(((2 * index + 1) * PI) / 1024)

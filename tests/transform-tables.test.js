@@ -60,7 +60,6 @@ describe('ATRAC3 runtime transform tables', () => {
     const tables = transformTables()
     expect(transformTables()).toBe(tables)
     expect(tables.mdctPreRotationCosines).toHaveLength(128)
-    expect(tables.mdctTwiddleCosines).toHaveLength(64)
     expect(tables.mdctWindow).toHaveLength(512)
     expect(tables.fftStagedCosines).toHaveLength(127)
     expect(tables.fftFinalCosines).toHaveLength(128)
@@ -75,14 +74,6 @@ describe('ATRAC3 runtime transform tables', () => {
     ])
     expect(f32Checksum(tables.mdctPreRotationSines)).toEqual([
       0x5f4155ea34n,
-      0x3f800000n,
-    ])
-    expect(f32Checksum(tables.mdctTwiddleCosines)).toEqual([
-      0x1f26f52b60n,
-      0x9b0d3000n,
-    ])
-    expect(f32Checksum(tables.mdctTwiddleSines)).toEqual([
-      0x2f8267fb60n,
       0x3f800000n,
     ])
     expect(f32Checksum(tables.mdctWindow)).toEqual([0x7cf3c8c84en, 0n])

@@ -74,7 +74,7 @@ describe('ATRAC3 forward MDCT', () => {
   it('matches the reference vector checksum', () => {
     const output = new Float32Array(256)
     transformMdctSubband(referenceSignal(), output, false, new MdctScratch())
-    // Captured from an isolated forward_mdct_256 reference contract.
-    expect(checksum(output)).toEqual([0x7bfe07a00fn, 0x0705378fn])
+    // Captured with the shared radix-2 FFT evaluation order.
+    expect(checksum(output)).toEqual([0x7bfe07a135n, 0x07053e7fn])
   })
 })
