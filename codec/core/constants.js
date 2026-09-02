@@ -179,6 +179,18 @@ export const TRANSFORM_MATRIX_BASE_WORD = 0x400
 export const LAYER_WORDS = 0x0b5a
 /** Words in each layered matrix/history region. */
 export const LAYER_MATRIX_WORDS = HALF_FRAME_SAMPLES
+/** Rows in each four-lane layered MDCT matrix. */
+export const LAYER_MDCT_ROWS = HALF_FRAME_SAMPLES / SUBBAND_COUNT
+/** Interleaved words advanced by one layered MDCT row pair. */
+export const LAYER_MDCT_ROW_WORDS = SUBBAND_COUNT * 2
+/** First layered MDCT quarter boundary. */
+export const LAYER_MDCT_QUARTER_WORDS = FRAME_SAMPLES / 4
+/** Third layered MDCT quarter boundary. */
+export const LAYER_MDCT_THREE_QUARTER_WORDS = LAYER_MDCT_QUARTER_WORDS * 3
+/** Last word in a layered MDCT spectrum. */
+export const LAYER_MDCT_LAST_WORD = FRAME_SAMPLES - 1
+/** Origin used to mirror four-lane layered MDCT rows. */
+export const LAYER_MDCT_MIRROR_BASE = FRAME_SAMPLES - SUBBAND_COUNT
 /** Detached layered gain-analysis scratch words. */
 export const LAYER_GAIN_SCRATCH_WORDS = 0xac
 /** Words between layered gain-control rows. */

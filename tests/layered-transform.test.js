@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LAYER_WORDS } from '../codec/core/constants.js'
+import { FRAME_SAMPLES, LAYER_WORDS } from '../codec/core/constants.js'
 import {
   LayeredGainScratch,
   LayeredMdctScratch,
@@ -7,6 +7,7 @@ import {
 } from '../codec/state/layered.js'
 import { analyzeLayeredGain } from '../codec/analysis/gain/layered.js'
 import { applyLayeredGainScale } from '../codec/signal/gain.js'
+import { transformLayeredMdct } from '../codec/signal/mdct.js'
 import { writeLayeredMdctOutputs } from '../codec/analysis/spectrum.js'
 
 const floatBits = new DataView(new ArrayBuffer(4))
@@ -75,6 +76,21 @@ function createReferenceLayer() {
 }
 
 describe('ATRAC3 layered transform', () => {
+  it('transforms a detached four-lane matrix without codec state', () => {
+    const transform = new Float32Array(FRAME_SAMPLES)
+    for (let index = 0; index < transform.length; index++) {
+      transform[index] = Math.fround(
+        (((index * 73 + 19) % 2003) - 1001) * 0.125
+      )
+    }
+
+    expect(transformLayeredMdct(transform)).toBe(transform)
+    expect(stateImageHash(new Uint32Array(transform.buffer))).toBe(
+      '55c895dc40361888'
+    )
+    expect(() => transformLayeredMdct(new Float32Array(0))).toThrow(RangeError)
+  })
+
   it('matches the persistent-state reference image', () => {
     const layer = createReferenceLayer()
     const words = new Uint32Array(LAYER_WORDS)

@@ -3,25 +3,18 @@
 import {
   DECODER_SPECTRAL_LINES_PER_UNIT,
   DECODER_SPECTRUM_FLOATS_PER_UNIT,
-  FLOAT32_NEGATIVE_ZERO_BITS,
   FRAME_SAMPLES,
   HALF_FRAME_SAMPLES,
   INVERSE_SQUARE_ROOT_TWO_BITS,
-  LAYER_GAIN_HISTORY_OFFSET,
-  LAYER_TRANSFORM_HISTORY_OFFSET,
-  LAYER_WINDOW_MATRIX_OFFSET,
-  PAIR_BLOCK_BASE_WORD,
-  PAIR_BLOCK_GAIN_LEVEL_OFFSET,
-  PAIR_BLOCK_WORDS,
+  LAYER_MDCT_MIRROR_BASE,
+  LAYER_MDCT_ROWS,
+  LAYER_MDCT_ROW_WORDS,
   SUBBAND_COUNT,
 } from '../core/constants.js'
 import {
-  ANALYSIS_POWER_OF_TWO_SCALES,
   ANALYSIS_ROTATION_SCALES,
-  ANALYSIS_TWIDDLES,
   INVERSE_TRANSFORM_TWIDDLES,
   SPECTRUM_RECONSTRUCTION_SCALE,
-  TRANSFORM_REORDER_INDICES,
   transformTables,
 } from '../core/tables.js'
 import { FFT } from './fft.js'
@@ -30,82 +23,27 @@ import {
   float32FromBits,
   float32Multiply,
   float32Subtract,
-  float32ToBits,
 } from '../utils.js'
 
-/**
- * Bit-exact forward MDCT for the 66/105 kbps layered transform.
- *
- * This kernel shares the MDCT responsibility with {@link MDCT}, but
- * preserves the low-rate port's interleaved word-image arithmetic.
- */
+/** Pinned inverse square root of two for layered MDCT post-rotation. */
 const inverseSquareRootTwo = float32FromBits(INVERSE_SQUARE_ROOT_TWO_BITS)
-const LAYER_MDCT_ROWS = HALF_FRAME_SAMPLES / SUBBAND_COUNT
-const LAYER_MDCT_ROW_WORDS = SUBBAND_COUNT * 2
-const LAYER_MDCT_QUARTER_WORDS = FRAME_SAMPLES / 4
-const LAYER_MDCT_THREE_QUARTER_WORDS = LAYER_MDCT_QUARTER_WORDS * 3
-const LAYER_MDCT_LAST_WORD = FRAME_SAMPLES - 1
-const LAYER_MDCT_MIRROR_BASE = FRAME_SAMPLES - SUBBAND_COUNT
 
 /**
- * Run the interleaved forward kernel over gain-prepared matrix rows.
+ * Transform one caller-prepared four-lane layered MDCT matrix in place.
  *
- * @param {Uint32Array} words Mutable layered transform word image.
- * @param {Float32Array} transform Reusable transform workspace.
- * @param {Float32Array} initialGainScales Reusable initial-gain workspace.
+ * This bit-exact low-rate kernel shares the mathematical MDCT responsibility
+ * with {@link MDCT}, while preserving its four interleaved transform lanes.
+ *
+ * @param {Float32Array} transform Prepared transform matrix and destination.
+ * @returns {Float32Array} The transformed matrix.
  */
-export function transformLayeredMdct(words, transform, initialGainScales) {
-  for (let unit = 0; unit < SUBBAND_COUNT; unit++) {
-    const gainIndex =
-      words[
-        PAIR_BLOCK_BASE_WORD +
-          unit * PAIR_BLOCK_WORDS +
-          PAIR_BLOCK_GAIN_LEVEL_OFFSET
-      ]
-    initialGainScales[unit] = ANALYSIS_POWER_OF_TWO_SCALES[gainIndex]
+export function transformLayeredMdct(transform) {
+  if (
+    !(transform instanceof Float32Array) ||
+    transform.length < FRAME_SAMPLES
+  ) {
+    throw new RangeError('ATRAC3 layered MDCT matrix has invalid geometry')
   }
-  transform.fill(0)
-  for (let row = 0; row < LAYER_MDCT_ROWS; row++) {
-    const reorderedRow = TRANSFORM_REORDER_INDICES[row]
-    const twiddleBase = reorderedRow * SUBBAND_COUNT
-    const twiddle1 = ANALYSIS_TWIDDLES[twiddleBase]
-    const twiddle2 = ANALYSIS_TWIDDLES[twiddleBase + 1]
-    const twiddle3 = ANALYSIS_TWIDDLES[twiddleBase + 2]
-    const twiddle0 = ANALYSIS_TWIDDLES[twiddleBase + 3]
-    for (let lane = 0; lane < SUBBAND_COUNT; lane++) {
-      const historyIndex = lane + row * SUBBAND_COUNT
-      const previousValue = float32FromBits(
-        words[LAYER_TRANSFORM_HISTORY_OFFSET + historyIndex]
-      )
-      const weightedHistory = initialGainScales[lane] * previousValue
-      const reorderedIndex = lane + reorderedRow * SUBBAND_COUNT
-      const mirroredIndex =
-        (LAYER_MDCT_ROWS - 1 - reorderedRow) * SUBBAND_COUNT + lane
-      const reorderedValue = float32FromBits(
-        words[LAYER_GAIN_HISTORY_OFFSET + reorderedIndex]
-      )
-      const mirroredValue = float32FromBits(
-        words[LAYER_WINDOW_MATRIX_OFFSET + mirroredIndex]
-      )
-      const rotatedSum = (mirroredValue * twiddle1 + reorderedValue) * twiddle3
-      words[LAYER_TRANSFORM_HISTORY_OFFSET + historyIndex] = float32ToBits(
-        (reorderedValue * twiddle1 - mirroredValue) * twiddle2
-      )
-      const signedOffset = lane + (row - LAYER_MDCT_ROWS) * LAYER_MDCT_ROW_WORDS
-      const side = (rotatedSum - weightedHistory) * twiddle0
-      const main = rotatedSum + weightedHistory + side
-      const index = LAYER_WINDOW_MATRIX_OFFSET + signedOffset
-      transform[index + SUBBAND_COUNT] = side
-      transform[index] = main
-    }
-  }
-
-  for (let coefficient = 0; coefficient < FRAME_SAMPLES; coefficient++) {
-    let bits = words[coefficient]
-    if (bits === FLOAT32_NEGATIVE_ZERO_BITS) bits = 0
-    words[LAYER_WINDOW_MATRIX_OFFSET + coefficient] = bits
-  }
-
   let blockBase = 0
   for (let index = -LAYER_MDCT_ROWS; index < 0; index += 2) {
     const scale = ANALYSIS_ROTATION_SCALES[index + LAYER_MDCT_ROWS + 1]
@@ -219,29 +157,8 @@ export function transformLayeredMdct(words, transform, initialGainScales) {
         transform[LAYER_MDCT_MIRROR_BASE - SUBBAND_COUNT * row + lane]
       )
     }
-    words[row] = float32ToBits(transform[SUBBAND_COUNT * row])
-    words[HALF_FRAME_SAMPLES - 1 - row] = float32ToBits(
-      transform[SUBBAND_COUNT * row + 1]
-    )
-    words[row + HALF_FRAME_SAMPLES] = float32ToBits(
-      transform[SUBBAND_COUNT * row + 2]
-    )
-    words[LAYER_MDCT_LAST_WORD - row] = float32ToBits(
-      transform[SUBBAND_COUNT * row + 3]
-    )
-    words[LAYER_MDCT_QUARTER_WORDS - 1 - row] = float32ToBits(
-      transform[LAYER_MDCT_MIRROR_BASE - SUBBAND_COUNT * row]
-    )
-    words[row + LAYER_MDCT_QUARTER_WORDS] = float32ToBits(
-      transform[LAYER_MDCT_MIRROR_BASE + 1 - SUBBAND_COUNT * row]
-    )
-    words[LAYER_MDCT_THREE_QUARTER_WORDS - 1 - row] = float32ToBits(
-      transform[LAYER_MDCT_MIRROR_BASE + 2 - SUBBAND_COUNT * row]
-    )
-    words[row + LAYER_MDCT_THREE_QUARTER_WORDS] = float32ToBits(
-      transform[LAYER_MDCT_MIRROR_BASE + 3 - SUBBAND_COUNT * row]
-    )
   }
+  return transform
 }
 
 /** Forward MDCT with Carta3's pinned Float32 evaluation order. */
