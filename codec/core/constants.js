@@ -120,8 +120,18 @@ export const BAND_PART_FLOATS = 256
 export const BAND_STRIDE_FLOATS = 768
 /** Qmf taps. */
 export const QMF_TAPS = 48
-/** Qmf delay. */
-export const QMF_DELAY = 46
+/** Bands emitted by one configurable QMF stage. */
+export const QMF_BANDS = 2
+/** First sample inspected by configurable QMF analysis. */
+export const QMF_ANALYSIS_START_SAMPLE = 0
+/** Input samples advanced by one configurable QMF output row. */
+export const QMF_ANALYSIS_STEP_SAMPLES = QMF_BANDS
+/** Input samples inspected by one configurable QMF output row. */
+export const QMF_ANALYSIS_WINDOW_SAMPLES = QMF_TAPS
+/** Scale applied after configurable QMF modulation. */
+export const QMF_ANALYSIS_MODULATION_SCALE = 1
+/** Persistent samples preceding one configurable QMF analysis input. */
+export const QMF_ANALYSIS_DELAY_SAMPLES = QMF_TAPS - QMF_BANDS
 /** Root history offset. */
 export const ROOT_HISTORY_OFFSET = 0x5000 / 4
 /** Low history offset. */

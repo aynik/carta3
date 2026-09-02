@@ -25,65 +25,42 @@ import {
   LAYERED_QMF_SYNTHESIS_LAST_TAP,
   LAYERED_QMF_SYNTHESIS_MIRROR_INDEX,
   LOW_HISTORY_OFFSET,
-  QMF_DELAY,
-  QMF_TAPS,
+  QMF_ANALYSIS_DELAY_SAMPLES,
   ROOT_HISTORY_OFFSET,
   SUBBAND_COUNT,
 } from '../core/constants.js'
 import {
   ANALYSIS_QMF_CURVE,
-  QMF_ANALYSIS_COEFFICIENTS,
   SYNTHESIS_QMF_CURVE,
   TWO_PI,
 } from '../core/tables.js'
 import { float32Add, float32Multiply } from '../utils.js'
+import { analyzeQmf } from './qmf.js'
 
 /**
- * Convolve one QMF branch and publish its updated delay line.
+ * Apply one reusable two-band QMF stage and publish its updated delay line.
  *
  * @param {Float32Array} input
  * @param {Float32Array} low
  * @param {Float32Array} high
- * @param {number} sampleCount
  * @param {Float32Array} history
- * @param {Float64Array} convolutionWork
+ * @param {object} scratch
  */
-function analyzeQmfPair(
-  input,
-  low,
-  high,
-  sampleCount,
-  history,
-  convolutionWork
-) {
-  for (let index = 0; index < QMF_DELAY; index++) {
-    convolutionWork[index] = history[index]
+function analyzeQmfPair(input, low, high, history, scratch) {
+  const window = scratch.analysisWindows[input.length]
+  if (!window) {
+    throw new RangeError(
+      `QMF analysis window for ${input.length} samples is required`
+    )
   }
-  for (let index = 0; index < sampleCount; index++) {
-    convolutionWork[QMF_DELAY + index] = input[index]
-  }
-  history.set(input.subarray(sampleCount - QMF_DELAY, sampleCount))
-
-  for (let outputIndex = 0; outputIndex < sampleCount / 2; outputIndex++) {
-    const windowStart = outputIndex * 2
-    let evenSum = 0
-    let oddSum = 0
-    for (let tap = QMF_TAPS - 1; tap >= 0; tap -= 4) {
-      evenSum +=
-        convolutionWork[windowStart + tap] * QMF_ANALYSIS_COEFFICIENTS[tap]
-      evenSum +=
-        convolutionWork[windowStart + tap - 2] *
-        QMF_ANALYSIS_COEFFICIENTS[tap - 2]
-      oddSum +=
-        convolutionWork[windowStart + tap - 1] *
-        QMF_ANALYSIS_COEFFICIENTS[tap - 1]
-      oddSum +=
-        convolutionWork[windowStart + tap - 3] *
-        QMF_ANALYSIS_COEFFICIENTS[tap - 3]
-    }
-    low[outputIndex] = evenSum + oddSum
-    high[outputIndex] = evenSum - oddSum
-  }
+  window.set(history)
+  window.set(input, history.length)
+  scratch.outputBands[0] = low
+  scratch.outputBands[1] = high
+  analyzeQmf(window, scratch.outputBands)
+  history.set(
+    window.subarray(input.length, input.length + QMF_ANALYSIS_DELAY_SAMPLES)
+  )
 }
 
 /**
@@ -139,7 +116,10 @@ export function analyzeIndependentQmfChannel(
     !independentQmfScratch ||
     independentQmfScratch.firstLow?.length < 512 ||
     independentQmfScratch.firstHigh?.length < 512 ||
-    independentQmfScratch.convolutionWork?.length < QMF_DELAY + FRAME_SAMPLES
+    independentQmfScratch.analysisWindows?.[FRAME_SAMPLES]?.length <
+      QMF_ANALYSIS_DELAY_SAMPLES + FRAME_SAMPLES ||
+    independentQmfScratch.analysisWindows?.[FRAME_SAMPLES / 2]?.length <
+      QMF_ANALYSIS_DELAY_SAMPLES + FRAME_SAMPLES / 2
   ) {
     throw new RangeError('ATRAC3 QMF scratch has invalid geometry')
   }
@@ -155,15 +135,14 @@ export function analyzeIndependentQmfChannel(
 
   const rootHistory = analysisWork.subarray(
     ROOT_HISTORY_OFFSET,
-    ROOT_HISTORY_OFFSET + QMF_DELAY
+    ROOT_HISTORY_OFFSET + QMF_ANALYSIS_DELAY_SAMPLES
   )
   analyzeQmfPair(
     pcm,
     independentQmfScratch.firstLow,
     independentQmfScratch.firstHigh,
-    FRAME_SAMPLES,
     rootHistory,
-    independentQmfScratch.convolutionWork
+    independentQmfScratch
   )
 
   analyzeQmfPair(
@@ -176,9 +155,11 @@ export function analyzeIndependentQmfChannel(
       bandSplitOffset(1),
       bandSplitOffset(1) + BAND_PART_FLOATS
     ),
-    512,
-    analysisWork.subarray(LOW_HISTORY_OFFSET, LOW_HISTORY_OFFSET + QMF_DELAY),
-    independentQmfScratch.convolutionWork
+    analysisWork.subarray(
+      LOW_HISTORY_OFFSET,
+      LOW_HISTORY_OFFSET + QMF_ANALYSIS_DELAY_SAMPLES
+    ),
+    independentQmfScratch
   )
 
   analyzeQmfPair(
@@ -191,9 +172,11 @@ export function analyzeIndependentQmfChannel(
       bandSplitOffset(2),
       bandSplitOffset(2) + BAND_PART_FLOATS
     ),
-    512,
-    analysisWork.subarray(HIGH_HISTORY_OFFSET, HIGH_HISTORY_OFFSET + QMF_DELAY),
-    independentQmfScratch.convolutionWork
+    analysisWork.subarray(
+      HIGH_HISTORY_OFFSET,
+      HIGH_HISTORY_OFFSET + QMF_ANALYSIS_DELAY_SAMPLES
+    ),
+    independentQmfScratch
   )
 
   return analysisWork

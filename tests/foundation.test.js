@@ -5,6 +5,7 @@ import {
   FRAME_SAMPLES,
   LAYER_GAIN_SCRATCH_WORDS,
   LAYER_WORDS,
+  QMF_ANALYSIS_DELAY_SAMPLES,
   RESIDUAL_DELAY_SAMPLES,
   SAMPLE_RATE,
   SUBBAND_COUNT,
@@ -110,7 +111,13 @@ describe('ATRAC3 profiles and state geometry', () => {
     expect(pool.encoder.scratch.mdct[0].real).toHaveLength(128)
     expect(pool.encoder.scratch.qmf).toBeInstanceOf(IndependentQmfScratch)
     expect(pool.encoder.scratch.qmf.firstLow).toHaveLength(512)
-    expect(pool.encoder.scratch.qmf.convolutionWork).toHaveLength(1070)
+    expect(pool.encoder.scratch.qmf.analysisWindows[1024]).toHaveLength(
+      QMF_ANALYSIS_DELAY_SAMPLES + FRAME_SAMPLES
+    )
+    expect(pool.encoder.scratch.qmf.analysisWindows[512]).toHaveLength(
+      QMF_ANALYSIS_DELAY_SAMPLES + FRAME_SAMPLES / 2
+    )
+    expect(pool.encoder.scratch.qmf.outputBands).toHaveLength(2)
     expect(pool.encoder.scratch.allocation.normalizedSpectrum).toHaveLength(
       FRAME_SAMPLES
     )

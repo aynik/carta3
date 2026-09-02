@@ -6,7 +6,7 @@ import {
   BAND_STRIDE_FLOATS,
   FORWARD_TRANSFORM_CARRY_OFFSET,
   FRAME_SAMPLES,
-  QMF_DELAY,
+  QMF_ANALYSIS_DELAY_SAMPLES,
   ROOT_HISTORY_OFFSET,
   SUBBAND_COUNT,
   TRANSFORM_CARRY_OFFSET_FLOATS,
@@ -104,7 +104,10 @@ describe('ATRAC3 sound-unit analysis flow', () => {
       )
     ).toEqual(history.referenceCarry)
     expect(
-      work.subarray(ROOT_HISTORY_OFFSET, ROOT_HISTORY_OFFSET + 3 * QMF_DELAY)
+      work.subarray(
+        ROOT_HISTORY_OFFSET,
+        ROOT_HISTORY_OFFSET + 3 * QMF_ANALYSIS_DELAY_SAMPLES
+      )
     ).toEqual(history.qmfDelays)
 
     work.fill(8)

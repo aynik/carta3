@@ -21,7 +21,8 @@ import {
   MAX_CODED_FRAME_BYTES,
   MAX_QUANTIZATION_BAND_COEFFICIENTS,
   MAX_SELECTED_GAIN_CANDIDATES,
-  QMF_DELAY,
+  QMF_ANALYSIS_DELAY_SAMPLES,
+  QMF_BANDS,
   ROOT_HISTORY_OFFSET,
   SAMPLE_RATE,
   SOUND_UNIT_FILL_MOVES_PER_BAND,
@@ -195,7 +196,7 @@ export class IndependentChannelHistory {
     )
     this.transformCarry = new Float32Array(FRAME_SAMPLES)
     this.referenceCarry = new Float32Array(FRAME_SAMPLES)
-    this.qmfDelays = new Float32Array(3 * QMF_DELAY)
+    this.qmfDelays = new Float32Array(3 * QMF_ANALYSIS_DELAY_SAMPLES)
     this.gainRecords = Array.from(
       { length: SUBBAND_COUNT },
       () => new GainRecord()
@@ -266,7 +267,10 @@ export class IndependentChannelHistory {
       )
     )
     this.qmfDelays.set(
-      work.subarray(ROOT_HISTORY_OFFSET, ROOT_HISTORY_OFFSET + 3 * QMF_DELAY)
+      work.subarray(
+        ROOT_HISTORY_OFFSET,
+        ROOT_HISTORY_OFFSET + 3 * QMF_ANALYSIS_DELAY_SAMPLES
+      )
     )
     return this
   }
@@ -410,11 +414,19 @@ export class GainScaleScratch {
 
 /** Stage-private buffers for cascaded independent-channel QMF analysis. */
 export class IndependentQmfScratch {
-  /** Allocate the two first-stage branches and shared convolution storage. */
+  /** Allocate the cascaded stage outputs and configurable QMF kernel storage. */
   constructor() {
     this.firstLow = new Float32Array(FRAME_SAMPLES / 2)
     this.firstHigh = new Float32Array(FRAME_SAMPLES / 2)
-    this.convolutionWork = new Float64Array(QMF_DELAY + FRAME_SAMPLES)
+    this.analysisWindows = {
+      [FRAME_SAMPLES / 2]: new Float32Array(
+        QMF_ANALYSIS_DELAY_SAMPLES + FRAME_SAMPLES / 2
+      ),
+      [FRAME_SAMPLES]: new Float32Array(
+        QMF_ANALYSIS_DELAY_SAMPLES + FRAME_SAMPLES
+      ),
+    }
+    this.outputBands = new Array(QMF_BANDS)
   }
 }
 
