@@ -12,7 +12,7 @@ import {
   applyDecoderJointStereoMix,
   prepareDecoderJointStereoMix,
 } from './signal/stereo.js'
-import { inverseMdctBlock } from './signal/spectrum.js'
+import { inverseMdctBlock } from './synthesis/spectrum.js'
 import { synthesizeQmfChannel } from './signal/bands.js'
 import { pipe } from './utils.js'
 

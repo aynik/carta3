@@ -23,7 +23,7 @@ import { applyJointStereoConversion } from '../signal/stereo.js'
 import {
   writeLayeredMdctOutputs,
   writeIndependentMdctOutputs,
-} from '../signal/spectrum.js'
+} from './spectrum.js'
 import {
   analyzeIndependentQmfChannel,
   analyzeLayeredQmfChannel,

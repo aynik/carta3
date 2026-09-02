@@ -40,13 +40,6 @@ function checksum(values) {
  */
 const f32Checksum = (values) => checksum([...values].map(float32Bits))
 /**
- * Test helper for u32Checksum.
- *
- * @param {ArrayLike<number>} values
- * @returns {number}
- */
-const u32Checksum = (values) => checksum(values)
-/**
  * Test helper for i16Checksum.
  *
  * @param {ArrayLike<number>} values
@@ -92,7 +85,6 @@ describe('ATRAC3 runtime transform tables', () => {
       0x2f8267fb60n,
       0x3f800000n,
     ])
-    expect(u32Checksum(tables.mdctBitReversalIndices)).toEqual([0x1fc0n, 0n])
     expect(f32Checksum(tables.mdctWindow)).toEqual([0x7cf3c8c84en, 0n])
     expect(f32Checksum(tables.mdctBaseCosineMinusFifthSine)).toEqual([
       0x2974ee2688n,

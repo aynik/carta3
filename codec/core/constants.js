@@ -153,9 +153,6 @@ export const TRANSFORM_CARRY_OFFSET_FLOATS =
   SUBBAND_COUNT * 3 * BAND_PART_FLOATS
 /** Forward transform carry offset. */
 export const FORWARD_TRANSFORM_CARRY_OFFSET = 0x4000 / 4
-/** Mdct normalization scale. */
-export const MDCT_NORMALIZATION_SCALE = 0.0078125
-
 /** Low-rate layer word-image geometry. */
 export const PAIR_BLOCK_WORDS = 51
 /** Pair block base word. */

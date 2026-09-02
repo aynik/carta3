@@ -144,6 +144,11 @@ export const MDCT_BIT_REVERSE_PAIRS = Object.freeze(
   }).filter(Boolean)
 )
 
+/** Interleaved source/destination swaps for the 128-point MDCT FFT. */
+export const MDCT_BIT_REVERSE_INDICES = Uint8Array.from(
+  MDCT_BIT_REVERSE_PAIRS.flat()
+)
+
 /** Canonical supported stream-profile rows. */
 export const PROFILE_ROWS = Object.freeze([
   Object.freeze({ bitrateKbps: 66, bytesPerFrame: 192, syntaxMode: 2 }),
@@ -321,7 +326,6 @@ function buildTransformTables() {
     mdctFifthCosineMinusBaseSine: new Float32Array(128),
     mdctTwiddleCosines: new Float32Array(64),
     mdctTwiddleSines: new Float32Array(64),
-    mdctBitReversalIndices: new Uint32Array(128),
     mdctWindow: new Float32Array(512),
     fftStagedCosines: new Int16Array(127),
     fftStagedSines: new Int16Array(127),
@@ -345,10 +349,6 @@ function buildTransformTables() {
   const halfPiCosine = float32FromBits(0x248d3000)
   tables.mdctPreRotationCosines[64] = halfPiCosine
   tables.mdctTwiddleCosines[32] = halfPiCosine
-
-  for (let index = 0; index < 128; index++) {
-    tables.mdctBitReversalIndices[index] = reverseLowBits(index, 7)
-  }
 
   for (let index = 0; index < 512; index++) {
     const sine = Math.sin(((2 * index + 1) * PI) / 1024)

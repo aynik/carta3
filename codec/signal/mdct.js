@@ -1,39 +1,30 @@
-/** Carta3 Audio Codec - Forward and inverse block transforms. */
+/** Carta3 floating-point and layered modified discrete cosine transforms. */
 
 import {
-  BAND_PART_FLOATS,
-  DECODER_MAX_UNITS,
   DECODER_SPECTRAL_LINES_PER_UNIT,
   DECODER_SPECTRUM_FLOATS_PER_UNIT,
   FLOAT32_NEGATIVE_ZERO_BITS,
   FRAME_SAMPLES,
-  GAIN_SCALE_SAMPLES,
   HALF_FRAME_SAMPLES,
   INVERSE_SQUARE_ROOT_TWO_BITS,
   LAYER_GAIN_HISTORY_OFFSET,
   LAYER_TRANSFORM_HISTORY_OFFSET,
   LAYER_WINDOW_MATRIX_OFFSET,
-  LAYER_WORDS,
-  MDCT_NORMALIZATION_SCALE,
   PAIR_BLOCK_BASE_WORD,
   PAIR_BLOCK_GAIN_LEVEL_OFFSET,
   PAIR_BLOCK_WORDS,
-  RESIDUAL_DELAY_SAMPLES,
   SUBBAND_COUNT,
 } from '../core/constants.js'
 import {
   ANALYSIS_POWER_OF_TWO_SCALES,
   ANALYSIS_ROTATION_SCALES,
   ANALYSIS_TWIDDLES,
-  INVERSE_TRANSFORM_COEFFICIENTS,
-  INVERSE_TRANSFORM_SCALES,
   INVERSE_TRANSFORM_TWIDDLES,
-  MDCT_BIT_REVERSE_PAIRS,
-  REVERSE_OUTPUT_BY_SUBBAND,
   SPECTRUM_RECONSTRUCTION_SCALE,
   TRANSFORM_REORDER_INDICES,
   transformTables,
 } from '../core/tables.js'
+import { FFT } from './fft.js'
 import {
   float32Add,
   float32FromBits,
@@ -42,13 +33,10 @@ import {
   float32ToBits,
 } from '../utils.js'
 
-// Preserve the readable table shape without pair iteration in the hot loop.
-const bitReverseIndices = Uint8Array.from(MDCT_BIT_REVERSE_PAIRS.flat())
-
 /**
  * Bit-exact forward MDCT for the 66/105 kbps layered transform.
  *
- * This kernel shares the MDCT responsibility with `forwardMdct256`, but
+ * This kernel shares the MDCT responsibility with {@link MDCT}, but
  * preserves the low-rate port's interleaved word-image arithmetic.
  */
 const inverseSquareRootTwo = float32FromBits(INVERSE_SQUARE_ROOT_TWO_BITS)
@@ -62,11 +50,11 @@ const LAYER_MDCT_MIRROR_BASE = FRAME_SAMPLES - SUBBAND_COUNT
 /**
  * Run the interleaved forward kernel over gain-prepared matrix rows.
  *
- * @param {Uint32Array} words
- * @param {object} transform
- * @param {Float32Array} initialGainScales
+ * @param {Uint32Array} words Mutable layered transform word image.
+ * @param {Float32Array} transform Reusable transform workspace.
+ * @param {Float32Array} initialGainScales Reusable initial-gain workspace.
  */
-function transformLayeredRows(words, transform, initialGainScales) {
+export function transformLayeredMdct(words, transform, initialGainScales) {
   for (let unit = 0; unit < SUBBAND_COUNT; unit++) {
     const gainIndex =
       words[
@@ -256,294 +244,141 @@ function transformLayeredRows(words, transform, initialGainScales) {
   }
 }
 
-/**
- * Read one field from the interleaved inverse-transform coefficient table.
- *
- * @param {number} index
- * @param {string} field
- * @returns {number}
- */
-function coefficient(index, field) {
-  return INVERSE_TRANSFORM_COEFFICIENTS[index * SUBBAND_COUNT + field]
-}
-
-/**
- * Transform a 512-sample current/previous window into 256 ATRAC3 coefficients.
- * Every f32 operation is explicitly rounded to preserve reference evaluation order.
- *
- * @param {Float32Array} source Prepared 512-sample gain-adjusted window.
- * @param {Float32Array} destination Destination 256-line spectrum.
- * @param {boolean} reverseOutput Whether to publish coefficients in reverse order.
- * @param {object} mdctScratch Reusable forward-transform storage.
- * @returns {Float32Array} `destination` after the transform.
- */
-export function forwardMdct256(
-  source,
-  destination,
-  reverseOutput,
-  mdctScratch
-) {
-  if (source.length < 512 || destination.length < 256) {
-    throw new RangeError('ATRAC3 MDCT requires 512 input and 256 output values')
-  }
-  if (
-    !mdctScratch ||
-    mdctScratch.preWindowed?.length < 256 ||
-    mdctScratch.real?.length < 128 ||
-    mdctScratch.imaginary?.length < 128
-  ) {
-    throw new RangeError('ATRAC3 MDCT scratch has invalid geometry')
-  }
-
-  const tables = transformTables()
-  const window = tables.mdctWindow
-  const preWindowed = mdctScratch.preWindowed
-  const real = mdctScratch.real
-  const imaginary = mdctScratch.imaginary
-
-  for (let sampleIndex = 0; sampleIndex < 64; sampleIndex++) {
-    const forwardIndex = 384 + sampleIndex * 2
-    const reverseIndex = 383 - sampleIndex * 2
-    preWindowed[sampleIndex] = float32Subtract(
-      -float32Multiply(source[forwardIndex], window[forwardIndex]),
-      float32Multiply(window[reverseIndex], source[reverseIndex])
-    )
-  }
-  for (let sampleIndex = 0; sampleIndex < 128; sampleIndex++) {
-    const forwardIndex = sampleIndex * 2
-    const reverseIndex = 255 - sampleIndex * 2
-    preWindowed[64 + sampleIndex] = float32Subtract(
-      float32Multiply(window[forwardIndex], source[forwardIndex]),
-      float32Multiply(window[reverseIndex], source[reverseIndex])
-    )
-  }
-  for (let sampleIndex = 0; sampleIndex < 64; sampleIndex++) {
-    const forwardIndex = 256 + sampleIndex * 2
-    const reverseIndex = 511 - sampleIndex * 2
-    preWindowed[192 + sampleIndex] = float32Add(
-      float32Multiply(window[forwardIndex], source[forwardIndex]),
-      float32Multiply(window[reverseIndex], source[reverseIndex])
-    )
-  }
-
-  for (let coefficient = 0; coefficient < 128; coefficient++) {
-    const evenSample = preWindowed[coefficient * 2]
-    const oddSample = preWindowed[coefficient * 2 + 1]
-    const cosine = tables.mdctPreRotationCosines[coefficient]
-    const sine = tables.mdctPreRotationSines[coefficient]
-    real[coefficient] = float32Subtract(
-      float32Multiply(evenSample, cosine),
-      float32Multiply(oddSample, sine)
-    )
-    imaginary[coefficient] = float32Add(
-      float32Multiply(evenSample, sine),
-      float32Multiply(oddSample, cosine)
-    )
-  }
-
-  for (let pair = 0; pair < bitReverseIndices.length; pair += 2) {
-    const sourceIndex = bitReverseIndices[pair]
-    const destinationIndex = bitReverseIndices[pair + 1]
-    const realValue = real[sourceIndex]
-    real[sourceIndex] = real[destinationIndex]
-    real[destinationIndex] = realValue
-    const imaginaryValue = imaginary[sourceIndex]
-    imaginary[sourceIndex] = imaginary[destinationIndex]
-    imaginary[destinationIndex] = imaginaryValue
-  }
-
-  let step = 64
-  let butterflyLength = 2
-  for (let stage = 0; stage <= 6; stage++) {
-    const half = butterflyLength >> 1
-    let base = 0
-    let secondLaneBase = half
-    let groups = step
-    while (groups !== 0) {
-      let twiddleIndex = 0
-      let butterflyCount = half
-      let firstLane = base
-      let secondLane = secondLaneBase
-      while (butterflyCount !== 0) {
-        const twiddleCosine = tables.mdctTwiddleCosines[twiddleIndex]
-        const twiddleSine = tables.mdctTwiddleSines[twiddleIndex]
-        const firstReal = real[firstLane]
-        const firstImaginary = imaginary[firstLane]
-        const secondReal = real[secondLane]
-        const secondImaginary = imaginary[secondLane]
-        const rotatedReal = float32Subtract(
-          float32Multiply(secondReal, twiddleCosine),
-          float32Multiply(secondImaginary, twiddleSine)
-        )
-        const rotatedImaginary = float32Add(
-          float32Multiply(secondImaginary, twiddleCosine),
-          float32Multiply(secondReal, twiddleSine)
-        )
-        real[secondLane] = float32Subtract(firstReal, rotatedReal)
-        imaginary[secondLane] = float32Subtract(
-          firstImaginary,
-          rotatedImaginary
-        )
-        real[firstLane] = float32Add(firstReal, rotatedReal)
-        imaginary[firstLane] = float32Add(firstImaginary, rotatedImaginary)
-        twiddleIndex += step
-        firstLane++
-        secondLane++
-        butterflyCount--
-      }
-      base += butterflyLength
-      secondLaneBase += butterflyLength
-      groups--
+/** Forward MDCT with Carta3's pinned Float32 evaluation order. */
+export class MDCT {
+  /**
+   * @param {number} size Time-domain transform size.
+   * @param {number} [scale=4] Transform normalization.
+   */
+  constructor(size, scale = 4) {
+    if (size !== 512 || !Number.isFinite(scale)) {
+      throw new RangeError('Carta3 MDCT requires size 512 and a finite scale')
     }
-    step >>= 1
-    butterflyLength <<= 1
+    this.size = size
+    this.halfSize = size >> 1
+    this.scale = Math.fround(scale / size)
   }
 
-  for (let coefficient = 0; coefficient < 128; coefficient++) {
-    const reverseIndex = 127 - coefficient
-    const forwardReal = real[coefficient]
-    const reverseReal = real[reverseIndex]
-    const forwardImaginary = imaginary[coefficient]
-    const reverseImaginary = imaginary[reverseIndex]
-    const minus = tables.mdctBaseCosineMinusFifthSine[coefficient]
-    const plus = tables.mdctBaseCosinePlusFifthSine[coefficient]
-    const fifthPlus = tables.mdctFifthCosinePlusBaseSine[coefficient]
-    const fifthMinus = tables.mdctFifthCosineMinusBaseSine[coefficient]
+  /**
+   * Transform windowed time-domain samples into MDCT coefficients.
+   *
+   * @param {Float32Array} input Windowed time-domain samples.
+   * @param {object} scratch Reusable transform storage.
+   * @param {Float32Array|null} [destination=null] Optional caller-owned output.
+   * @param {number} [destinationOffset=0] First output coefficient.
+   * @returns {Float32Array} Destination containing the coefficients.
+   */
+  transform(input, scratch, destination = null, destinationOffset = 0) {
+    const output = destination ?? new Float32Array(this.halfSize)
+    if (
+      !(input instanceof Float32Array) ||
+      input.length < this.size ||
+      !(output instanceof Float32Array) ||
+      destinationOffset < 0 ||
+      destinationOffset + this.halfSize > output.length ||
+      !(scratch?.folded instanceof Float32Array) ||
+      scratch.folded.length < this.halfSize ||
+      !(scratch?.real instanceof Float32Array) ||
+      scratch.real.length < 128 ||
+      !(scratch?.imaginary instanceof Float32Array) ||
+      scratch.imaginary.length < 128
+    ) {
+      throw new RangeError('Carta3 MDCT buffers have invalid geometry')
+    }
 
-    preWindowed[coefficient] = float32Add(
-      float32Add(
+    const tables = transformTables()
+    const folded = scratch.folded
+    const real = scratch.real
+    const imaginary = scratch.imaginary
+
+    for (let sample = 0; sample < 64; sample++) {
+      folded[sample] = float32Subtract(
+        -input[384 + sample * 2],
+        input[383 - sample * 2]
+      )
+    }
+    for (let sample = 0; sample < 128; sample++) {
+      folded[64 + sample] = float32Subtract(
+        input[sample * 2],
+        input[255 - sample * 2]
+      )
+    }
+    for (let sample = 0; sample < 64; sample++) {
+      folded[192 + sample] = float32Add(
+        input[256 + sample * 2],
+        input[511 - sample * 2]
+      )
+    }
+
+    for (let coefficientIndex = 0; coefficientIndex < 128; coefficientIndex++) {
+      const evenSample = folded[coefficientIndex * 2]
+      const oddSample = folded[coefficientIndex * 2 + 1]
+      const cosine = tables.mdctPreRotationCosines[coefficientIndex]
+      const sine = tables.mdctPreRotationSines[coefficientIndex]
+      real[coefficientIndex] = float32Subtract(
+        float32Multiply(evenSample, cosine),
+        float32Multiply(oddSample, sine)
+      )
+      imaginary[coefficientIndex] = float32Add(
+        float32Multiply(evenSample, sine),
+        float32Multiply(oddSample, cosine)
+      )
+    }
+
+    FFT.transform(real, imaginary)
+
+    for (let coefficientIndex = 0; coefficientIndex < 128; coefficientIndex++) {
+      const reverseIndex = 127 - coefficientIndex
+      const forwardReal = real[coefficientIndex]
+      const reverseReal = real[reverseIndex]
+      const forwardImaginary = imaginary[coefficientIndex]
+      const reverseImaginary = imaginary[reverseIndex]
+      const minus = tables.mdctBaseCosineMinusFifthSine[coefficientIndex]
+      const plus = tables.mdctBaseCosinePlusFifthSine[coefficientIndex]
+      const fifthPlus = tables.mdctFifthCosinePlusBaseSine[coefficientIndex]
+      const fifthMinus = tables.mdctFifthCosineMinusBaseSine[coefficientIndex]
+
+      folded[coefficientIndex] = float32Add(
         float32Add(
-          float32Multiply(forwardReal, minus),
-          float32Multiply(reverseReal, plus)
+          float32Add(
+            float32Multiply(forwardReal, minus),
+            float32Multiply(reverseReal, plus)
+          ),
+          float32Multiply(forwardImaginary, fifthPlus)
         ),
-        float32Multiply(forwardImaginary, fifthPlus)
-      ),
-      float32Multiply(reverseImaginary, fifthMinus)
-    )
-    preWindowed[255 - coefficient] = float32Add(
-      float32Subtract(
+        float32Multiply(reverseImaginary, fifthMinus)
+      )
+      folded[255 - coefficientIndex] = float32Add(
         float32Subtract(
-          float32Multiply(forwardReal, fifthPlus),
-          float32Multiply(reverseReal, fifthMinus)
+          float32Subtract(
+            float32Multiply(forwardReal, fifthPlus),
+            float32Multiply(reverseReal, fifthMinus)
+          ),
+          float32Multiply(forwardImaginary, minus)
         ),
-        float32Multiply(forwardImaginary, minus)
-      ),
-      float32Multiply(reverseImaginary, plus)
-    )
-  }
-
-  if (reverseOutput) {
-    for (let coefficient = 0; coefficient < 256; coefficient++) {
-      destination[coefficient] = float32Multiply(
-        MDCT_NORMALIZATION_SCALE,
-        preWindowed[255 - coefficient]
+        float32Multiply(reverseImaginary, plus)
       )
     }
-  } else {
-    for (let coefficient = 0; coefficient < 256; coefficient++) {
-      destination[coefficient] = float32Multiply(
-        MDCT_NORMALIZATION_SCALE,
-        preWindowed[coefficient]
+
+    for (let coefficientIndex = 0; coefficientIndex < 256; coefficientIndex++) {
+      output[destinationOffset + coefficientIndex] = float32Multiply(
+        this.scale,
+        folded[coefficientIndex]
       )
     }
+    return output
   }
-  return destination
 }
 
 /**
- * Transform four already-prepared windows into one 1024-line spectrum.
- *
- * Window construction, gain application, and overlap publication deliberately
- * happen before this function; this operation owns only the MDCT.
- *
- * @param {Float32Array} windows Four contiguous 512-sample time windows.
- * @param {Float32Array} spectrum Destination for four 256-line spectra.
- * @param {object} mdctScratch Reusable MDCT work buffers.
- * @returns {Float32Array} `spectrum`.
- */
-export function writeIndependentMdctOutputs(windows, spectrum, mdctScratch) {
-  if (
-    windows?.length < SUBBAND_COUNT * GAIN_SCALE_SAMPLES ||
-    spectrum?.length < SUBBAND_COUNT * BAND_PART_FLOATS
-  ) {
-    throw new RangeError('ATRAC3 prepared MDCT has invalid geometry')
-  }
-  for (let band = 0; band < SUBBAND_COUNT; band++) {
-    forwardMdct256(
-      windows.subarray(
-        band * GAIN_SCALE_SAMPLES,
-        (band + 1) * GAIN_SCALE_SAMPLES
-      ),
-      spectrum.subarray(band * BAND_PART_FLOATS, (band + 1) * BAND_PART_FLOATS),
-      REVERSE_OUTPUT_BY_SUBBAND[band] !== 0,
-      mdctScratch
-    )
-  }
-  return spectrum
-}
-
-/**
- * Transform a gain-prepared low-rate layer and publish its detached result.
- *
- * @param {object} layer Transaction-local layer state.
- * @param {Uint32Array} words Gain-prepared layered transform image.
- * @param {object} mdctScratch Reusable layered MDCT storage.
- * @returns {object} The transformed `layer`.
- */
-export function writeLayeredMdctOutputs(layer, words, mdctScratch) {
-  if (
-    !layer ||
-    words?.length < LAYER_WORDS ||
-    mdctScratch.transformValues?.length < FRAME_SAMPLES ||
-    mdctScratch.initialGainScales?.length < SUBBAND_COUNT
-  ) {
-    throw new RangeError('ATRAC3 layered MDCT has invalid state geometry')
-  }
-  transformLayeredRows(
-    words,
-    mdctScratch.transformValues,
-    mdctScratch.initialGainScales
-  )
-  return layer.loadFrom(words)
-}
-
-/**
- * Bit-exact inverse MDCT and overlap reconstruction used by decoding.
- *
- * Gain-envelope application is deliberately owned by `gain-scale.js`.
- */
-/**
- * Inverse-transform one spectral unit and update its overlap history.
+ * Apply the bit-exact inverse MDCT butterfly to one spectral unit.
  *
  * @param {Float32Array} spectrum Mutable reconstructed spectrum.
- * @param {number} blockIndex Interleaved subband index.
- * @param {number} gainIndex Initial transform scale selector.
- * @param {object} synthesis Transaction-staged decoder channel state.
- * @returns {void}
+ * @returns {Float32Array} The transformed `spectrum`.
  */
-export function inverseMdctBlock(spectrum, blockIndex, gainIndex, synthesis) {
-  if (
-    spectrum.length !== DECODER_SPECTRAL_LINES_PER_UNIT ||
-    blockIndex < 0 ||
-    blockIndex >= DECODER_MAX_UNITS
-  ) {
+export function inverseMdct256(spectrum) {
+  if (spectrum.length !== DECODER_SPECTRAL_LINES_PER_UNIT) {
     throw new RangeError('Invalid ATRAC3 inverse block geometry')
-  }
-
-  if ((blockIndex & 1) === 0) {
-    for (let lower = 0; lower < DECODER_SPECTRUM_FLOATS_PER_UNIT; lower++) {
-      spectrum[lower] = float32Subtract(
-        spectrum[lower],
-        spectrum[DECODER_SPECTRAL_LINES_PER_UNIT - 1 - lower]
-      )
-    }
-  } else {
-    for (let lower = 0; lower < DECODER_SPECTRUM_FLOATS_PER_UNIT; lower++) {
-      const mirror = DECODER_SPECTRAL_LINES_PER_UNIT - 1 - lower
-      const lowerValue = spectrum[lower]
-      spectrum[lower] = float32Subtract(spectrum[mirror], lowerValue)
-      spectrum[mirror] = lowerValue
-    }
   }
 
   for (let lower = 0; lower < DECODER_SPECTRUM_FLOATS_PER_UNIT; lower++) {
@@ -634,35 +469,5 @@ export function inverseMdctBlock(spectrum, blockIndex, gainIndex, synthesis) {
     spectrum[offset + 3] = float32Subtract(secondDifference, rotatedThird)
   }
 
-  const synthesisBase = RESIDUAL_DELAY_SAMPLES + blockIndex
-  const gain = INVERSE_TRANSFORM_SCALES[gainIndex]
-  for (
-    let tableIndex = 0;
-    tableIndex < DECODER_SPECTRUM_FLOATS_PER_UNIT;
-    tableIndex++
-  ) {
-    const reorder = TRANSFORM_REORDER_INDICES[tableIndex]
-    const source = tableIndex * 2
-    const first = Number(spectrum[source])
-    const second = Number(spectrum[source + 1])
-    const difference = first - second
-    const scaledSum = Number(coefficient(reorder, 3)) * second
-    const previous = Number(synthesis.overlap[blockIndex][reorder])
-    const rotatedDifference =
-      (difference - scaledSum) * Number(gain) * Number(coefficient(reorder, 2))
-    const lowerOutput =
-      synthesisBase +
-      (DECODER_SPECTRUM_FLOATS_PER_UNIT - 1 - reorder) * SUBBAND_COUNT
-    const upperOutput =
-      synthesisBase + reorder * SUBBAND_COUNT + HALF_FRAME_SAMPLES
-    synthesis.synthesisBuffer[lowerOutput] = Math.fround(
-      previous - Number(coefficient(reorder, 0)) * rotatedDifference
-    )
-    synthesis.synthesisBuffer[upperOutput] = Math.fround(
-      Number(coefficient(reorder, 0)) * previous + rotatedDifference
-    )
-    synthesis.overlap[blockIndex][reorder] = Math.fround(
-      (difference + scaledSum) * Number(coefficient(reorder, 1))
-    )
-  }
+  return spectrum
 }

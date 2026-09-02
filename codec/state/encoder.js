@@ -420,9 +420,10 @@ export class IndependentQmfScratch {
 
 /** Stage-private work vectors for one 256-line forward MDCT. */
 export class MdctScratch {
-  /** Allocate pre-windowing and complex FFT work vectors. */
+  /** Allocate window, folding, and complex FFT work vectors. */
   constructor() {
-    this.preWindowed = new Float32Array(256)
+    this.windowed = new Float32Array(512)
+    this.folded = new Float32Array(256)
     this.real = new Float32Array(128)
     this.imaginary = new Float32Array(128)
   }

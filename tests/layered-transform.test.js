@@ -7,7 +7,7 @@ import {
 } from '../codec/state/layered.js'
 import { analyzeLayeredGain } from '../codec/analysis/gain/layered.js'
 import { applyLayeredGainScale } from '../codec/signal/gain.js'
-import { writeLayeredMdctOutputs } from '../codec/signal/spectrum.js'
+import { writeLayeredMdctOutputs } from '../codec/analysis/spectrum.js'
 
 const floatBits = new DataView(new ArrayBuffer(4))
 
