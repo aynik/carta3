@@ -19,7 +19,7 @@ import {
   ALLOCATION_BAND_COUNT,
   PAIR_BLOCK_GAIN_COUNT_WORD,
   RESIDUAL_MODE_MAX,
-  RESIDUAL_SEARCH_DONE as DONE,
+  RESIDUAL_SEARCH_DONE,
   SCALE_FACTOR_INDEX_MAX,
   SPECTRUM_ALLOCATION_BITS_PER_BAND,
   SUBBAND_SAMPLES,
@@ -461,13 +461,13 @@ function seedResidualRefinement(layer, converged) {
   for (let band = 0; band < activeBands; band++) {
     const mode = allocation.modes[band]
     if (mode === 0) {
-      selectKeys[band] = DONE
+      selectKeys[band] = RESIDUAL_SEARCH_DONE
       continue
     }
     const width = bandWidth(band)
     if ((totalAvailable - bitsUsed) * 2 - 0x10 < width) {
       allocation.modes[band] = 0
-      selectKeys[band] = DONE
+      selectKeys[band] = RESIDUAL_SEARCH_DONE
       continue
     }
     const score = metrics[band + 1] - bitsUsed * 10
@@ -488,7 +488,7 @@ function seedResidualRefinement(layer, converged) {
     bandBits[band] = bits
     if (bits === minimumResidualBandBits(allocation.modes[band], width)) {
       allocation.modes[band] = 0
-      selectKeys[band] = DONE
+      selectKeys[band] = RESIDUAL_SEARCH_DONE
     } else {
       selectKeys[band] = allocation.scaleFactors[band]
       bitsUsed += bits
@@ -527,7 +527,7 @@ function selectOverflowTailTrim(execution, band) {
     band + 1,
     (tail) =>
       execution.allocation.modes[tail] !== 0 &&
-      execution.selectKeys[tail] === DONE
+      execution.selectKeys[tail] === RESIDUAL_SEARCH_DONE
   )
   return { previousActiveBands, activeBands }
 }
@@ -609,7 +609,7 @@ function fitRefinementBand(layer, band, execution) {
     }
   }
 
-  execution.selectKeys[band] = DONE
+  execution.selectKeys[band] = RESIDUAL_SEARCH_DONE
   if (tailTrim) {
     for (
       let tail = tailTrim.activeBands;
@@ -617,7 +617,7 @@ function fitRefinementBand(layer, band, execution) {
       tail++
     ) {
       allocation.modes[tail] = 0
-      execution.selectKeys[tail] = DONE
+      execution.selectKeys[tail] = RESIDUAL_SEARCH_DONE
     }
     execution.budgetLimit +=
       (tailTrim.previousActiveBands - tailTrim.activeBands) *
@@ -653,7 +653,7 @@ function refineResidualAllocation(layer, bitBudget, primary, converged) {
     layer.priorGainCount + layer.pairBlocks[0][PAIR_BLOCK_GAIN_COUNT_WORD] !== 0
   ) {
     for (let band = 0; band < Math.min(activeBands, 5); band++) {
-      if (execution.selectKeys[band] !== DONE) {
+      if (execution.selectKeys[band] !== RESIDUAL_SEARCH_DONE) {
         execution.selectKeys[band] = Math.max(
           execution.selectKeys[band],
           SCALE_FACTOR_SENTINEL
@@ -662,12 +662,12 @@ function refineResidualAllocation(layer, bitBudget, primary, converged) {
     }
   }
   const rankedBands = Array.from({ length: activeBands }, (_, band) => band)
-    .filter((band) => execution.selectKeys[band] !== DONE)
+    .filter((band) => execution.selectKeys[band] !== RESIDUAL_SEARCH_DONE)
     .sort(
       (left, right) => execution.selectKeys[right] - execution.selectKeys[left]
     )
   for (const band of rankedBands) {
-    if (execution.selectKeys[band] !== DONE) {
+    if (execution.selectKeys[band] !== RESIDUAL_SEARCH_DONE) {
       fitRefinementBand(layer, band, execution)
     }
   }
