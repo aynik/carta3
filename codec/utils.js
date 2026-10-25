@@ -1,6 +1,8 @@
 /** Carta3 Audio Codec - Shared numerical and composition helpers. */
 
 const numericBits = new DataView(new ArrayBuffer(8))
+const float32Bits = new Float32Array(1)
+const uint32Bits = new Uint32Array(float32Bits.buffer)
 
 /**
  * Add two values and round the result to IEEE-754 float32 precision.
@@ -40,10 +42,11 @@ export function float32Multiply(left, right) {
  *
  * @param {number} bits
  * @returns {number}
+ * @nativeBitcast {Uint32Array} Float32Array
  */
 export function float32FromBits(bits) {
-  numericBits.setUint32(0, bits, true)
-  return numericBits.getFloat32(0, true)
+  uint32Bits[0] = bits
+  return float32Bits[0]
 }
 
 /**
@@ -51,16 +54,17 @@ export function float32FromBits(bits) {
  *
  * @param {number} value
  * @returns {number}
+ * @nativeBitcast {Float32Array} Uint32Array
  */
 export function float32ToBits(value) {
-  numericBits.setFloat32(0, value, true)
-  return numericBits.getUint32(0, true)
+  float32Bits[0] = value
+  return uint32Bits[0]
 }
 
 /**
  * Reinterpret one unsigned 64-bit word as an IEEE-754 float64 value.
  *
- * @param {number} bits
+ * @param {bigint} bits
  * @returns {number}
  */
 export function float64FromBits(bits) {
@@ -71,14 +75,17 @@ export function float64FromBits(bits) {
 /**
  * Return the maximum absolute value in one half-open array range.
  *
- * @param {ArrayLike<number>} values
- * @param {number} [start]
- * @param {number} [end]
+ * @param {Float32Array} values
+ * @param {i32} [start] First sample in the range.
+ * @param {i32} [end] Exclusive sample limit.
  * @returns {number}
+ * @nativeUnchecked Callers supply an in-bounds half-open sample range.
  */
 export function absoluteMaximum(values, start = 0, end = values.length) {
+  /** @type {i32} */
+  const limit = end
   let maximum = 0
-  for (let index = start; index < end; index++) {
+  for (let index = start; index < limit; index++) {
     const magnitude = Math.abs(values[index])
     if (magnitude > maximum) maximum = magnitude
   }
@@ -116,6 +123,11 @@ export function reverseLowBits(value, bitCount) {
  */
 export function pipe(context, ...stages) {
   const operations = stages.map((stage) => stage(context))
-  return (input) =>
-    operations.reduce((value, operation) => operation(value), input)
+  return (input) => {
+    let value = input
+    for (let index = 0; index < operations.length; index++) {
+      value = operations[index](value)
+    }
+    return value
+  }
 }

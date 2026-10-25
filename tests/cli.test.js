@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createProgram, main } from '../bin/cli.js'
+import { parseArguments, main } from '../bin/cli.js'
 import { createPcmWave, PCM_SCALE } from '../codec/boundary/pcm.js'
 import { parseWave } from '../codec/boundary/container.js'
 
@@ -45,9 +45,7 @@ describe('carta3 CLI', () => {
   })
 
   it('uses mutually exclusive root encode and decode flags', () => {
-    const encode = createProgram().parse([
-      'node',
-      'carta3',
+    const encode = parseArguments([
       '-e',
       '-q',
       '-b',
@@ -55,22 +53,15 @@ describe('carta3 CLI', () => {
       inputFile,
       encodedFile,
     ])
-    expect(encode.commands).toHaveLength(0)
-    expect(encode.opts()).toMatchObject({
+    expect(encode.options).toMatchObject({
       bitrate: '105',
       encode: true,
       quiet: true,
     })
-    expect(encode.args).toEqual([inputFile, encodedFile])
+    expect(encode.paths).toEqual([inputFile, encodedFile])
 
-    const decode = createProgram().parse([
-      'node',
-      'carta3',
-      '-d',
-      encodedFile,
-      decodedFile,
-    ])
-    expect(decode.opts()).toMatchObject({ decode: true })
+    const decode = parseArguments(['-d', encodedFile, decodedFile])
+    expect(decode.options).toMatchObject({ decode: true })
   })
 
   it('rejects missing, conflicting, and decode-only-inapplicable options', async () => {

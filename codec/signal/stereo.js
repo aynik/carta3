@@ -25,18 +25,26 @@ const half = float32FromBits(HALF_BITS)
 /**
  * Convert one left/right coefficient pair to scaled mid/side form.
  *
- * @param {object[]} layers
+ * @param {Float32Array} leftSpectrum
+ * @param {Float32Array} rightSpectrum
  * @param {number} index
  * @param {number} ratio
- * @param {boolean} inverseScale
+ * @param {number} inverseScale
+ * @nativeUnchecked The caller validates both complete spectra before conversion.
  */
-function applyCoefficient(layers, index, ratio, inverseScale) {
-  const left = layers[0].spectrum[index]
-  const right = layers[1].spectrum[index]
+function applyCoefficient(
+  leftSpectrum,
+  rightSpectrum,
+  index,
+  ratio,
+  inverseScale
+) {
+  const left = leftSpectrum[index]
+  const right = rightSpectrum[index]
   const mid = (left + right) * half
   const side = (left - ratio * mid) * inverseScale
-  layers[1].spectrum[index] = Math.fround(side)
-  layers[0].spectrum[index] = Math.fround(mid)
+  rightSpectrum[index] = Math.fround(side)
+  leftSpectrum[index] = Math.fround(mid)
 }
 
 /**
@@ -54,6 +62,10 @@ export function applyJointStereoConversion(state, layers) {
   ) {
     throw new RangeError('ATRAC3 joint stereo requires two 1024-line layers')
   }
+  /** @type {Float32Array} */
+  const leftSpectrum = layers[0].spectrum
+  /** @type {Float32Array} */
+  const rightSpectrum = layers[1].spectrum
   const modeWeights = [0, 2, 2, 1, 1]
   for (let stream = 0; stream < 4; stream++) {
     const mode = Math.abs(state.slotModes[stream])
@@ -73,11 +85,18 @@ export function applyJointStereoConversion(state, layers) {
         const relative = ramp - 8
         const scale = scaledRatio - relative * ratioStep
         const ratio = currentWeight - relative * weightStep
-        applyCoefficient(layers, stream + ramp * 4, ratio, unity / scale)
+        applyCoefficient(
+          leftSpectrum,
+          rightSpectrum,
+          stream + ramp * 4,
+          ratio,
+          unity / scale
+        )
       }
       for (let position = 8; position < 0x100; position++) {
         applyCoefficient(
-          layers,
+          leftSpectrum,
+          rightSpectrum,
           stream + position * 4,
           currentWeight,
           unity / scaledRatio
@@ -103,15 +122,15 @@ export function applyJointStereoConversion(state, layers) {
     const scaleStep = (previousScale - currentScale) * interpolationStep
     for (let ramp = 0; ramp < 8; ramp++) {
       const index = stream + ramp * 4
-      const sum = layers[0].spectrum[index] + layers[1].spectrum[index]
+      const sum = leftSpectrum[index] + rightSpectrum[index]
       const scale = currentScale - (ramp - 8) * scaleStep
-      layers[0].spectrum[index] = float32Multiply(unity / scale, sum)
+      leftSpectrum[index] = float32Multiply(unity / scale, sum)
     }
     const inverseScale = unity / currentScale
     for (let position = 8; position < 0x100; position++) {
       const index = stream + position * 4
-      const sum = layers[0].spectrum[index] + layers[1].spectrum[index]
-      layers[0].spectrum[index] = float32Multiply(sum, inverseScale)
+      const sum = leftSpectrum[index] + rightSpectrum[index]
+      leftSpectrum[index] = float32Multiply(sum, inverseScale)
     }
   }
   return layers

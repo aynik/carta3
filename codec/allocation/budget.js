@@ -60,12 +60,19 @@ function mergedSourceMask(layers) {
  */
 function reconstructionNoise(layer, words) {
   const allocation = new AllocationWorkView(words)
+  /** @type {i32} */
   const activeBands = allocation.activeBandCount
-  return Float64Array.from({ length: 32 }, (_, band) => {
+  /** @type {Float32Array} */
+  const spectrum = layer.spectrum
+  const noise = new Float64Array(32)
+  for (let band = 0; band < noise.length; band++) {
     const mode = band < activeBands ? allocation.mode(band) : 0
     const scaleFactor = band < activeBands ? allocation.scaleFactor(band) : 0
-    return measureResidualBand(layer.spectrum, band, mode, scaleFactor).error
-  })
+    /** @type {number} */
+    const error = measureResidualBand(spectrum, band, mode, scaleFactor).error
+    noise[band] = error
+  }
+  return noise
 }
 
 /**

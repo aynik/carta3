@@ -46,6 +46,18 @@ import {
 } from './distortion.js'
 import { absoluteMaximum, float32Add, float32Multiply } from '../utils.js'
 
+/**
+ * @typedef {object} SoundUnitAllocationCandidate
+ * @property {Int32Array} wordLengths Selected word lengths by band.
+ * @property {Int32Array} initialWordLengths Initial word lengths by band.
+ * @property {Int32Array} scaleFactorIndices Spectral scale factors by band.
+ * @property {Int32Array} timeFactors Quantizer dead-zone factors by band.
+ * @property {Int32Array} bitsByBand Exact residual costs by band.
+ * @property {Int32Array} quantizedSpectrum Retained quantized coefficients.
+ * @property {number} timeFactorLimit Maximum permitted dead-zone factor.
+ * @property {number} sumBits Total residual bit cost.
+ */
+
 const maximumWordLengthThresholds = new Float32Array(
   ALLOCATION_BAND_COUNT
 ).fill(WORD_LENGTH_LIMIT)
@@ -55,14 +67,22 @@ const maximumWordLengthThresholds = new Float32Array(
  *
  * @param {number} tableGroup Huffman family selector.
  * @param {number} wordLength Coded word length.
- * @param {ArrayLike<number>} symbols Quantized symbols.
+ * @param {Int32Array} symbols Quantized symbols.
+ * @param {number} [count] Number of symbols in the band.
+ * @param {i32} [start=0] First symbol in the row.
  * @returns {number} Exact syntax cost in bits.
  */
-function measureNontoneBits(tableGroup, wordLength, symbols) {
+function measureNontoneBits(
+  tableGroup,
+  wordLength,
+  symbols,
+  count = symbols.length,
+  start = 0
+) {
   if (wordLength === 0) return 0
   const table = HUFFMAN_FAMILIES[tableGroup]?.[wordLength]
   if (!table) throw new RangeError('ATRAC3 non-tone codebook is unavailable')
-  return 6 + measureHuffmanBits(table, symbols)
+  return 6 + measureHuffmanBits(table, symbols, count, start)
 }
 
 /**
@@ -145,11 +165,11 @@ function hasAttack(current, previous, componentCount) {
 /**
  * Derive attack-aware perceptual word-length thresholds for each band.
  *
- * @param {ArrayLike<number>} transformedScaleFactors
+ * @param {Int32Array} transformedScaleFactors
  * @param {number} bandCount
  * @param {number} averageScaleFactor
  * @param {boolean} attack
- * @param {ArrayLike<number>} thresholds
+ * @param {Float32Array} thresholds
  * @returns {Float32Array}
  */
 function buildThresholds(
@@ -188,7 +208,7 @@ function buildThresholds(
  * Quantize thresholds and suppress bands below the reference gate.
  *
  * @param {Float32Array} source
- * @param {ArrayLike<number>} references
+ * @param {Int32Array} references
  * @param {number} bandCount
  * @param {Int32Array} output
  * @returns {object}
@@ -218,7 +238,7 @@ function translateWordLengths(source, references, bandCount, output) {
 /**
  * Normalize each active band by its selected spectral scale factor.
  *
- * @param {ArrayLike<number>} scaleFactors
+ * @param {Int32Array} scaleFactors
  * @param {number} bandCount
  * @param {Float32Array} output
  */
@@ -236,29 +256,36 @@ function normalizeSpectrum(scaleFactors, bandCount, output) {
 /**
  * Trial-quantize and exactly Huffman-price every active candidate band.
  *
- * @param {object} state
+ * @param {SoundUnitAllocationCandidate} state
  * @param {Float32Array} spectrum
  * @param {number} bandCount
  * @returns {number}
  */
 function priceCandidate(state, spectrum, bandCount) {
-  state.sumBits = 0
+  const { wordLengths, timeFactors, quantizedSpectrum, bitsByBand } = state
+  let sumBits = 0
   for (let band = 0; band < bandCount; band++) {
     const start = QUANTIZATION_UNIT_OFFSETS[band]
     const end = QUANTIZATION_UNIT_OFFSETS[band + 1]
-    const wordLength = state.wordLengths[band]
-    const symbols = state.quantizedSpectrum.subarray(start, end)
+    const wordLength = wordLengths[band]
     const count = quantizeNontoneSymbols(
       wordLength,
-      quantZeroThreshold(state.timeFactors[band], wordLength),
-      spectrum.subarray(start, end),
-      symbols
+      quantZeroThreshold(timeFactors[band], wordLength),
+      spectrum,
+      quantizedSpectrum,
+      start,
+      end - start,
+      start
     )
-    const bits = count === 0 ? 0 : measureNontoneBits(0, wordLength, symbols)
-    state.bitsByBand[band] = bits
-    state.sumBits += bits
+    const bits =
+      count === 0
+        ? 0
+        : measureNontoneBits(0, wordLength, quantizedSpectrum, count, start)
+    bitsByBand[band] = bits
+    sumBits += bits
   }
-  return state.sumBits
+  state.sumBits = sumBits
+  return sumBits
 }
 
 /**
@@ -274,20 +301,21 @@ function priceCandidate(state, spectrum, bandCount) {
 function priceBandOption(wordLength, timeFactor, spectrum, band, output) {
   const start = QUANTIZATION_UNIT_OFFSETS[band]
   const end = QUANTIZATION_UNIT_OFFSETS[band + 1]
-  const symbols = output.subarray(0, end - start)
   const count = quantizeNontoneSymbols(
     wordLength,
     quantZeroThreshold(timeFactor, wordLength),
-    spectrum.subarray(start, end),
-    symbols
+    spectrum,
+    output,
+    start,
+    end - start
   )
-  return count === 0 ? 0 : measureNontoneBits(0, wordLength, symbols)
+  return count === 0 ? 0 : measureNontoneBits(0, wordLength, output, count)
 }
 
 /**
  * Apply one selected band option without repricing unaffected bands.
  *
- * @param {object} state Mutable sound-unit allocation state.
+ * @param {SoundUnitAllocationCandidate} state Mutable sound-unit allocation state.
  * @param {Float32Array} spectrum Normalized source spectrum.
  * @param {number} band Quantization-band index.
  * @param {number} wordLength Selected spectral word length.
@@ -316,9 +344,10 @@ function applyBandOption(
   state.wordLengths[band] = wordLength
   state.timeFactors[band] = timeFactor
   state.bitsByBand[band] = bits
-  state.quantizedSpectrum
-    .subarray(start, end)
-    .set(symbolScratch.subarray(0, end - start))
+  const quantizedSpectrum = state.quantizedSpectrum
+  for (let coefficient = start; coefficient < end; coefficient++) {
+    quantizedSpectrum[coefficient] = symbolScratch[coefficient - start]
+  }
   state.sumBits += bits - previousBits
   return bits - previousBits
 }
@@ -337,10 +366,10 @@ function tuneWeight(tune, band) {
 /**
  * Rebuild and exactly price a candidate at one global tuning offset.
  *
- * @param {object} seed
- * @param {object} state
- * @param {ArrayLike<number>} thresholds
- * @param {Uint8Array} gate
+ * @param {SoundUnitAllocationCandidate} seed
+ * @param {SoundUnitAllocationCandidate} state
+ * @param {Float32Array} thresholds
+ * @param {Int32Array} gate
  * @param {number} tune
  * @param {number} runningBitSum
  * @param {Float32Array} spectrum
@@ -385,9 +414,9 @@ function retuneCandidate(
 /**
  * Bracket and refine the global threshold offset that fits the residual budget.
  *
- * @param {object} seed
- * @param {ArrayLike<number>} thresholds
- * @param {Uint8Array} gate
+ * @param {SoundUnitAllocationCandidate} seed
+ * @param {Float32Array} thresholds
+ * @param {Int32Array} gate
  * @param {number} budget
  * @param {Float32Array} spectrum
  * @param {number} bandCount
@@ -503,7 +532,7 @@ function tuneToBudget(
 /**
  * Enumerate active bands eligible for syntax-cost reduction.
  *
- * @param {ArrayLike<number>} transformedScaleFactors
+ * @param {Int32Array} transformedScaleFactors
  * @param {number} bandCount
  * @returns {object[]}
  */
@@ -519,7 +548,7 @@ function trimTargets(transformedScaleFactors, bandCount) {
 /**
  * Measure one lower-rate neighboring candidate for a selected band.
  *
- * @param {object} state
+ * @param {SoundUnitAllocationCandidate} state
  * @param {object} target
  * @param {object} operation
  * @returns {object|null}
@@ -594,7 +623,7 @@ function rankTrimCandidates(candidates) {
 /**
  * Apply one selected trim move to the current candidate state.
  *
- * @param {object} state
+ * @param {SoundUnitAllocationCandidate} state
  * @param {object} choice
  * @param {object} operation
  * @returns {object}
@@ -641,7 +670,7 @@ function bestCrossingCandidate(candidates, start, overage) {
 /**
  * Apply one ordered trim phase until its target budget is met or exhausted.
  *
- * @param {object} state
+ * @param {SoundUnitAllocationCandidate} state
  * @param {number} budget
  * @param {object} operation
  * @returns {object}
@@ -649,12 +678,14 @@ function bestCrossingCandidate(candidates, start, overage) {
 function trimPhase(state, budget, operation) {
   const { targets, targetLimit, kind } = operation
   for (;;) {
-    const candidates = rankTrimCandidates(
-      targets
-        .filter((target) => target.band < targetLimit)
-        .map((target) => measureTrimMove(state, target, operation))
-        .filter(Boolean)
-    )
+    const candidates = []
+    for (const target of targets) {
+      if (target.band < targetLimit) {
+        const candidate = measureTrimMove(state, target, operation)
+        if (candidate) candidates.push(candidate)
+      }
+    }
+    rankTrimCandidates(candidates)
     if (candidates.length === 0 || state.sumBits <= budget) return state
     if (kind === 'word') {
       const overage = state.sumBits - budget
@@ -688,12 +719,12 @@ function trimPhase(state, budget, operation) {
 /**
  * Run ordered trim phases until the complete candidate fits its budget.
  *
- * @param {object} state
+ * @param {SoundUnitAllocationCandidate} state
  * @param {number} budget
  * @param {Float32Array} spectrum
  * @param {number} bandCount
  * @param {number} componentCount
- * @param {ArrayLike<number>} transformedScaleFactors
+ * @param {Int32Array} transformedScaleFactors
  * @param {Int32Array} candidateSymbols
  * @returns {object}
  */
@@ -733,16 +764,16 @@ function trimCandidate(
 /**
  * Measure and retain one band-local water-fill transition.
  *
- * @param {object} state Current mutable sound-unit allocation.
- * @param {Int32Array} transformedScaleFactors Reference scale-factor profile.
- * @param {Float32Array} spectrum Normalized source spectrum.
- * @param {Float64Array} mask Reconstruction masking threshold by band.
+ * @param {SoundUnitAllocationCandidate} state Current mutable sound-unit allocation.
  * @param {number} band Quantization-band index.
  * @param {number} slot Candidate-frontier destination slot.
  * @param {number} wordLength Candidate spectral word length.
  * @param {number} timeFactor Candidate dead-zone time factor.
  * @param {number} incumbentNoise Current reconstructed noise for the band.
  * @param {object} operation Shared fill-search evidence and scratch.
+ * @param {Int32Array} operation.transformedScaleFactors Reference scale factors.
+ * @param {Float32Array} operation.spectrum Normalized source spectrum.
+ * @param {Float64Array} operation.mask Reconstruction masking threshold by band.
  * @returns {void}
  */
 function measureFillCandidate(
@@ -785,7 +816,7 @@ function measureFillCandidate(
 /**
  * Refresh the two transitions affected by one band's current state.
  *
- * @param {object} state Current mutable sound-unit allocation.
+ * @param {SoundUnitAllocationCandidate} state Current mutable sound-unit allocation.
  * @param {number} band Quantization-band index.
  * @param {boolean} allowLowerTimeFactors Whether reverse trim moves are legal.
  * @param {object} operation Shared fill-search evidence and scratch.
@@ -827,7 +858,7 @@ function refreshFillBand(state, band, allowLowerTimeFactors, operation) {
 /**
  * Spend remaining bits on the lowest masked-noise candidate improvements.
  *
- * @param {object} state Current mutable sound-unit allocation.
+ * @param {SoundUnitAllocationCandidate} state Current mutable sound-unit allocation.
  * @param {number} unitBits Complete sound-unit bit capacity.
  * @param {number} syntaxBits Bits already occupied by complete unit syntax.
  * @param {object} operation Shared fill-search evidence and scratch.
@@ -888,7 +919,7 @@ function fillCandidate(state, unitBits, syntaxBits, operation) {
 /**
  * Return the shortest prefix containing every nonzero word length.
  *
- * @param {object} state
+ * @param {SoundUnitAllocationCandidate} state
  * @param {number} reservedBandCount
  * @returns {number}
  */
@@ -901,11 +932,12 @@ function countActiveBands(state, reservedBandCount) {
 /**
  * Recenter selected scale factors around reconstructed per-band energy.
  *
- * @param {object} state
+ * @param {SoundUnitAllocationCandidate} state
  * @param {Float32Array} spectrum
  * @param {number} bandCount
  */
 function refineCandidateScales(state, spectrum, bandCount) {
+  const symbols = state.quantizedSpectrum
   for (let band = 0; band < bandCount; band++) {
     const wordLength = state.wordLengths[band]
     if (wordLength === 0) continue
@@ -922,10 +954,7 @@ function refineCandidateScales(state, spectrum, bandCount) {
         referenceEnergy,
         float32Multiply(source, source)
       )
-      const quantized = float32Multiply(
-        inverseStep,
-        state.quantizedSpectrum[coefficient]
-      )
+      const quantized = float32Multiply(inverseStep, symbols[coefficient])
       quantizedEnergy = float32Add(
         quantizedEnergy,
         float32Multiply(quantized, quantized)
@@ -987,7 +1016,7 @@ function resetCandidateSyntax(block, bandCount, componentCount) {
  * This does not publish chronological encoder state.
  *
  * @param {object} block Detached candidate syntax destination.
- * @param {object} state Trial allocation and symbols.
+ * @param {SoundUnitAllocationCandidate} state Trial allocation and symbols.
  * @param {number} componentCount Retained component-group count.
  * @param {number} bandCount Retained spectrum-group count.
  */

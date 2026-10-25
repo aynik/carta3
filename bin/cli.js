@@ -8,15 +8,9 @@
  *   carta3 --decode input.at3.wav output.wav
  */
 
-import { once } from 'node:events'
 import fs from 'node:fs'
-import { open } from 'node:fs/promises'
 import path from 'node:path'
-import { performance } from 'node:perf_hooks'
-import { finished } from 'node:stream/promises'
 import { pathToFileURL } from 'node:url'
-import cliProgress from 'cli-progress'
-import { Command } from 'commander'
 import {
   CHANNELS,
   FRAME_SAMPLES,
@@ -35,13 +29,16 @@ import {
   PCM_SCALE,
 } from '../codec/boundary/pcm.js'
 
+/** Typed PCM views are valid only on a little-endian host. */
+const LITTLE_ENDIAN_PCM = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1
+
 /**
  * Format a duration in seconds as MM:SS.
  *
  * @param {number} seconds
  * @returns {string}
  */
-function formatTime(seconds) {
+export function formatTime(seconds) {
   const minutes = Math.floor(seconds / 60)
   const remainder = Math.floor(seconds % 60)
   return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
@@ -50,69 +47,73 @@ function formatTime(seconds) {
 /**
  * Display frame progress and real-time processing speed.
  */
-class ProgressTracker {
+export class ProgressTracker {
   /**
-   * Create a tracker for one encode or decode operation.
+   * Create a progress tracker.
    *
-   * @param {number} frameCount
-   * @param {string} operation
-   * @param {boolean} [quiet]
+   * @param {number} frameCount - Total number of frames to process
+   * @param {string} operation - Operation name ('Encoding' or 'Decoding')
+   * @param {boolean} [quiet=false] - Suppress progress display
    */
   constructor(frameCount, operation, quiet = false) {
     this.totalFrames = frameCount
-    this.quiet = quiet || frameCount === 0
+    this.operation = operation
+    this.enabled = !quiet && process.stderr.isTTY
     this.startTime = performance.now()
+    this.lastRender = -Infinity
     this.frameCount = 0
-    if (!this.quiet) {
-      this.bar = new cliProgress.SingleBar(
-        {
-          autopadding: true,
-          format: `${operation} |{bar}| {percentage}% | {value}/{total} frames | {elapsed}/{remaining} | RT: {speed}x`,
-        },
-        cliProgress.Presets.rect
-      )
-      this.bar.start(frameCount, 0, {
-        elapsed: '00:00',
-        remaining: '00:00',
-        speed: '0.0',
-      })
-    }
+    this.render()
   }
 
   /**
-   * Set the number of source or container frames processed so far.
+   * Update progress with a new processed frame.
    *
-   * @param {number} frameCount
+   * @param {number} frameCount - Number of source or container frames processed
    */
   update(frameCount) {
     this.frameCount = Math.min(frameCount, this.totalFrames)
-    if (this.quiet) return
-    const elapsed = (performance.now() - this.startTime) / 1000
-    const audioProcessed = (this.frameCount * FRAME_SAMPLES) / SAMPLE_RATE
-    const speed = elapsed > 0 ? audioProcessed / elapsed : 0
-    const fraction = this.frameCount / this.totalFrames
-    const totalTime = fraction > 0 ? elapsed / fraction : 0
-    this.bar.update(this.frameCount, {
-      elapsed: formatTime(elapsed),
-      remaining: formatTime(Math.max(0, totalTime - elapsed)),
-      speed: speed.toFixed(1),
-    })
+    this.render()
   }
 
   /**
-   * Complete and stop the progress display.
+   * Render a throttled progress update on an interactive terminal.
    *
-   * @param {boolean} [completed]
+   * @param {boolean} [force=false] - Render even inside the throttle interval
+   */
+  render(force = false) {
+    if (!this.enabled) return
+    const now = performance.now()
+    if (!force && now - this.lastRender < 100) return
+    this.lastRender = now
+    const elapsed = (now - this.startTime) / 1000
+    const fraction =
+      this.totalFrames > 0 ? Math.min(1, this.frameCount / this.totalFrames) : 1
+    const filled = Math.floor(fraction * 24)
+    const remaining = fraction > 0 ? elapsed * (1 / fraction - 1) : 0
+    const speed =
+      elapsed > 0
+        ? (this.frameCount * FRAME_SAMPLES) /
+          (this.sampleRate || SAMPLE_RATE) /
+          elapsed
+        : 0
+    process.stderr.write(
+      `\r\x1b[2K${this.operation} |${'█'.repeat(filled)}${'░'.repeat(24 - filled)}| ${Math.floor(fraction * 100)}% | ${this.frameCount}/${this.totalFrames} frames | ${formatTime(elapsed)}/${formatTime(remaining)} | RT: ${speed.toFixed(1)}x`
+    )
+  }
+
+  /**
+   * Stop the display, completing its frame count only after successful output.
+   * @param {boolean} [completed=false] Whether the operation finished.
    */
   stop(completed = false) {
-    if (this.quiet || !this.bar) return
-    if (completed) this.update(this.totalFrames)
-    this.bar.stop()
+    if (completed) this.frameCount = this.totalFrames
+    this.render(true)
+    if (this.enabled) process.stderr.write('\n')
   }
 }
 
 /** Error caused by an invalid combination of command-line arguments. */
-class CliUsageError extends Error {}
+export class CliUsageError extends Error {}
 
 /**
  * Read exactly one fixed-size region from an open file.
@@ -145,7 +146,7 @@ async function readExactly(handle, length, position) {
  * @returns {Promise<object>}
  */
 async function readAtracWaveMetadata(filePath) {
-  const handle = await open(filePath, 'r')
+  const handle = await fs.promises.open(filePath, 'r')
   try {
     const { size } = await handle.stat()
     const header = await readExactly(handle, 12, 0)
@@ -158,9 +159,13 @@ async function readAtracWaveMetadata(filePath) {
 
     let format = null
     let fact = null
+    /** @type {f64} */
     let dataOffset = -1
+    /** @type {f64} */
     let dataBytes = -1
-    for (let offset = 12; offset + 8 <= size;) {
+    /** @type {f64} */
+    let offset = 12
+    for (; offset + 8 <= size;) {
       const chunkHeader = await readExactly(handle, 8, offset)
       const id = chunkHeader.toString('ascii', 0, 4)
       const chunkBytes = chunkHeader.readUInt32LE(4)
@@ -232,8 +237,8 @@ async function readAtracWaveMetadata(filePath) {
  * @param {string} filePath
  * @returns {Promise<object>}
  */
-async function readPcmWaveMetadata(filePath) {
-  const handle = await open(filePath, 'r')
+export async function readPcmWaveMetadata(filePath) {
+  const handle = await fs.promises.open(filePath, 'r')
   try {
     const { size } = await handle.stat()
     const header = await readExactly(handle, 12, 0)
@@ -245,9 +250,13 @@ async function readPcmWaveMetadata(filePath) {
     }
 
     let format = null
+    /** @type {f64} */
     let dataOffset = -1
+    /** @type {f64} */
     let dataBytes = -1
-    for (let offset = 12; offset + 8 <= size;) {
+    /** @type {f64} */
+    let offset = 12
+    for (; offset + 8 <= size;) {
       const chunkHeader = await readExactly(handle, 8, offset)
       const id = chunkHeader.toString('ascii', 0, 4)
       const declaredBytes = chunkHeader.readUInt32LE(4)
@@ -378,6 +387,7 @@ async function* readAtracFrames(filePath, metadata) {
  * @param {AsyncIterable<Uint8Array>} chunks
  * @param {number} channelCount
  * @returns {AsyncGenerator<Float32Array[]>}
+ * @nativeUnchecked Sample loops are bounded by the complete PCM chunk length.
  */
 async function* readPlanarPcm(chunks, channelCount) {
   let carry = Buffer.alloc(0)
@@ -387,31 +397,87 @@ async function* readPlanarPcm(chunks, channelCount) {
     const completeBytes = chunk.length - (chunk.length % blockBytes)
     carry = chunk.subarray(completeBytes)
     const sampleCount = completeBytes / blockBytes
-    const channels = [
-      new Float32Array(sampleCount),
-      new Float32Array(sampleCount),
-    ]
-    for (let sample = 0; sample < sampleCount; sample++) {
-      const left = chunk.readInt16LE(sample * blockBytes)
-      channels[0][sample] = left / PCM_SCALE
-      channels[1][sample] =
-        (channelCount === 1
-          ? left
-          : chunk.readInt16LE(sample * blockBytes + 2)) / PCM_SCALE
+    const left = new Float32Array(sampleCount)
+    const right = new Float32Array(sampleCount)
+    if (LITTLE_ENDIAN_PCM && (chunk.byteOffset & 1) === 0) {
+      const samples = new Int16Array(
+        chunk.buffer,
+        chunk.byteOffset,
+        completeBytes / 2
+      )
+      for (let sample = 0; sample < sampleCount; sample++) {
+        const first = samples[sample * channelCount]
+        left[sample] = first / PCM_SCALE
+        right[sample] =
+          (channelCount === 1 ? first : samples[sample * channelCount + 1]) /
+          PCM_SCALE
+      }
+    } else {
+      for (let sample = 0; sample < sampleCount; sample++) {
+        const first = chunk.readInt16LE(sample * blockBytes)
+        left[sample] = first / PCM_SCALE
+        right[sample] =
+          (channelCount === 1
+            ? first
+            : chunk.readInt16LE(sample * blockBytes + 2)) / PCM_SCALE
+      }
     }
-    if (sampleCount !== 0) yield channels
+    if (sampleCount !== 0) yield [left, right]
   }
   if (carry.length !== 0) throw new RangeError('Truncated PCM sample')
 }
 
 /**
- * Write bytes while respecting stream backpressure.
+ * Write a complete byte block, handling partial filesystem writes.
  *
- * @param {NodeJS.WritableStream} stream
- * @param {Uint8Array} bytes
+ * @param {import('node:fs/promises').FileHandle} handle - Open output file
+ * @param {Uint8Array} bytes - Bytes to write
+ * @param {number|null} [position=null] - Absolute offset or the current position
+ * @returns {Promise<void>}
  */
-async function writeBytes(stream, bytes) {
-  if (!stream.write(bytes)) await once(stream, 'drain')
+async function writeBytes(handle, bytes, position = null) {
+  let offset = 0
+  while (offset < bytes.length) {
+    const result = await handle.write(
+      bytes,
+      offset,
+      bytes.length - offset,
+      position === null ? null : position + offset
+    )
+    if (result.bytesWritten === 0) throw new Error('Could not write output')
+    offset += result.bytesWritten
+  }
+}
+
+/** Buffer frame writes without retaining the encoded or decoded stream. */
+class BufferedWriter {
+  /** @param {import('node:fs/promises').FileHandle} handle - Open output file */
+  constructor(handle) {
+    this.handle = handle
+    this.buffer = Buffer.alloc(65536)
+    this.used = 0
+  }
+
+  /**
+   * @param {Uint8Array} bytes - Next frame's bytes
+   * @returns {Promise<void>}
+   */
+  async write(bytes) {
+    if (this.used + bytes.length > this.buffer.length) await this.flush()
+    if (bytes.length >= this.buffer.length) {
+      await writeBytes(this.handle, bytes)
+      return
+    }
+    this.buffer.set(bytes, this.used)
+    this.used += bytes.length
+  }
+
+  /** @returns {Promise<void>} Resolves when all pending bytes are written. */
+  async flush() {
+    if (this.used === 0) return
+    await writeBytes(this.handle, this.buffer.subarray(0, this.used))
+    this.used = 0
+  }
 }
 
 /**
@@ -439,40 +505,44 @@ async function encodeFile(inputFile, outputFile, options) {
   let completed = false
   try {
     const encoder = createWaveStreamingEncoder({ bitrateKbps })
-    const output = fs.createWriteStream(outputFile)
-    await writeBytes(output, createWaveHeader(profile, 0, FRAME_SAMPLES, 0))
-    let frameCount = 0
-    let processedSamples = 0
-    const chunks = readDataChunks(inputFile, metadata)
-    for await (const channels of readPlanarPcm(
-      chunks,
-      metadata.format.channels
-    )) {
-      for (const frame of encoder.frames(channels)) {
-        await writeBytes(output, frame)
+    const output = await fs.promises.open(
+      outputFile,
+      options.force ? 'w' : 'wx'
+    )
+    const writer = new BufferedWriter(output)
+    try {
+      await writeBytes(output, createWaveHeader(profile, 0, FRAME_SAMPLES, 0))
+      /** @type {f64} Total encoded frames, including codec delay. */
+      let frameCount = 0
+      /** @type {f64} Total input samples consumed. */
+      let processedSamples = 0
+      const chunks = readDataChunks(inputFile, metadata)
+      for await (const channels of readPlanarPcm(
+        chunks,
+        metadata.format.channels
+      )) {
+        for (const frame of encoder.frames(channels)) {
+          await writer.write(frame)
+          frameCount++
+        }
+        processedSamples += channels[0].length
+        progress.update(Math.ceil(processedSamples / FRAME_SAMPLES))
+      }
+      for (const frame of encoder.finish()) {
+        await writer.write(frame)
         frameCount++
       }
-      processedSamples += channels[0].length
-      progress.update(Math.ceil(processedSamples / FRAME_SAMPLES))
-    }
-    for (const frame of encoder.finish()) {
-      await writeBytes(output, frame)
-      frameCount++
-    }
-    output.end()
-    await finished(output)
+      await writer.flush()
 
-    const waveHeader = createWaveHeader(
-      profile,
-      frameCount * profile.bytesPerFrame,
-      FRAME_SAMPLES,
-      encoder.sampleCount
-    )
-    const handle = await open(outputFile, 'r+')
-    try {
-      await handle.write(waveHeader, 0, waveHeader.length, 0)
+      const waveHeader = createWaveHeader(
+        profile,
+        frameCount * profile.bytesPerFrame,
+        FRAME_SAMPLES,
+        encoder.sampleCount
+      )
+      await writeBytes(output, waveHeader, 0)
     } finally {
-      await handle.close()
+      await output.close()
     }
     completed = true
   } finally {
@@ -510,49 +580,168 @@ async function decodeFile(inputFile, outputFile, options) {
       alignmentSampleCount: metadata.fact.alignmentSampleCount,
       sampleCount,
     })
-    const output = fs.createWriteStream(outputFile)
-    await writeBytes(output, createPcmWaveHeader({ sampleCount }))
-    let frameCount = 0
-    for await (const frame of readAtracFrames(inputFile, metadata)) {
-      const pcm = decoder.write(frame)
-      if (pcm[0].length !== 0) {
-        await writeBytes(output, interleavePcm16(pcm))
+    const output = await fs.promises.open(
+      outputFile,
+      options.force ? 'w' : 'wx'
+    )
+    const writer = new BufferedWriter(output)
+    try {
+      await writeBytes(output, createPcmWaveHeader({ sampleCount }))
+      /** @type {f64} Total encoded frames consumed. */
+      let frameCount = 0
+      for await (const frame of readAtracFrames(inputFile, metadata)) {
+        const pcm = decoder.write(frame)
+        if (pcm[0].length !== 0) {
+          await writer.write(interleavePcm16(pcm))
+        }
+        progress.update(++frameCount)
       }
-      progress.update(++frameCount)
+      decoder.finish()
+      await writer.flush()
+    } finally {
+      await output.close()
     }
-    decoder.finish()
-    output.end()
-    await finished(output)
     completed = true
   } finally {
     progress.stop(completed)
   }
 }
 
+/** Command-line options shared by parsing and help output. */
+const CLI_OPTIONS = [
+  { short: 'V', name: 'version', description: 'output the version number' },
+  { short: 'e', name: 'encode', description: 'Encode PCM WAVE to ATRAC3 WAVE' },
+  { short: 'd', name: 'decode', description: 'Decode ATRAC3 WAVE to PCM WAVE' },
+  {
+    short: 'q',
+    name: 'quiet',
+    description: 'Suppress all output except errors',
+  },
+  {
+    short: 'f',
+    name: 'force',
+    description: 'Overwrite output file if it exists',
+  },
+  {
+    short: 'b',
+    name: 'bitrate',
+    value: 'kbps',
+    description: 'ATRAC3 encoding bitrate: 66, 105, or 132 kbps (default: 132)',
+  },
+  { short: 'h', name: 'help', description: 'display help for command' },
+]
+
+/** Print usage and the supported options. */
+function printHelp() {
+  console.log(`Usage: carta3 [options] <input> <output>
+
+ATRAC3 Audio Codec
+
+Arguments:
+  input                Input file path
+  output               Output file path
+
+Options:`)
+  for (const option of CLI_OPTIONS) {
+    const value = option.value ? ` <${option.value}>` : ''
+    const flags = `-${option.short}, --${option.name}${value}`
+    console.log(`  ${flags.padEnd(21)}${option.description}`)
+  }
+}
+
 /**
- * Build the root-flag CLI shared by direct execution and CLI tests.
+ * Report invalid command-line syntax without an internal stack trace.
  *
- * @returns {Command}
+ * @param {string} message - Argument error to display.
+ * @returns {never}
  */
-function createProgram() {
+function argumentError(message) {
+  throw new CliUsageError(message)
+}
+
+/**
+ * Parse long options, combined short flags, option values, and positional paths.
+ * A double dash ends option parsing so paths may start with a dash.
+ *
+ * @param {string[]} args - Arguments after the executable and script names.
+ * @returns {{options: object, paths: string[], bitrateSpecified: boolean}} Parsed arguments.
+ */
+export function parseArguments(args) {
   const { version } = JSON.parse(
     fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')
   )
-  return new Command()
-    .name('carta3')
-    .description('ATRAC3 Audio Codec')
-    .version(version)
-    .option('-e, --encode', 'Encode PCM WAVE to ATRAC3 WAVE')
-    .option('-d, --decode', 'Decode ATRAC3 WAVE to PCM WAVE')
-    .option('-q, --quiet', 'Suppress all output except errors')
-    .option('-f, --force', 'Overwrite the output file if it exists')
-    .option(
-      '-b, --bitrate <kbps>',
-      'ATRAC3 encoding bitrate: 66, 105, or 132 kbps',
-      '132'
+  const options = { bitrate: '132' }
+  let bitrateSpecified = false
+  const paths = []
+  let positional = false
+  let unknownOption = null
+
+  for (let index = 0; index < args.length; index++) {
+    const argument = args[index]
+    if (positional || argument === '-' || !argument.startsWith('-')) {
+      paths.push(argument)
+      continue
+    }
+    if (argument === '--') {
+      positional = true
+      continue
+    }
+
+    const long = argument.startsWith('--')
+    const equals = long ? argument.indexOf('=') : -1
+    let offset = 1
+    do {
+      const name = long
+        ? argument.slice(2, equals === -1 ? argument.length : equals)
+        : argument[offset++]
+      const option = CLI_OPTIONS.find((candidate) =>
+        long ? candidate.name === name : candidate.short === name
+      )
+      const flag = long ? `--${name}` : `-${name}`
+      if (
+        !option ||
+        (!option.value && equals !== -1) ||
+        (option.name === 'help' && !long && offset < argument.length)
+      ) {
+        unknownOption ||= argument
+        break
+      }
+
+      let value = true
+      if (option.value) {
+        if (equals !== -1) {
+          value = argument.slice(equals + 1)
+        } else if (!long && offset < argument.length) {
+          value = argument.slice(offset)
+        } else {
+          value = args[++index]
+          if (value === undefined) {
+            argumentError(`option '${flag}' argument missing`)
+          }
+        }
+        offset = argument.length
+      }
+
+      if (option.name === 'help') {
+        printHelp()
+        process.exit(0)
+      }
+      if (option.name === 'version') {
+        console.log(version)
+        process.exit(0)
+      }
+      options[option.name] = value
+      if (option.name === 'bitrate') bitrateSpecified = true
+    } while (!long && offset < argument.length)
+  }
+
+  if (unknownOption) argumentError(`unknown option '${unknownOption}'`)
+  if (paths.length < 2) {
+    argumentError(
+      `missing required argument '${paths.length ? 'output' : 'input'}'`
     )
-    .argument('<input>', 'Input file path')
-    .argument('<output>', 'Output file path')
+  }
+  return { options, paths, bitrateSpecified }
 }
 
 /**
@@ -560,11 +749,9 @@ function createProgram() {
  *
  * @param {string[]} [argv]
  */
-async function main(argv = process.argv) {
-  const cli = createProgram()
-  cli.parse(argv)
-  const options = cli.opts()
-  const [inputFile, outputFile] = cli.args
+export async function main(argv = process.argv) {
+  const { options, paths, bitrateSpecified } = parseArguments(argv.slice(2))
+  const [inputFile, outputFile] = paths
   const operationCount = [options.encode, options.decode].filter(Boolean).length
   if (operationCount === 0) {
     throw new CliUsageError('Must specify one of --encode or --decode')
@@ -572,7 +759,7 @@ async function main(argv = process.argv) {
   if (operationCount > 1) {
     throw new CliUsageError('Cannot specify multiple operation modes')
   }
-  if (options.decode && cli.getOptionValueSource('bitrate') === 'cli') {
+  if (options.decode && bitrateSpecified) {
     throw new CliUsageError('--bitrate only applies when encoding')
   }
   if (path.resolve(inputFile) === path.resolve(outputFile)) {
@@ -589,7 +776,7 @@ async function main(argv = process.argv) {
 }
 
 /** Execute the CLI and translate failures to a conventional exit status. */
-async function run() {
+export async function run() {
   try {
     await main()
   } catch (error) {
@@ -609,17 +796,10 @@ async function run() {
   }
 }
 
-const entryPath = process.argv[1]
-  ? pathToFileURL(fs.realpathSync(process.argv[1]))
-  : null
-if (entryPath?.href === import.meta.url) await run()
-
-export {
-  CliUsageError,
-  ProgressTracker,
-  createProgram,
-  formatTime,
-  main,
-  readPcmWaveMetadata,
-  run,
+if (
+  import.meta.main ??
+  (process.argv[1] &&
+    pathToFileURL(fs.realpathSync(process.argv[1])).href === import.meta.url)
+) {
+  await run()
 }

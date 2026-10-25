@@ -36,6 +36,7 @@ const inverseSquareRootTwo = float32FromBits(INVERSE_SQUARE_ROOT_TWO_BITS)
  *
  * @param {Float32Array} transform Prepared transform matrix and destination.
  * @returns {Float32Array} The transformed matrix.
+ * @nativeUnchecked Transform geometry is validated before accessing its lanes.
  */
 export function transformLayeredMdct(transform) {
   if (
@@ -181,9 +182,13 @@ export class MDCT {
    *
    * @param {Float32Array} input Windowed time-domain samples.
    * @param {object} scratch Reusable transform storage.
+   * @param {Float32Array} scratch.folded Folded time-domain samples.
+   * @param {Float32Array} scratch.real Real FFT components.
+   * @param {Float32Array} scratch.imaginary Imaginary FFT components.
    * @param {Float32Array|null} [destination=null] Optional caller-owned output.
    * @param {number} [destinationOffset=0] First output coefficient.
    * @returns {Float32Array} Destination containing the coefficients.
+   * @nativeUnchecked Buffer geometry is validated before the transform.
    */
   transform(input, scratch, destination = null, destinationOffset = 0) {
     const output = destination ?? new Float32Array(this.halfSize)
@@ -204,6 +209,18 @@ export class MDCT {
     }
 
     const tables = transformTables()
+    /** @type {Float32Array} */
+    const preRotationCosines = tables.mdctPreRotationCosines
+    /** @type {Float32Array} */
+    const preRotationSines = tables.mdctPreRotationSines
+    /** @type {Float32Array} */
+    const cosineMinusFifthSine = tables.mdctBaseCosineMinusFifthSine
+    /** @type {Float32Array} */
+    const cosinePlusFifthSine = tables.mdctBaseCosinePlusFifthSine
+    /** @type {Float32Array} */
+    const fifthCosinePlusSine = tables.mdctFifthCosinePlusBaseSine
+    /** @type {Float32Array} */
+    const fifthCosineMinusSine = tables.mdctFifthCosineMinusBaseSine
     const folded = scratch.folded
     const real = scratch.real
     const imaginary = scratch.imaginary
@@ -230,8 +247,8 @@ export class MDCT {
     for (let coefficientIndex = 0; coefficientIndex < 128; coefficientIndex++) {
       const evenSample = folded[coefficientIndex * 2]
       const oddSample = folded[coefficientIndex * 2 + 1]
-      const cosine = tables.mdctPreRotationCosines[coefficientIndex]
-      const sine = tables.mdctPreRotationSines[coefficientIndex]
+      const cosine = preRotationCosines[coefficientIndex]
+      const sine = preRotationSines[coefficientIndex]
       real[coefficientIndex] = float32Subtract(
         float32Multiply(evenSample, cosine),
         float32Multiply(oddSample, sine)
@@ -250,10 +267,10 @@ export class MDCT {
       const reverseReal = real[reverseIndex]
       const forwardImaginary = imaginary[coefficientIndex]
       const reverseImaginary = imaginary[reverseIndex]
-      const minus = tables.mdctBaseCosineMinusFifthSine[coefficientIndex]
-      const plus = tables.mdctBaseCosinePlusFifthSine[coefficientIndex]
-      const fifthPlus = tables.mdctFifthCosinePlusBaseSine[coefficientIndex]
-      const fifthMinus = tables.mdctFifthCosineMinusBaseSine[coefficientIndex]
+      const minus = cosineMinusFifthSine[coefficientIndex]
+      const plus = cosinePlusFifthSine[coefficientIndex]
+      const fifthPlus = fifthCosinePlusSine[coefficientIndex]
+      const fifthMinus = fifthCosineMinusSine[coefficientIndex]
 
       folded[coefficientIndex] = float32Add(
         float32Add(
@@ -277,9 +294,10 @@ export class MDCT {
       )
     }
 
+    const normalization = this.scale
     for (let coefficientIndex = 0; coefficientIndex < 256; coefficientIndex++) {
       output[destinationOffset + coefficientIndex] = float32Multiply(
-        this.scale,
+        normalization,
         folded[coefficientIndex]
       )
     }
@@ -292,6 +310,7 @@ export class MDCT {
  *
  * @param {Float32Array} spectrum Mutable reconstructed spectrum.
  * @returns {Float32Array} The transformed `spectrum`.
+ * @nativeUnchecked The spectrum length is validated before the butterflies.
  */
 export function inverseMdct256(spectrum) {
   if (spectrum.length !== DECODER_SPECTRAL_LINES_PER_UNIT) {

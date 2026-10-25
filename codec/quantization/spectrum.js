@@ -13,24 +13,22 @@ import {
 } from '../core/constants.js'
 
 /**
- * Truncate a finite f64 to the codec's saturated signed integer domain.
+ * Truncate an f64 to the saturated signed integer domain; NaN maps to its minimum.
  *
  * @param {number} value
- * @returns {number}
+ * @returns {i32}
  */
 function truncateF64ToI32(value) {
-  if (Number.isNaN(value)) return -0x80000000
-  if (value >= 0x7fffffff) return 0x7fffffff
-  if (value <= -0x80000000) return -0x80000000
-  return Math.trunc(value)
+  if (value >= -0x80000000 && value < 0x80000000) return value | 0
+  return value > 0 ? 0x7fffffff : -0x80000000
 }
 
 /**
  * Clamp one quantized symbol to the selected mode's signed range.
  *
- * @param {number} symbol
- * @param {number} stepCount
- * @returns {number}
+ * @param {i32} symbol
+ * @param {i32} stepCount
+ * @returns {i32}
  */
 function clampSymbol(symbol, stepCount) {
   if (symbol > stepCount) return stepCount
@@ -53,12 +51,18 @@ export function spectralScaleForIndex(index) {
  * Select the first scale-factor index strictly above an absolute magnitude.
  *
  * @param {number} value Non-negative spectral magnitude.
- * @returns {number} Six-bit scale-factor index.
+ * @returns {i32} Six-bit scale-factor index.
+ * @nativeUnchecked The search stays within the fixed 64-entry scale table.
  */
 export function scaleFactorIndexForAbs(value) {
-  let index = 0
-  while (index < 63 && SPECTRAL_SCALE_FACTORS[index] <= value) index++
-  return index
+  let lower = 0
+  let upper = 63
+  while (lower < upper) {
+    const middle = (lower + upper) >> 1
+    if (SPECTRAL_SCALE_FACTORS[middle] <= value) lower = middle + 1
+    else upper = middle
+  }
+  return lower
 }
 
 /**
@@ -81,7 +85,7 @@ export function quantZeroThreshold(timeFactor, wordLength) {
  *
  * @param {number} spectrum Source coefficient.
  * @param {number} scale Selected spectral scale factor.
- * @param {number} stepCount Maximum signed quantizer rank.
+ * @param {i32} stepCount Maximum signed quantizer rank.
  * @returns {number} Saturated signed symbol.
  */
 export function quantizeSpectralValue(spectrum, scale, stepCount) {
@@ -95,32 +99,49 @@ export function quantizeSpectralValue(spectrum, scale, stepCount) {
  *
  * @param {number} wordLength Coded word length, or zero for an omitted band.
  * @param {number} zeroThreshold Absolute dead-zone threshold.
- * @param {ArrayLike<number>} spectrum Normalized source coefficients.
+ * @param {Float32Array} spectrum Normalized source coefficients.
  * @param {Int32Array} output Destination symbols.
+ * @param {i32} [start=0] First source coefficient.
+ * @param {number} [count] Number of source coefficients.
+ * @param {i32} [outputOffset=0] First destination symbol.
  * @returns {number} Number of symbols written.
+ * @nativeUnchecked Source and destination ranges are validated before the loop.
  */
 export function quantizeNontoneSymbols(
   wordLength,
   zeroThreshold,
   spectrum,
-  output
+  output,
+  start = 0,
+  count = spectrum.length - start,
+  outputOffset = 0
 ) {
   if (wordLength === 0) return 0
-  if (wordLength < 0 || wordLength > 7 || output.length < spectrum.length) {
+  /** @type {number} */
+  const sampleCount = count
+  if (
+    wordLength < 0 ||
+    wordLength > 7 ||
+    start < 0 ||
+    sampleCount < 0 ||
+    start + sampleCount > spectrum.length ||
+    outputOffset < 0 ||
+    outputOffset + sampleCount > output.length
+  ) {
     throw new RangeError('ATRAC3 non-tone quantization geometry is invalid')
   }
   const stepCount = WORD_LENGTH_QUANTIZER_LEVELS[wordLength]
   const limit = float32Add(stepCount, QUANTIZATION_LIMIT_BIAS)
-  for (let index = 0; index < spectrum.length; index++) {
-    const sample = spectrum[index]
+  for (let index = 0; index < sampleCount; index++) {
+    const sample = spectrum[start + index]
     if (Math.abs(sample) <= zeroThreshold) {
-      output[index] = 0
+      output[outputOffset + index] = 0
     } else {
-      output[index] = clampSymbol(
+      output[outputOffset + index] = clampSymbol(
         (truncateF64ToI32(sample * limit + QUANTIZATION_BIAS_SCALE) - 0x1f) | 0,
         stepCount
       )
     }
   }
-  return spectrum.length
+  return sampleCount
 }

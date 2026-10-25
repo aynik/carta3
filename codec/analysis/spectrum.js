@@ -40,8 +40,10 @@ const forwardMdct = new MDCT(GAIN_SCALE_SAMPLES, 4)
  * @param {Float32Array} destination Caller-owned spectrum.
  * @param {boolean} reverseOutput Whether the codec reverses this subband.
  * @param {object} scratch Reusable transform storage.
+ * @param {Float32Array} scratch.windowed Reusable windowed input.
  * @param {number} [destinationOffset=0] First output coefficient.
  * @returns {Float32Array} Destination containing the transformed subband.
+ * @nativeUnchecked Source, destination, and scratch geometry are validated below.
  */
 export function transformMdctSubband(
   source,
@@ -62,16 +64,13 @@ export function transformMdctSubband(
     throw new RangeError('ATRAC3 MDCT buffers have invalid geometry')
   }
 
+  /** @type {Float32Array} */
   const window = transformTables().mdctWindow
+  const windowed = scratch.windowed
   for (let sample = 0; sample < GAIN_SCALE_SAMPLES; sample++) {
-    scratch.windowed[sample] = float32Multiply(source[sample], window[sample])
+    windowed[sample] = float32Multiply(source[sample], window[sample])
   }
-  forwardMdct.transform(
-    scratch.windowed,
-    scratch,
-    destination,
-    destinationOffset
-  )
+  forwardMdct.transform(windowed, scratch, destination, destinationOffset)
 
   if (reverseOutput) {
     for (
@@ -125,6 +124,8 @@ export function writeIndependentMdctOutputs(windows, spectrum, scratch) {
  * @param {Uint32Array} words Mutable layered transform word image.
  * @param {Float32Array} transform Transform matrix destination.
  * @param {Float32Array} initialGainScales Initial-gain workspace.
+ * @nativeUnchecked The caller validates the fixed transform buffers; gain indices
+ * come from the selected gain plan.
  */
 function prepareLayeredMdct(words, transform, initialGainScales) {
   for (let unit = 0; unit < SUBBAND_COUNT; unit++) {
@@ -179,6 +180,7 @@ function prepareLayeredMdct(words, transform, initialGainScales) {
  *
  * @param {Uint32Array} words Mutable layered transform word image.
  * @param {Float32Array} transform Completed four-lane transform matrix.
+ * @nativeUnchecked The caller validates the fixed transform and word-image sizes.
  */
 function publishLayeredMdct(words, transform) {
   for (let coefficient = 0; coefficient < FRAME_SAMPLES; coefficient++) {

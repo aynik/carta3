@@ -243,6 +243,7 @@ export function analyzeLayeredQmfChannel(pcm, spectrum, history, qmfScratch) {
  *
  * @param {object} channel Decoder channel state containing synthesis history.
  * @returns {Float32Array} One reconstructed PCM frame view.
+ * @nativeUnchecked Buffers have the fixed geometry owned by the channel state.
  */
 export function synthesizeQmfChannel(channel) {
   const work = channel.synthesisBuffer

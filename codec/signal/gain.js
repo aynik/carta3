@@ -26,8 +26,6 @@ import {
   INVERSE_TRANSFORM_SCALES,
 } from '../core/tables.js'
 
-const LAYER_GAIN_ROW_OFFSETS = Object.freeze([0, 4, 8, 12, 16, 20, 24, 28])
-
 /**
  * Apply one selected layered gain envelope to interleaved transform rows.
  *
@@ -52,7 +50,11 @@ function applyLayeredGainRegions(words, unit, pairBase, selector) {
       const stop =
         TRANSFORM_MATRIX_BASE_WORD + unit + regionEnd * LAYER_GAIN_ROW_WORDS
       while (matrixOffset < stop) {
-        for (const rowOffset of LAYER_GAIN_ROW_OFFSETS) {
+        for (
+          let rowOffset = 0;
+          rowOffset < LAYER_GAIN_ROW_WORDS;
+          rowOffset += SUBBAND_COUNT
+        ) {
           words[matrixOffset + rowOffset] = float32ToBits(
             float32Multiply(
               float32FromBits(words[matrixOffset + rowOffset]),

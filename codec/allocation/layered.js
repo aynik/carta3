@@ -661,11 +661,12 @@ function refineResidualAllocation(layer, bitBudget, primary, converged) {
       }
     }
   }
-  const rankedBands = Array.from({ length: activeBands }, (_, band) => band)
-    .filter((band) => execution.selectKeys[band] !== RESIDUAL_SEARCH_DONE)
-    .sort(
-      (left, right) => execution.selectKeys[right] - execution.selectKeys[left]
-    )
+  const selectKeys = execution.selectKeys
+  const rankedBands = []
+  for (let band = 0; band < activeBands; band++) {
+    if (selectKeys[band] !== RESIDUAL_SEARCH_DONE) rankedBands.push(band)
+  }
+  rankedBands.sort((left, right) => selectKeys[right] - selectKeys[left])
   for (const band of rankedBands) {
     if (execution.selectKeys[band] !== RESIDUAL_SEARCH_DONE) {
       fitRefinementBand(layer, band, execution)

@@ -152,16 +152,16 @@ export class LayerWork {
     if (words.length < LAYER_WORDS) {
       throw new RangeError('ATRAC3 layered word image has invalid geometry')
     }
+    const spectrum = this.spectrum
+    const qmfHistory = this.qmfHistory
     for (let index = 0; index < FRAME_SAMPLES; index++) {
-      words[index] = float32ToBits(this.spectrum[index])
+      words[index] = float32ToBits(spectrum[index])
     }
     words.set(this.windowMatrix, LAYER_WINDOW_MATRIX_OFFSET)
     words.set(this.gainHistory, LAYER_GAIN_HISTORY_OFFSET)
     words.set(this.transformHistory, LAYER_TRANSFORM_HISTORY_OFFSET)
     for (let index = 0; index < QMF_ANALYSIS_HISTORY_FLOATS; index++) {
-      words[LAYER_QMF_HISTORY_OFFSET + index] = float32ToBits(
-        this.qmfHistory[index]
-      )
+      words[LAYER_QMF_HISTORY_OFFSET + index] = float32ToBits(qmfHistory[index])
     }
     for (let block = 0; block < SUBBAND_COUNT; block++) {
       words.set(
@@ -186,8 +186,10 @@ export class LayerWork {
     if (words.length < LAYER_WORDS) {
       throw new RangeError('ATRAC3 layered word image has invalid geometry')
     }
+    const spectrum = this.spectrum
+    const qmfHistory = this.qmfHistory
     for (let index = 0; index < FRAME_SAMPLES; index++) {
-      this.spectrum[index] = float32FromBits(words[index])
+      spectrum[index] = float32FromBits(words[index])
     }
     this.windowMatrix.set(
       words.subarray(
@@ -208,7 +210,7 @@ export class LayerWork {
       )
     )
     for (let index = 0; index < QMF_ANALYSIS_HISTORY_FLOATS; index++) {
-      this.qmfHistory[index] = float32FromBits(
+      qmfHistory[index] = float32FromBits(
         words[LAYER_QMF_HISTORY_OFFSET + index]
       )
     }

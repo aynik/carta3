@@ -8,6 +8,18 @@ import {
   WORD_LENGTH_QUANTIZER_LEVELS,
   WORD_LENGTH_VALUE_BITS,
 } from '../core/tables.js'
+import { BitCounter, BitReader, BitWriter, packBits } from './bitstream.js'
+
+/**
+ * @typedef {object} HuffmanTable
+ * @property {i32} valueBits Bits per unpacked symbol.
+ * @property {i32} valuesPerCodeword Symbols grouped into one codeword.
+ * @property {i32} valueMask Mask for an unpacked symbol.
+ * @property {Uint16Array} codes Right-aligned Huffman codewords.
+ * @property {Uint8Array} bitLengths Codeword lengths by symbol.
+ * @property {i32} maxCodeLength Longest codeword in the table.
+ * @property {Int16Array} decodeSymbols Symbols indexed by codeword and length.
+ */
 
 /**
  * Build one immutable Huffman family from compact code/length pairs.
@@ -31,6 +43,10 @@ function buildFamily(pairs) {
       maxCodeLength = Math.max(maxCodeLength, bitLengths[entry])
       pairIndex++
     }
+    const decodeSymbols = new Int16Array(2 ** (maxCodeLength + 1)).fill(-1)
+    for (let entry = 0; entry < entryCount; entry++) {
+      decodeSymbols[2 ** bitLengths[entry] + codes[entry]] = entry
+    }
     family[wordLength] = {
       valueBits,
       valuesPerCodeword,
@@ -38,6 +54,7 @@ function buildFamily(pairs) {
       codes,
       bitLengths,
       maxCodeLength,
+      decodeSymbols,
     }
   }
   if (pairIndex * 2 !== pairs.length) {
@@ -54,55 +71,80 @@ const primaryHuffmanFamily = buildFamily(HUFFMAN_PAIRS_A)
 const secondaryHuffmanFamily = buildFamily(HUFFMAN_PAIRS_B)
 
 /**
- * Traverse symbols using the table's one- or two-value grouping rule.
+ * Validate a symbol run and return its one- or two-value grouping stride.
  *
- * @param {object} table
- * @param {ArrayLike<number>} values
+ * @param {HuffmanTable} table
+ * @param {Int32Array} values
  * @param {number} count
- * @param {Function} visitor
+ * @returns {i32} Number of values per codeword.
  */
-function visitSymbols(table, values, count, visitor) {
+function symbolStride(table, values, count) {
   if (!table || count > values.length) {
     throw new RangeError('ATRAC3 Huffman symbol count is invalid')
   }
-  const mask = table.valueMask
-  if (table.valuesPerCodeword === 1) {
-    for (let index = 0; index < count; index++) {
-      visitor((values[index] >>> 0) & mask)
-    }
-    return
-  }
-  if (table.valuesPerCodeword === 2) {
+  const stride = table.valuesPerCodeword
+  if (stride === 1) return stride
+  if (stride === 2) {
     if ((count & 1) !== 0) {
       throw new RangeError('Paired ATRAC3 Huffman runs require an even count')
     }
-    for (let index = 0; index < count; index += 2) {
-      visitor(
-        (((values[index] >>> 0) & mask) << table.valueBits) |
-          ((values[index + 1] >>> 0) & mask)
-      )
-    }
-    return
+    return stride
   }
   throw new RangeError('Unsupported ATRAC3 Huffman grouping')
 }
 
 /**
+ * Pack one or two signed values into their Huffman table index.
+ *
+ * @param {Int32Array} values
+ * @param {i32} index
+ * @param {i32} mask
+ * @param {i32} valueBits
+ * @param {i32} stride
+ * @returns {i32} Unsigned grouped symbol.
+ * @nativeUnchecked The caller validates the run length and grouping stride.
+ */
+function groupedSymbol(values, index, mask, valueBits, stride) {
+  const first = values[index] & mask
+  return stride === 1
+    ? first
+    : (first << valueBits) | (values[index + 1] & mask)
+}
+
+/**
  * Decode one symbol by walking the canonical prefix table.
  *
- * @param {object} table
+ * @param {HuffmanTable} table
  * @param {object} reader
  * @returns {number}
  */
 function readHuffmanSymbol(table, reader) {
-  let code = 0
-  for (let width = 1; width <= table.maxCodeLength; width++) {
-    code = code * 2 + reader.read(1)
-    for (let symbol = 0; symbol < table.codes.length; symbol++) {
-      if (table.bitLengths[symbol] === width && table.codes[symbol] === code) {
+  const decodeSymbols = table.decodeSymbols
+  const maxCodeLength = table.maxCodeLength
+  if (reader.read === BitReader.prototype.read) {
+    /** @type {Uint8Array} */
+    const buffer = reader.buffer
+    /** @type {i32} */
+    let position = reader.bitPosition
+    let code = 0
+    for (let width = 1; width <= maxCodeLength; width++) {
+      code =
+        (code << 1) | ((buffer[position >> 3] >>> (7 - (position & 7))) & 1)
+      position++
+      const symbol = decodeSymbols[2 ** width + code]
+      if (symbol >= 0) {
+        reader.bitPosition = position
         return symbol
       }
     }
+    reader.bitPosition = position
+    throw new RangeError('Invalid ATRAC3 Huffman codeword')
+  }
+  let code = 0
+  for (let width = 1; width <= maxCodeLength; width++) {
+    code = code * 2 + reader.read(1)
+    const symbol = decodeSymbols[2 ** width + code]
+    if (symbol >= 0) return symbol
   }
   throw new RangeError('Invalid ATRAC3 Huffman codeword')
 }
@@ -143,39 +185,88 @@ export const HUFFMAN_FAMILIES = Object.freeze([
 /**
  * Measure the exact Huffman cost of a symbol run.
  *
- * @param {object} table One word-length table from {@link HUFFMAN_FAMILIES}.
- * @param {ArrayLike<number>} values Signed symbols in encoder representation.
+ * @param {HuffmanTable} table One word-length table from {@link HUFFMAN_FAMILIES}.
+ * @param {Int32Array} values Signed symbols in encoder representation.
  * @param {number} [count] Number of values to traverse.
- * @returns {number} Required codeword bits.
+ * @param {i32} [start=0] First symbol in the source row.
+ * @returns {i32} Required codeword bits.
+ * @nativeUnchecked The symbol run and codebook indices are validated before access.
  */
-export function measureHuffmanBits(table, values, count = values.length) {
+export function measureHuffmanBits(
+  table,
+  values,
+  count = values.length,
+  start = 0
+) {
+  /** @type {number} */
+  const symbolCount = count
+  const stride = symbolStride(table, values, symbolCount)
+  if (start < 0 || start + symbolCount > values.length) {
+    throw new RangeError('ATRAC3 Huffman symbol count is invalid')
+  }
+  /** @type {i32} */
+  const end = start + symbolCount
+  const bitLengths = table.bitLengths
+  const symbolLimit = bitLengths.length
+  const mask = table.valueMask
+  const valueBits = table.valueBits
   let bits = 0
-  visitSymbols(table, values, count, (symbol) => {
-    if (symbol >= table.bitLengths.length) {
+  for (let index = start; index < end; index += stride) {
+    const symbol = groupedSymbol(values, index, mask, valueBits, stride)
+    if (symbol >= symbolLimit) {
       throw new RangeError('Missing ATRAC3 Huffman codeword')
     }
-    bits += table.bitLengths[symbol]
-  })
+    bits += bitLengths[symbol]
+  }
   return bits
 }
 
 /**
  * Write a Huffman symbol run using the table's grouping rule.
  *
- * @param {object} table One word-length Huffman table.
- * @param {ArrayLike<number>} values Signed symbols in encoder representation.
+ * @param {HuffmanTable} table One word-length Huffman table.
+ * @param {Int32Array} values Signed symbols in encoder representation.
  * @param {object} sink Bit writer or counter.
  * @param {number} [count] Number of values to write.
  * @returns {number} Number of bits written.
  */
 export function writeHuffman(table, values, sink, count = values.length) {
+  if (sink instanceof BitCounter) {
+    const bits = measureHuffmanBits(table, values, count)
+    const position = sink.bitPosition
+    sink.bitPosition = position + bits
+    return bits
+  }
+  /** @type {number} */
+  const symbolCount = count
+  const stride = symbolStride(table, values, symbolCount)
+  const codes = table.codes
+  const bitLengths = table.bitLengths
+  const mask = table.valueMask
+  const valueBits = table.valueBits
   const start = sink.bitPosition
-  visitSymbols(table, values, count, (symbol) => {
-    if (symbol >= table.codes.length) {
+  const output = sink.write === BitWriter.prototype.write ? sink.buffer : null
+  const bitLimit = output ? output.length * 8 : 0
+  let position = start
+  for (let index = 0; index < symbolCount; index += stride) {
+    const symbol = groupedSymbol(values, index, mask, valueBits, stride)
+    if (symbol >= codes.length) {
+      if (output) sink.bitPosition = position
       throw new RangeError('Missing ATRAC3 Huffman codeword')
     }
-    sink.write(table.codes[symbol], table.bitLengths[symbol])
-  })
+    const width = bitLengths[symbol]
+    if (output) {
+      if (position < 0 || position + width > bitLimit) {
+        sink.bitPosition = position
+        throw new RangeError('Bit write exceeds destination buffer')
+      }
+      packBits(output, position, codes[symbol], width)
+      position += width
+    } else {
+      sink.write(codes[symbol], width)
+    }
+  }
+  if (output) sink.bitPosition = position
   return sink.bitPosition - start
 }
 

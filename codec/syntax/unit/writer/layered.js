@@ -33,20 +33,24 @@ class LayerBitEmitter {
    * Write one value using the layered channel's two-byte merge behavior.
    *
    * @param {number} value
-   * @param {number} width
+   * @param {i32} width
    */
   write(value, width) {
-    const byteIndex = this.bitPosition >> 3
-    const bitOffset = this.bitPosition & 7
+    /** @type {Uint8Array} */
+    const output = this.output
+    /** @type {i32} */
+    const position = this.bitPosition
+    const byteIndex = position >> 3
+    const bitOffset = position & 7
     const shift = 16 - width - bitOffset
     const shifted = (value << (shift & 0x1f)) >>> 0
-    if (byteIndex + 1 < this.output.length) {
-      this.output[byteIndex + 1] = shifted & 0xff
-      this.output[byteIndex] |= (shifted >>> 8) & 0xff
-    } else if (byteIndex < this.output.length) {
-      this.output[byteIndex] |= (shifted >>> 8) & 0xff
+    if (byteIndex + 1 < output.length) {
+      output[byteIndex + 1] = shifted & 0xff
+      output[byteIndex] = output[byteIndex] | ((shifted >>> 8) & 0xff)
+    } else if (byteIndex < output.length) {
+      output[byteIndex] = output[byteIndex] | ((shifted >>> 8) & 0xff)
     }
-    this.bitPosition += width
+    this.bitPosition = position + width
   }
 }
 

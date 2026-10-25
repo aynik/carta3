@@ -19,16 +19,23 @@ import { residualCodebook, validateResidualSyntax } from '../syntax/residual.js'
  * @param {number} mode
  * @param {number} scaleFactor
  * @returns {object}
+ * @nativeUnchecked The caller validates the source range; quantizer masks bound
+ * all codebook indices.
  */
 function measureBand(source, range, mode, scaleFactor) {
   validateResidualSyntax(mode, scaleFactor)
   const codebook = residualCodebook(mode)
   const quantizerScale = residualQuantGroupScale(mode, scaleFactor)
   const decodeScale = SPECTRAL_SCALE_FACTORS[scaleFactor]
+  const { bitLengths, firstValues, secondValues } = codebook
+  /** @type {i32} */
+  const start = range.start
+  /** @type {i32} */
+  const end = range.end
   let bits = 6
   let error = 0
   if (codebook.paired) {
-    for (let line = range.start; line + 1 < range.end; line += 2) {
+    for (let line = start; line + 1 < end; line += 2) {
       const firstSample = Math.fround(source[line])
       const secondSample = Math.fround(source[line + 1])
       const first = quantizeResidualCoefficient(firstSample, quantizerScale, 3)
@@ -38,12 +45,10 @@ function measureBand(source, range, mode, scaleFactor) {
         3
       )
       const symbol = second + first * 4
-      bits += codebook.bitLengths[symbol]
-      const firstReconstructed = Math.fround(
-        codebook.firstValues[symbol] * decodeScale
-      )
+      bits += bitLengths[symbol]
+      const firstReconstructed = Math.fround(firstValues[symbol] * decodeScale)
       const secondReconstructed = Math.fround(
-        codebook.secondValues[symbol] * decodeScale
+        secondValues[symbol] * decodeScale
       )
       const firstError = firstSample - firstReconstructed
       const secondError = secondSample - secondReconstructed
@@ -52,17 +57,15 @@ function measureBand(source, range, mode, scaleFactor) {
     }
   } else {
     const symbolMask = RESIDUAL_SYMBOL_MASKS[mode - 2]
-    for (let line = range.start; line < range.end; line++) {
+    for (let line = start; line < end; line++) {
       const sample = Math.fround(source[line])
       const symbol = quantizeResidualCoefficient(
         sample,
         quantizerScale,
         symbolMask
       )
-      bits += codebook.bitLengths[symbol]
-      const reconstructed = Math.fround(
-        codebook.firstValues[symbol] * decodeScale
-      )
+      bits += bitLengths[symbol]
+      const reconstructed = Math.fround(firstValues[symbol] * decodeScale)
       const difference = sample - reconstructed
       error += difference * difference
     }
@@ -76,7 +79,7 @@ function measureBand(source, range, mode, scaleFactor) {
 /**
  * Measure exact syntax bits, reconstruction error, and energy for one band.
  *
- * @param {ArrayLike<number>} source Complete residual spectrum.
+ * @param {Float32Array} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Residual mode, or zero for an omitted band.
  * @param {number} scaleFactor Six-bit scale-factor index.
@@ -84,8 +87,12 @@ function measureBand(source, range, mode, scaleFactor) {
  */
 export function measureResidualBand(source, band, mode, scaleFactor) {
   const range = residualBandRange(source, band)
+  /** @type {i32} */
+  const start = range.start
+  /** @type {i32} */
+  const end = range.end
   let energy = 0
-  for (let line = range.start; line < range.end; line++) {
+  for (let line = start; line < end; line++) {
     const sample = Math.fround(source[line])
     energy += sample * sample
   }
@@ -96,16 +103,14 @@ export function measureResidualBand(source, band, mode, scaleFactor) {
       energy,
     }
   const cost = measureBand(source, range, mode, scaleFactor)
-  return {
-    ...cost,
-    energy,
-  }
+  cost.energy = energy
+  return cost
 }
 
 /**
  * Measure the immediately adjacent residual modes for allocation search.
  *
- * @param {ArrayLike<number>} source Complete residual spectrum.
+ * @param {Float32Array} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Current residual mode.
  * @param {number} scaleFactor Current scale-factor index.
@@ -119,16 +124,16 @@ export function measureResidualModeNeighbors(source, band, mode, scaleFactor) {
   if (!Number.isInteger(scaleFactor) || scaleFactor < 0 || scaleFactor > 63) {
     throw new RangeError('Invalid ATRAC3 residual scale factor')
   }
-  return [mode - 1, mode + 1].map((candidate) => {
-    if (candidate < 1 || candidate > 7) return null
-    return measureBand(source, range, candidate, scaleFactor)
-  })
+  return [
+    mode > 1 ? measureBand(source, range, mode - 1, scaleFactor) : null,
+    mode < 7 ? measureBand(source, range, mode + 1, scaleFactor) : null,
+  ]
 }
 
 /**
  * Measure the immediately adjacent scale factors for allocation search.
  *
- * @param {ArrayLike<number>} source Complete residual spectrum.
+ * @param {Float32Array} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Current residual mode.
  * @param {number} scaleFactor Current scale-factor index.
@@ -138,13 +143,12 @@ export function measureResidualScaleNeighbors(source, band, mode, scaleFactor) {
   const range = residualBandRange(source, band)
   if (mode === 0) return [null, null]
   validateResidualSyntax(mode, scaleFactor)
-  return [scaleFactor - 1, scaleFactor + 1].map((candidate) => {
-    if (candidate < 0 || candidate > 63) return null
+  const neighbors = [null, null]
+  for (let slot = 0; slot < neighbors.length; slot++) {
+    const candidate = scaleFactor + (slot === 0 ? -1 : 1)
+    if (candidate < 0 || candidate > 63) continue
     const { bits, error } = measureBand(source, range, mode, candidate)
-    return {
-      scaleFactor: candidate,
-      bits,
-      error,
-    }
-  })
+    neighbors[slot] = { scaleFactor: candidate, bits, error }
+  }
+  return neighbors
 }

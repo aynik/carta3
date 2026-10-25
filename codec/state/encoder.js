@@ -41,15 +41,31 @@ import { JointStereoHistory, JointStereoWork } from './stereo.js'
 import { LayerHistory, LayerWork } from './layered.js'
 
 /**
- * Deep-copy a dynamic list without replacing destination-owned storage.
+ * Copy a tone record's plain fields, nested lists, and owned typed arrays.
+ * Tone syntax is an acyclic tree; separate records never share mutable storage.
+ *
+ * @param {*} value Tone syntax value to copy.
+ * @returns {*} Independent copy of the value.
+ */
+function copyToneValue(value) {
+  if (value === null || typeof value !== 'object') return value
+  if (ArrayBuffer.isView(value)) return value.slice()
+  if (Array.isArray(value)) return value.map(copyToneValue)
+  const output = {}
+  for (const key of Object.keys(value)) output[key] = copyToneValue(value[key])
+  return output
+}
+
+/**
+ * Copy dynamic tone syntax without replacing the destination-owned list.
  *
  * @param {object[]} source
  * @param {object[]} destination
  */
-function copyCloneList(source, destination) {
+function copyToneList(source, destination) {
   destination.length = source.length
   for (let index = 0; index < source.length; index++) {
-    destination[index] = structuredClone(source[index])
+    destination[index] = copyToneValue(source[index])
   }
 }
 
@@ -150,8 +166,8 @@ export class EncoderChannelBlock {
       target.peakHistory = record.peakHistory
     }
     destination.toneEntryIndex = this.toneEntryIndex
-    copyCloneList(this.toneEntries, destination.toneEntries)
-    copyCloneList(this.tonePool, destination.tonePool)
+    copyToneList(this.toneEntries, destination.toneEntries)
+    copyToneList(this.tonePool, destination.tonePool)
     destination.toneCount = this.toneCount
     destination.wordLengths.set(this.wordLengths)
     destination.scaleFactorIndices.set(this.scaleFactorIndices)

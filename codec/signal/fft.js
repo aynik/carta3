@@ -6,19 +6,21 @@ export class FFT {
    *
    * @param {Float32Array} real Real input and output components.
    * @param {Float32Array} imaginary Imaginary input and output components.
+   * @nativeUnchecked The MDCT supplies equal rows of a fixed power-of-two size.
    */
   static transform(real, imaginary) {
     const size = real.length
     if (size === 1) return
 
-    const bits = Math.log2(size)
-    for (let index = 0; index < size; index++) {
-      let reversed = 0
-      let remaining = index
-      for (let bit = 0; bit < bits; bit++) {
-        reversed = (reversed << 1) | (remaining & 1)
-        remaining >>= 1
+    /** @type {i32} */
+    let reversed = 0
+    for (let index = 1; index < size; index++) {
+      let bit = size >> 1
+      while ((reversed & bit) !== 0) {
+        reversed ^= bit
+        bit >>= 1
       }
+      reversed ^= bit
       if (reversed > index) {
         const realValue = real[index]
         real[index] = real[reversed]

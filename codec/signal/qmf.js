@@ -15,6 +15,7 @@ import { QMF_ANALYSIS_COEFFICIENTS } from '../core/tables.js'
  * @param {Float32Array} input History followed by chronological input samples.
  * @param {Float32Array[]} outputBands Caller-owned chronological subband rows.
  * @returns {Float32Array[]} The completed subband rows.
+ * @nativeUnchecked Buffers have the fixed geometry owned by the channel state.
  */
 export function analyzeQmf(input, outputBands) {
   const lowBand = outputBands[0]

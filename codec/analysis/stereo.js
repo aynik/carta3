@@ -38,6 +38,7 @@ function zeroEnergies() {
  * @param {object} state Detached joint-stereo transaction.
  * @param {object[]} layers Two analyzed layer spectra.
  * @returns {object[]} Current per-slot energy evidence.
+ * @nativeUnchecked Both complete source spectra are validated before the loop.
  */
 export function selectJointStereoModes(state, layers) {
   if (
@@ -47,6 +48,10 @@ export function selectJointStereoModes(state, layers) {
   ) {
     throw new RangeError('ATRAC3 joint stereo requires two 1024-line layers')
   }
+  /** @type {Float32Array} */
+  const leftSpectrum = layers[0].spectrum
+  /** @type {Float32Array} */
+  const rightSpectrum = layers[1].spectrum
   const neutralScale = Math.fround(19.697716)
   const primaryScale = Math.fround(2304)
   const secondaryScale = Math.fround(96)
@@ -67,8 +72,8 @@ export function selectJointStereoModes(state, layers) {
     let leftEnergy = slotBias
     let rightEnergy = slotBias
     for (let index = slot; index < 1024; index += 4) {
-      leftEnergy += Math.abs(layers[0].spectrum[index])
-      rightEnergy += Math.abs(layers[1].spectrum[index])
+      leftEnergy += Math.abs(leftSpectrum[index])
+      rightEnergy += Math.abs(rightSpectrum[index])
     }
     energies[slot].left = Math.fround(leftEnergy)
     energies[slot].right = Math.fround(rightEnergy)

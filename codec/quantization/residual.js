@@ -55,7 +55,7 @@ export function residualQuantGroupScale(mode, scaleFactor) {
  * @param {number} coefficient Source spectral coefficient.
  * @param {number} quantizerScale Float32 quantizer scale.
  * @param {number} symbolMask Codebook-specific unsigned symbol mask.
- * @returns {number} Unsigned codebook symbol.
+ * @returns {i32} Unsigned codebook symbol.
  */
 export function quantizeResidualCoefficient(
   coefficient,
@@ -71,7 +71,7 @@ export function quantizeResidualCoefficient(
 /**
  * Materialize one residual band's selected symbols.
  *
- * @param {ArrayLike<number>} source Complete residual spectrum.
+ * @param {Float32Array} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Residual quantization mode.
  * @param {number} scaleFactor Six-bit scale-factor index.
@@ -91,8 +91,12 @@ export function quantizeResidualSymbols(
     throw new RangeError('Invalid ATRAC3 residual symbol storage')
   }
   const quantizerScale = residualQuantGroupScale(mode, scaleFactor)
+  /** @type {i32} */
+  const start = range.start
+  /** @type {i32} */
+  const end = range.end
   if (mode === 1) {
-    for (let line = range.start; line + 1 < range.end; line += 2) {
+    for (let line = start; line + 1 < end; line += 2) {
       output[line] = quantizeResidualCoefficient(
         source[line],
         quantizerScale,
@@ -106,7 +110,7 @@ export function quantizeResidualSymbols(
     }
   } else {
     const symbolMask = RESIDUAL_SYMBOL_MASKS[mode - 2]
-    for (let line = range.start; line < range.end; line++) {
+    for (let line = start; line < end; line++) {
       output[line] = quantizeResidualCoefficient(
         source[line],
         quantizerScale,

@@ -11,6 +11,7 @@ import {
   residualQuantGroupScale,
 } from '../quantization/residual.js'
 import { float32FromBits } from '../utils.js'
+import { BitCounter } from './bitstream.js'
 
 /**
  * Expand one compact residual mode into its encoder and decoder descriptor.
@@ -101,7 +102,7 @@ export function validateResidualSyntax(mode, scaleFactor) {
 /**
  * Quantize and write residual symbols over a validated coefficient range.
  *
- * @param {ArrayLike<number>} source Complete residual spectrum.
+ * @param {Float32Array} source Complete residual spectrum.
  * @param {object} range Coefficient range.
  * @param {number} mode Residual coding mode.
  * @param {number} scaleFactor Six-bit scale-factor index.
@@ -111,9 +112,16 @@ export function validateResidualSyntax(mode, scaleFactor) {
 function writeSymbols(source, range, mode, scaleFactor, sink) {
   const codebook = residualCodebook(mode)
   const quantizerScale = residualQuantGroupScale(mode, scaleFactor)
+  const { codes, bitLengths } = codebook
+  /** @type {i32} */
+  const firstLine = range.start
+  /** @type {i32} */
+  const end = range.end
   const start = sink.bitPosition
+  const countOnly = sink.write === BitCounter.prototype.write
+  let bits = 0
   if (codebook.paired) {
-    for (let line = range.start; line + 1 < range.end; line += 2) {
+    for (let line = firstLine; line + 1 < end; line += 2) {
       const first = quantizeResidualCoefficient(source[line], quantizerScale, 3)
       const second = quantizeResidualCoefficient(
         source[line + 1],
@@ -121,19 +129,24 @@ function writeSymbols(source, range, mode, scaleFactor, sink) {
         3
       )
       const symbol = second + first * 4
-      sink.write(codebook.codes[symbol], codebook.bitLengths[symbol])
+      const width = bitLengths[symbol]
+      if (countOnly) bits += width
+      else sink.write(codes[symbol], width)
     }
   } else {
     const symbolMask = RESIDUAL_SYMBOL_MASKS[mode - 2]
-    for (let line = range.start; line < range.end; line++) {
+    for (let line = firstLine; line < end; line++) {
       const symbol = quantizeResidualCoefficient(
         source[line],
         quantizerScale,
         symbolMask
       )
-      sink.write(codebook.codes[symbol], codebook.bitLengths[symbol])
+      const width = bitLengths[symbol]
+      if (countOnly) bits += width
+      else sink.write(codes[symbol], width)
     }
   }
+  if (countOnly) sink.bitPosition = start + bits
   return sink.bitPosition - start
 }
 
@@ -157,16 +170,21 @@ export function writeQuantizedResidualSymbols(
   const range = residualBandRange(symbols, band)
   validateResidualSyntax(mode, scaleFactor)
   const codebook = residualCodebook(mode)
+  const { codes, bitLengths } = codebook
+  /** @type {i32} */
+  const firstLine = range.start
+  /** @type {i32} */
+  const end = range.end
   const start = sink.bitPosition
   if (codebook.paired) {
-    for (let line = range.start; line + 1 < range.end; line += 2) {
+    for (let line = firstLine; line + 1 < end; line += 2) {
       const symbol = symbols[line + 1] + symbols[line] * 4
-      sink.write(codebook.codes[symbol], codebook.bitLengths[symbol])
+      sink.write(codes[symbol], bitLengths[symbol])
     }
   } else {
-    for (let line = range.start; line < range.end; line++) {
+    for (let line = firstLine; line < end; line++) {
       const symbol = symbols[line]
-      sink.write(codebook.codes[symbol], codebook.bitLengths[symbol])
+      sink.write(codes[symbol], bitLengths[symbol])
     }
   }
   return sink.bitPosition - start
@@ -175,7 +193,7 @@ export function writeQuantizedResidualSymbols(
 /**
  * Emit only residual symbols; the allocation header owns the selector.
  *
- * @param {ArrayLike<number>} source Complete residual spectrum.
+ * @param {Float32Array} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Residual quantization mode.
  * @param {number} scaleFactor Six-bit scale-factor index.
@@ -191,7 +209,7 @@ export function writeResidualSymbols(source, band, mode, scaleFactor, sink) {
 /**
  * Emit a residual band's six-bit scale selector and exact codewords.
  *
- * @param {ArrayLike<number>} source Complete residual spectrum.
+ * @param {Float32Array} source Complete residual spectrum.
  * @param {number} band Quantization-unit index.
  * @param {number} mode Residual quantization mode.
  * @param {number} scaleFactor Six-bit scale-factor index.

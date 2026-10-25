@@ -69,28 +69,31 @@ const seedMagnitudeLimit = Math.fround(SEED_MAGNITUDE_LIMIT)
  *
  * @param {Uint32Array} words
  * @param {Uint32Array} output
+ * @nativeUnchecked The layer entry point validates both fixed-size work images.
  */
 function analyzeMaximumMagnitudes(words, output) {
   let source = 0
   for (let block = 0; block < PAIR_BLOCK_MAGNITUDE_HISTORY_WORDS; block++) {
-    const maximum = [
-      Math.imul(words[source], 2) >>> 0,
-      Math.imul(words[source + 1], 2) >>> 0,
-      Math.imul(words[source + 2], 2) >>> 0,
-      Math.imul(words[source + 3], 2) >>> 0,
-    ]
-    source += 4
+    let first = Math.imul(words[source], 2) >>> 0
+    let second = Math.imul(words[source + 1], 2) >>> 0
+    let third = Math.imul(words[source + 2], 2) >>> 0
+    let fourth = Math.imul(words[source + 3], 2) >>> 0
+    source += SUBBAND_COUNT
     for (let group = 1; group < LAYER_GAIN_GROUP_COUNT; group++) {
-      for (let lane = 0; lane < SUBBAND_COUNT; lane++) {
-        const value = Math.imul(words[source + lane], 2) >>> 0
-        if (maximum[lane] < value) maximum[lane] = value
-      }
+      const firstValue = Math.imul(words[source], 2) >>> 0
+      const secondValue = Math.imul(words[source + 1], 2) >>> 0
+      const thirdValue = Math.imul(words[source + 2], 2) >>> 0
+      const fourthValue = Math.imul(words[source + 3], 2) >>> 0
+      if (first < firstValue) first = firstValue
+      if (second < secondValue) second = secondValue
+      if (third < thirdValue) third = thirdValue
+      if (fourth < fourthValue) fourth = fourthValue
       source += SUBBAND_COUNT
     }
-    for (let lane = 0; lane < SUBBAND_COUNT; lane++) {
-      output[block + lane * PAIR_BLOCK_MAGNITUDE_HISTORY_WORDS] =
-        maximum[lane] >>> 1
-    }
+    output[block] = first >>> 1
+    output[block + PAIR_BLOCK_MAGNITUDE_HISTORY_WORDS] = second >>> 1
+    output[block + PAIR_BLOCK_MAGNITUDE_HISTORY_WORDS * 2] = third >>> 1
+    output[block + PAIR_BLOCK_MAGNITUDE_HISTORY_WORDS * 3] = fourth >>> 1
   }
 }
 

@@ -26,6 +26,7 @@ function scaleFactorEstimate(magnitudeKey) {
  * @param {object} layer Transformed transaction-local layer state.
  * @param {object} profile Reusable destination measurement profile.
  * @returns {object} The populated `profile`.
+ * @nativeUnchecked Fixed source, profile, and table geometry is validated below.
  */
 export function measureResidualSource(layer, profile) {
   if (
@@ -40,12 +41,19 @@ export function measureResidualSource(layer, profile) {
   }
 
   profile.reset()
-  const groups = profile.groupScaleFactors
+  /** @type {Float32Array} */
+  const spectrum = layer.spectrum
+  const {
+    groupScaleFactors: groups,
+    bandMetrics,
+    scaleFactors,
+    primaryExpansionThresholds,
+  } = profile
   for (let group = 0; group < 256; group++) {
     const base = group * 4
     let maximumKey = 0
     for (let line = 0; line < 4; line++) {
-      const key = (float32ToBits(layer.spectrum[base + line]) << 1) >>> 0
+      const key = (float32ToBits(spectrum[base + line]) << 1) >>> 0
       if (key > maximumKey) maximumKey = key
     }
     groups[group] = scaleFactorEstimate(maximumKey)
@@ -71,14 +79,14 @@ export function measureResidualSource(layer, profile) {
       globalPeak = peak
       const thresholdClass = (((bandStart >>> 7) ^ 1) & 1) | (band > 0x15)
       const threshold = thresholdClass === 0 ? 0x10 : 8
-      profile.primaryExpansionThresholds[band] = over7Total * threshold
+      primaryExpansionThresholds[band] = over7Total * threshold
     } else if (peak < 3 || sum < RESIDUAL_BAND_ENERGY_THRESHOLDS[band]) {
       peak = 0
       sum = 0
     }
     sumRunning = (sumRunning + sum) >>> 0
-    profile.bandMetrics[band + 1] = over7Total
-    profile.scaleFactors[band] = peak
+    bandMetrics[band + 1] = over7Total
+    scaleFactors[band] = peak
   }
   profile.sumRunning = sumRunning
   return profile

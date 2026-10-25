@@ -241,8 +241,9 @@ export class AllocationWorkMut extends AllocationWorkView {
         'ATRAC3 residual spectrum requires 1024 coefficients'
       )
     }
+    const words = this.words
     for (let index = 0; index < ALLOCATION_RESIDUAL_SPECTRUM_COUNT; index++) {
-      this.words[ALLOCATION_RESIDUAL_SPECTRUM_OFFSET + index] =
+      words[ALLOCATION_RESIDUAL_SPECTRUM_OFFSET + index] =
         float32ToBits(spectrum[index]) | 0
     }
   }

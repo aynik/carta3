@@ -29,6 +29,7 @@ function tonality(band) {
  *
  * @param {object[]} bands Per-band energy, peak, and width records.
  * @returns {Float64Array} Positive masking threshold for each band.
+ * @nativeUnchecked Spread limits stay within the allocated thresholds and tables.
  */
 export function buildMaskFromBandMeasures(bands) {
   const thresholds = new Float64Array(bands.length)
@@ -66,6 +67,7 @@ export function buildMaskFromBandMeasures(bands) {
  * @param {Int32Array} scaleFactorIndices Per-band scale selectors.
  * @param {number} bandCount Active quantization-band count.
  * @returns {Float64Array} Masking thresholds for all codec bands.
+ * @nativeUnchecked The caller bounds active bands to the complete source spectrum.
  */
 export function buildReconstructionMask(
   normalizedSpectrum,
@@ -82,13 +84,17 @@ export function buildReconstructionMask(
     const end = QUANTIZATION_UNIT_OFFSETS[band + 1]
     const scale = spectralScaleForIndex(scaleFactorIndices[band])
     const measure = bands[band]
-    measure.width = end - start
+    let energy = 0
+    let peak = 0
     for (let coefficient = start; coefficient < end; coefficient++) {
       const sample = Number(normalizedSpectrum[coefficient]) * scale
       const square = sample * sample
-      measure.energy += square
-      if (square > measure.peak) measure.peak = square
+      energy += square
+      if (square > peak) peak = square
     }
+    measure.width = end - start
+    measure.energy = energy
+    measure.peak = peak
   }
 
   return buildMaskFromBandMeasures(bands)
@@ -108,13 +114,13 @@ export function measureBandReconstructionNoise(
   band
 ) {
   const start = QUANTIZATION_UNIT_OFFSETS[band]
-  const end = QUANTIZATION_UNIT_OFFSETS[band + 1]
   return measureBandOptionReconstructionNoise(
     state.wordLengths[band],
     state.scaleFactorIndices[band],
-    state.quantizedSpectrum.subarray(start, end),
+    state.quantizedSpectrum,
     normalizedSpectrum,
-    band
+    band,
+    start
   )
 }
 
@@ -123,9 +129,10 @@ export function measureBandReconstructionNoise(
  *
  * @param {number} wordLength Candidate coded word length.
  * @param {number} scaleFactorIndex Candidate spectral scale selector.
- * @param {Int32Array} symbols Candidate symbols starting at index zero.
+ * @param {Int32Array} symbols Candidate symbols.
  * @param {Float32Array} normalizedSpectrum Normalized source coefficients.
  * @param {number} band Quantization-band index.
+ * @param {i32} [symbolOffset=0] First candidate symbol.
  * @returns {number} Sum of squared coefficient error.
  */
 export function measureBandOptionReconstructionNoise(
@@ -133,7 +140,8 @@ export function measureBandOptionReconstructionNoise(
   scaleFactorIndex,
   symbols,
   normalizedSpectrum,
-  band
+  band,
+  symbolOffset = 0
 ) {
   const inverseStep =
     wordLength > 0 ? 1 / (WORD_LENGTH_QUANTIZER_LEVELS[wordLength] + 0.5) : 0
@@ -143,7 +151,9 @@ export function measureBandOptionReconstructionNoise(
   let noise = 0
   for (let coefficient = start; coefficient < end; coefficient++) {
     const reconstructed =
-      wordLength > 0 ? symbols[coefficient - start] * inverseStep : 0
+      wordLength > 0
+        ? symbols[symbolOffset + coefficient - start] * inverseStep
+        : 0
     const error =
       (Number(normalizedSpectrum[coefficient]) - reconstructed) * sourceScale
     noise += error * error

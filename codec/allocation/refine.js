@@ -10,13 +10,57 @@ import { QUANTIZATION_UNIT_OFFSETS } from '../core/tables.js'
 import { buildMaskFromBandMeasures } from './distortion.js'
 
 /**
+ * @typedef {object} ResidualCost
+ * @property {number} bits Exact coded cost.
+ * @property {number} error Reconstruction error.
+ * @property {number} [energy] Source energy, when measured.
+ */
+
+/**
+ * @typedef {object} ResidualCandidate
+ * @property {number} bits Exact coded cost.
+ * @property {number} error Reconstruction error.
+ * @property {i32} mode Proposed residual mode.
+ * @property {i32} scaleFactor Proposed scale factor.
+ */
+
+/**
+ * @typedef {object} ResidualMove
+ * @property {i32} band Quantization-band index.
+ * @property {i32} mode Proposed residual mode.
+ * @property {i32} scaleFactor Proposed scale factor.
+ * @property {ResidualCost} cost Measured reconstruction cost.
+ * @property {number} bitDelta Change in coded bits from the incumbent.
+ * @property {number} errorDelta Change in reconstruction error.
+ * @property {number} maskedDelta Change in masked reconstruction error.
+ */
+
+/**
+ * @typedef {object} ResidualQualityProfile
+ * @property {Float64Array} sourceEnergy Per-band source energies.
+ * @property {Float64Array} maskThresholds Per-band masking thresholds.
+ */
+
+/**
+ * @typedef {object} ResidualProposal
+ * @property {ResidualMove|null} donor Optional bit-donating move.
+ * @property {ResidualMove} receiver Bit-receiving move.
+ * @property {number} candidateBits Total residual bits after the exchange.
+ * @property {number} rawErrorDelta Change in reconstruction error.
+ * @property {number} normalizedErrorDelta Change in normalized error.
+ * @property {number} maskedNmrDelta Change in masked error.
+ * @property {boolean} strictlyImprovesAll Whether all three error measures improve.
+ */
+
+/**
  * Select a no-more-bits candidate that strictly lowers error.
  *
- * @param {object|null} selected
- * @param {object[]} candidates
- * @returns {object|null}
+ * @param {ResidualCost} selected
+ * @param {Array<ResidualCandidate|null>} candidates
+ * @returns {ResidualCandidate|null}
  */
 function chooseParetoImprovement(selected, candidates) {
+  /** @type {ResidualCandidate|null} */
   let best = null
   for (const candidate of candidates) {
     if (
@@ -41,23 +85,38 @@ function chooseParetoImprovement(selected, candidates) {
  * Enumerate feasible adjacent residual-mode moves.
  *
  * @param {object} allocation
- * @param {object[][]} modeCosts
+ * @param {Array<Array<ResidualCost|null>>} modeCosts
  * @param {number} activeBands
  * @param {number} step
  * @param {number} slot
- * @returns {object[]}
+ * @param {ResidualCost[]} incumbentCosts
+ * @param {ResidualQualityProfile} qualityProfile
+ * @returns {ResidualMove[]}
  */
-function modeMoves(allocation, modeCosts, activeBands, step, slot) {
+function modeMoves(
+  allocation,
+  modeCosts,
+  activeBands,
+  step,
+  slot,
+  incumbentCosts,
+  qualityProfile
+) {
   const moves = []
   for (let band = 0; band < activeBands; band++) {
     const mode = allocation.mode(band) + step
     const cost = modeCosts[band][slot]
     if (mode >= 1 && mode <= 7 && cost) {
+      const incumbent = incumbentCosts[band]
+      const errorDelta = cost.error - incumbent.error
       moves.push({
         band,
         mode,
         scaleFactor: allocation.scaleFactor(band),
         cost,
+        bitDelta: cost.bits - incumbent.bits,
+        errorDelta,
+        maskedDelta: errorDelta / qualityProfile.maskThresholds[band],
       })
     }
   }
@@ -78,27 +137,34 @@ function normalizedError(error, energy) {
 /**
  * Combine donor and receiver moves into one exact stereo proposal.
  *
- * @param {object|null} donor
- * @param {object} receiver
- * @param {object[]} incumbentCosts
- * @param {object} qualityProfile
+ * @param {ResidualMove|null} donor
+ * @param {ResidualMove} receiver
+ * @param {ResidualCost[]} incumbentCosts
+ * @param {ResidualQualityProfile} qualityProfile
  * @param {number} residualBits
- * @returns {object}
+ * @param {number} bitLimit
+ * @param {number} maximumMaskedDelta Best accepted masked-noise delta, or zero.
+ * @returns {ResidualProposal|null} Improving proposal, or null when it cannot be selected.
  */
 function buildModeProposal(
   donor,
   receiver,
   incumbentCosts,
   qualityProfile,
-  residualBits
+  residualBits,
+  bitLimit,
+  maximumMaskedDelta
 ) {
   const receiverCost = incumbentCosts[receiver.band]
-  const receiverBitDelta = receiver.cost.bits - receiverCost.bits
-  const receiverErrorDelta = receiver.cost.error - receiverCost.error
+  /** @type {ResidualCost|null} */
   const donorCost = donor ? incumbentCosts[donor.band] : null
-  const donorBitDelta = donor ? donor.cost.bits - donorCost.bits : 0
-  const donorErrorDelta = donor ? donor.cost.error - donorCost.error : 0
-  const rawErrorDelta = receiverErrorDelta + donorErrorDelta
+  const candidateBits =
+    residualBits + receiver.bitDelta + (donor ? donor.bitDelta : 0)
+  const maskedNmrDelta = receiver.maskedDelta + (donor ? donor.maskedDelta : 0)
+  if (!(candidateBits <= bitLimit && maskedNmrDelta < maximumMaskedDelta)) {
+    return null
+  }
+  const rawErrorDelta = receiver.errorDelta + (donor ? donor.errorDelta : 0)
   const normalizedErrorDelta =
     normalizedError(
       receiver.cost.error,
@@ -118,13 +184,10 @@ function buildModeProposal(
           qualityProfile.sourceEnergy[donor.band]
         )
       : 0)
-  const maskedNmrDelta =
-    receiverErrorDelta / qualityProfile.maskThresholds[receiver.band] +
-    (donor ? donorErrorDelta / qualityProfile.maskThresholds[donor.band] : 0)
   return {
     donor,
     receiver,
-    candidateBits: residualBits + receiverBitDelta + donorBitDelta,
+    candidateBits,
     rawErrorDelta,
     normalizedErrorDelta,
     maskedNmrDelta,
@@ -138,12 +201,12 @@ function buildModeProposal(
  *
  * @param {object} allocation
  * @param {number} activeBands
- * @param {object[]} incumbentCosts
- * @param {object[][]} modeCosts
+ * @param {ResidualCost[]} incumbentCosts
+ * @param {Array<Array<ResidualCost|null>>} modeCosts
  * @param {number} residualBits
  * @param {number} bitLimit
- * @param {object} qualityProfile
- * @returns {object|null}
+ * @param {ResidualQualityProfile} qualityProfile
+ * @returns {ResidualProposal|null}
  */
 function selectModeProposal(
   allocation,
@@ -154,29 +217,41 @@ function selectModeProposal(
   bitLimit,
   qualityProfile
 ) {
-  const donors = modeMoves(allocation, modeCosts, activeBands, -1, 0)
-  const receivers = modeMoves(allocation, modeCosts, activeBands, 1, 1)
+  const donors = modeMoves(
+    allocation,
+    modeCosts,
+    activeBands,
+    -1,
+    0,
+    incumbentCosts,
+    qualityProfile
+  )
+  const receivers = modeMoves(
+    allocation,
+    modeCosts,
+    activeBands,
+    1,
+    1,
+    incumbentCosts,
+    qualityProfile
+  )
+  /** @type {ResidualProposal|null} */
   let selected = null
   for (const receiver of receivers) {
-    const candidates = [
-      null,
-      ...donors.filter((move) => move.band !== receiver.band),
-    ]
-    for (const donor of candidates) {
+    for (let index = -1; index < donors.length; index++) {
+      /** @type {ResidualMove|null} */
+      const donor = index < 0 ? null : donors[index]
+      if (donor && donor.band === receiver.band) continue
       const proposal = buildModeProposal(
         donor,
         receiver,
         incumbentCosts,
         qualityProfile,
-        residualBits
+        residualBits,
+        bitLimit,
+        selected ? selected.maskedNmrDelta : 0
       )
-      if (
-        proposal.candidateBits <= bitLimit &&
-        proposal.maskedNmrDelta < 0 &&
-        (!selected || proposal.maskedNmrDelta < selected.maskedNmrDelta)
-      ) {
-        selected = proposal
-      }
+      if (proposal) selected = proposal
     }
   }
   return selected
@@ -208,7 +283,7 @@ export function measureResidualBandMeasures(spectrum) {
  * Capture source evidence used to judge equal-rate mode exchange.
  *
  * @param {object} layer Transaction-local transformed layer state.
- * @returns {object} Source energies and masking thresholds.
+ * @returns {ResidualQualityProfile} Source energies and masking thresholds.
  */
 export function createResidualQualityProfile(layer) {
   const bands = measureResidualBandMeasures(layer.spectrum)
@@ -221,7 +296,7 @@ export function createResidualQualityProfile(layer) {
 /**
  * Apply one layer's accepted syntax proposal.
  *
- * @param {object} proposal Accepted donor/receiver mode exchange.
+ * @param {ResidualProposal} proposal Accepted donor/receiver mode exchange.
  * @param {Int32Array} words Structured allocation word image.
  * @returns {number} Raw reconstruction-error delta.
  */
@@ -240,11 +315,12 @@ export function applyResidualProposal(proposal, words) {
  *
  * @param {object} layer Transaction-local transformed layer state.
  * @param {Int32Array} words Completed allocation word image.
- * @param {object|null} [qualityProfile] Optional source quality evidence.
- * @returns {object|null} Optional detached mode proposal.
+ * @param {ResidualQualityProfile|null} [qualityProfile] Optional source quality evidence.
+ * @returns {ResidualProposal|null} Optional detached mode proposal.
  */
 export function refineResidual(layer, words, qualityProfile = null) {
   const allocation = new AllocationWorkView(words)
+  /** @type {i32} */
   const activeBands = allocation.activeBandCountRaw
   if (activeBands < 0 || activeBands > 32) {
     throw new RangeError('Invalid ATRAC3 residual active-band count')
@@ -252,14 +328,18 @@ export function refineResidual(layer, words, qualityProfile = null) {
 
   const stagedModes = new Int32Array(activeBands)
   const stagedScaleFactors = new Int32Array(activeBands)
+  /** @type {ResidualCost[]} */
   const incumbentCosts = Array.from({ length: 32 }, () => ({
     bits: 0,
     error: 0,
   }))
+  /** @type {Array<Array<ResidualCost|null>>|null} */
   const proposalModeCosts = qualityProfile
     ? Array.from({ length: 32 }, () => [null, null])
     : null
+  /** @type {number} */
   let residualBits = activeBands * 3
+  /** @type {number} */
   let bitLimit = activeBands * 3
 
   for (let band = 0; band < activeBands; band++) {
@@ -267,6 +347,7 @@ export function refineResidual(layer, words, qualityProfile = null) {
     const scaleFactor = allocation.scaleFactor(band)
     stagedModes[band] = mode
     stagedScaleFactors[band] = scaleFactor
+    /** @type {ResidualCost} */
     const selected = measureResidualBand(
       layer.spectrum,
       band,
@@ -285,7 +366,9 @@ export function refineResidual(layer, words, qualityProfile = null) {
       continue
     }
 
+    /** @type {ResidualCandidate[]} */
     const candidates = []
+    /** @type {Array<ResidualCost|null>} */
     const modeCosts =
       probedModeCosts ??
       measureResidualModeNeighbors(layer.spectrum, band, mode, scaleFactor)
