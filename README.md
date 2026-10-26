@@ -263,36 +263,3 @@ the tests.
 ## License
 
 ISC
-
-## Web MiniDisc encoder plugin
-
-`npm run build` also creates `dist/carta3.wme`, a self-contained Web MiniDisc
-API v1 encoder plugin. The same artifact is included in the npm package and
-attached to GitHub Releases. No Web MiniDisc checkout or native encoder is
-needed to build it.
-
-In Web MiniDisc Pro / Electron Web MiniDisc, open **Settings → Encoding →
-Installed encoders → Manage**, choose **Install new**, and select `carta3.wme`. Then select
-**Carta3 (ATRAC3)** under **LP / HiMD encoder to use**.
-
-Use Carta3 for **ATRAC3**: standard MD LP2/LP4 or Hi-MD ATRAC3 recording.
-Use Carta5 for ATRAC3plus Hi-MD recording.
-
-The plugin supports stereo 44.1 kHz ATRAC3 at 66, 105, 132 kbps.
-The app filters these against the connected device's recording modes. Its
-built-in FFmpeg decodes/resamples the input and applies ReplayGain when enabled;
-the existing Carta3 browser worker performs ATRAC encoding. PCM/SP and
-MP3 requests use the app's built-in encoder. Other ATRAC families are reported
-as unsupported. Gapless recording is not advertised: API v1 receives raw frames
-without the WAVE timeline metadata used by the standalone codec.
-
-The adapter source is `codec/boundary/wme.js`. It implements API v1's default
-encoder class, including lifecycle, capability and bitrate reporting, progress,
-and error handling. The build bundles it as an ES module and packages it with
-the existing codec worker and versioned metadata in the host's SAR format.
-
-GitHub Releases attach `carta3.wme`, all three browser JavaScript bundles,
-and their source maps. Release CDN links are pinned to the published version.
-
-The repository-only WME packager lives in `build/wme.js`. Build tooling is
-excluded from the npm package; the generated `dist/` assets are included.
